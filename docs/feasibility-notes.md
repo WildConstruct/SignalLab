@@ -11,13 +11,16 @@ bridge; the AE plugin exposes its parameters. "Outputs" are the plugin's three
 
 ## Q2 — Can an effect expose stable pick-whippable outputs?
 
-**Yes. [I]** An AE effect's parameters are first-class properties; any other
-property can pick-whip them, e.g.
-`thisComp.layer("SR · Pulse Driver").effect("Signal Rack")("Output A")`. Because
-Output A/B/C are **effect params written by the plugin each frame** (from the
-shader's interpreted scalars), they read as ordinary animatable values. This is
-strictly more stable than the expression-slider approach because the value is
-produced by the plugin, not a fragile expression the user can break.
+**Yes, but not the naive way — read this carefully. [I]** An AE param is
+pick-whippable, BUT an effect's `Render()` cannot publish a freshly-computed
+scalar back onto its own Output slider for other properties to read *live*. AE
+params are inputs. So "the plugin computes Output A and layers pick-whip it live"
+is **not** directly true. The supported couplings are: **(1) bake** engine output
+to keyframes on the Output sliders (robust, zero user expressions), **(2) live**
+via a one-line auto-generated courier expression that reads an AEGP-cached
+sample, **(3) guide-layer preview**. Full analysis + the open question for Harry:
+**`docs/ae-output-publishing.md`**. This is the single most important feasibility
+finding in the prototype.
 
 ## Q3 — Which AE property types for outputs?
 

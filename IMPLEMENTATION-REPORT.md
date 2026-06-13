@@ -108,6 +108,18 @@ expression to **detach**. Frame-center values match live exactly; fast signals
 (triggers/high rate) need dense bake or higher fps to avoid interp aliasing.
 Comparison method in `tests/bake-tests.md`. **[I — to spec, not run in AE]**
 
+## 11b. Critical feasibility finding — output publishing
+While scaffolding the plugin I hit the sharpest constraint in the whole concept:
+**an AE effect cannot publish a live, pick-whippable computed scalar from
+`Render()`** — params are inputs, not effect-written outputs. The viable v1
+couplings are **bake** (engine → keyframes on the Output sliders; robust, no user
+expressions), a **live courier expression** (one auto-generated line reading an
+AEGP-cached sample), and **guide-layer preview**. This does not weaken the
+WGSL/Dawn engine decision (the engine still owns probes/DSP/bake) but it means we
+**lead with bake** and must not promise live zero-expression plugin outputs until
+the courier path is proven. Full write-up + the open question for Harry:
+`docs/ae-output-publishing.md`. **[I — strong from the SDK model; confirm hands-on.]**
+
 ## 12. Known fragility
 Name-based AE references break on rename/duplicate/precomp — mitigated by Moniker
 naming + short `id` in the layer name + a rack marker for a future repair pass.

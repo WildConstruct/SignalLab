@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  engine-logic:
+    name: Engine logic + contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 1. WGSL parity oracle (CPU reference port mirrors signal_core.wgsl)
+      - name: validate.js (signal engine logic)
+        run: node prototypes/webgpu-lab/validate.js
+
+      # 2. C++ contract: Recipe -> Compile() WGSL-parity + AE param mapping
+      - name: core contract (compile + run)
+        run: |
+          g++ -std=c++17 -I include -I . examples/core_contract_test.cpp -o core_contract_test
+          ./core_contract_test
+
+      # 3. WGSL embed codegen produces a valid header
+      - name: wgsl embed codegen
+        run: |
+          cmake -DWGSL_IN=shaders/signal_core.wgsl \
+                -DWGSL_OUT=signal_core_wgsl.h \
+                -DWGSL_SYMBOL=kSignalCoreWgsl \
+                -P tools/embed_wgsl.cmake
+          test -s signal_core_wgsl.h
+          grep -q "kSignalCoreWgsl" signal_core_wgsl.h
+
+      # 4. Schemas + recipes are valid JSON
+      - name: validate json (schemas + recipes)
+        run: |
+          for f in schemas/*.json schemas/examples/*.json; do
+            node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || { echo "BAD $f"; exit 1; }
+          done
+          echo "all JSON valid"
