@@ -113,12 +113,16 @@ While scaffolding the plugin I hit the sharpest constraint in the whole concept:
 **an AE effect cannot publish a live, pick-whippable computed scalar from
 `Render()`** — params are inputs, not effect-written outputs. The viable v1
 couplings are **bake** (engine → keyframes on the Output sliders; robust, no user
-expressions), a **live courier expression** (one auto-generated line reading an
-AEGP-cached sample), and **guide-layer preview**. This does not weaken the
-WGSL/Dawn engine decision (the engine still owns probes/DSP/bake) but it means we
-**lead with bake** and must not promise live zero-expression plugin outputs until
-the courier path is proven. Full write-up + the open question for Harry:
-`docs/ae-output-publishing.md`. **[I — strong from the SDK model; confirm hands-on.]**
+expressions) and **live render-to-value** (the plugin renders each output into a
+3×1 pixel value strip; a generated `sampleImage` expression decodes it and remaps
+through the range — live, engine stays in WGSL). The **codec is now prototyped
+and proven**: `value-codec.js`/`value_codec.h` are bit-identical (24-bit
+round-trip ~6e-8), with a test demonstrating the color-management hazard that
+forces the strip to be a linear pass-through. So the live path is no longer
+hypothetical — what remains to verify in-AE is `sampleImage` on a guide layer,
+evaluation order under playback, and color management. We still **lead with
+bake** as the guaranteed fallback. Write-ups: `docs/ae-output-publishing.md`,
+`examples/courier-expression.md`. **[C codec proven · I in-AE behaviour.]**
 
 ## 12. Known fragility
 Name-based AE references break on rename/duplicate/precomp — mitigated by Moniker
