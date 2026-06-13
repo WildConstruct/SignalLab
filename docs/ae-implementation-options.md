@@ -1,116 +1,112 @@
-# AE Implementation Options
+# Implementation Options & Chosen Path
 
-Answers required first-pass question **1** ("most viable first implementation path"),
-**12** (not feasible without native plugin), **13** (not feasible without a panel),
-**14** (deferred).
+Answers first-pass questions **1** (viable path), **12** (not feasible without
+native plugin), **13** (not feasible without a panel), **14** (deferred).
 
-Legend: **[C]** confirmed by AE docs / long-standing stable behaviour ·
-**[I]** inferred, needs in-AE verification · **[X]** rejected for v1.
+> **Architecture correction (this revision).** Per Wild Construct standards,
+> the engine is **developed in WebGPU/WGSL first and exposed natively through
+> the C++ Dawn bridge** — the same pattern as `ethera-etheros`
+> (`Recipe → CompiledConfig → runtime`, `Recipe → .wcx payload`, WebGPU/Dawn as
+> the *only* backend, modular WGSL as the canonical product source). The
+> earlier AE-expression-only engine has been **retired** as the engine and
+> survives only as an optional binding/bake helper around the plugin.
 
----
-
-## 1. The path we chose: **Script-assisted Expression-Control rig** (hybrid, script-light)
-
-The Signal Rack is a **control layer** carrying a stack of **Expression
-Controls** (Slider / Angle / Point / Color / Checkbox / **Dropdown Menu**
-Control). The three **Output** sliders each carry the **signal-engine
-expression** that generates the value over time. Targets pick-whip those
-output sliders. A small **ScriptUI panel** (`SignalRack.jsx`) automates
-building the rig, binding, chaining, scope, and bake — but **nothing the
-script does is load-bearing at render time**. Once built, the rig is pure
-AE objects + expressions and runs with the panel closed, on any machine,
-forever. **[C]**
-
-### Why this wins
-
-| Criterion | Result |
-|---|---|
-| Works with one rack, no panel open | **Yes** — outputs evaluate from expressions alone |
-| Pick-whippable outputs | **Yes** — output sliders are ordinary properties |
-| Survives sharing the project | **Yes** — no plugin/panel install needed to *play* |
-| Chainable (sidechain) | **Yes** — pick-whip into an Input slider |
-| Bakeable / detachable | **Yes** — `setValuesAtTimes` + remove expression |
-| Build effort | **Low** — one .jsx, no compilation, no signing |
-| Matches existing AE mental model | **Yes** — it *is* the controller-null/slider workflow, productized |
-
-This is the literal embodiment of the north-star: *safe, visible,
-pick-whippable control outputs without a modular programming environment.*
-The "patch cable" is AE's own pick-whip.
+Legend: **[C]** confirmed here (built/ran) · **[I]** inferred from docs/conventions, needs in-target verification · **[X]** rejected for v1.
 
 ---
 
-## 2. Options considered and rejected (or deferred) for v1
+## 1. Chosen path: **WGSL engine → Dawn bridge → thin AE plugin**
 
-### 2a. Native AE effect plugin (C/C++ SDK) — **[X] deferred**
-A real `PF_Effect` could expose typed parameters and do fast pixel work on the
-GPU. But:
-- Requires C++ build toolchains per-OS, code signing, notarization, installer. **[C]**
-- An effect's parameters **are** pick-whippable, but you still cannot beat the
-  zero-install share story of pure expressions for a prototype. **[C]**
-- **Only a native plugin can:** sample pixels fast/cached across the whole
-  frame, hold true stateful DSP (one-pole filters, hysteresis, sample-and-hold
-  with real memory), guarantee evaluation order, and own a custom UI inside the
-  Effect Controls panel. These are the things to revisit **after** the workflow
-  is proven. **[I]**
-- **Verdict:** the right *eventual* engine home, wrong first step. Defer.
+```
+shaders/signal_core.wgsl        canonical engine (sources, processors, output profiles)
+        │  (IAN_EMBED_WGSL embeds it as a C string)
+        ▼
+core/  SignalRecipe ──Compile()──► CompiledSignalConfig   (CPU, unit-tested)
+        ▼
+runtime/dawn/ SignalRuntime.Evaluate()  ── dispatch ──►  interpreted scalar outputs
+        ▼
+plugins/after-effects/ signalrack_bridge.h   (AE params ⇄ recipe, CPU-tested)
+        ▼
+plugin/SignalRackPlugin  (Adobe SDK; WebGpuBackend holds the wgpu::Device)
+```
 
-### 2b. Pure script-created preset, no panel (`.ffx` / animation preset) — **[partially adopted]**
-You can save the built rack layer (or the effect stack) as an **animation
-preset (.ffx)** so users apply it without the script. **[C]** We keep this as a
-**distribution format** (see `prototypes/ae-presets/`), but the script remains
-the authoring tool because presets can't *bind targets* or *chain* for you.
+**Why this is the right altitude**
 
-### 2c. CEP panel — **[X] for the core product**
-CEP (HTML/JS panel) is mature and still supported, and could host a nicer scope
-and recipe browser. But CEP as the **core** product violates the guardrail "no
-giant panel before validating one rack driving one property." CEP also still
-drives AE through the same ExtendScript DOM under the hood — so it buys UI, not
-new capability. **Revisit as a convenience shell later.** **[C]**
+- It matches the **company runtime** so Signal Rack reuses the same Dawn
+  device, build system, `.wcx` preset envelope, and shader discipline as
+  Ethera/Cathode rather than inventing a parallel stack. **[C — verified the
+  conventions against `ethera-etheros`]**
+- The **engine is portable**: the identical `signal_core.wgsl` runs in the
+  browser (`prototypes/webgpu-lab`) for development and inside AE via Dawn for
+  production. **[C — browser harness dispatches the real WGSL; CPU reference
+  port passes 10/10 parity tests]**
+- Outputs are **interpreted scalars** emitted by the shader (the Etheros
+  "outputs philosophy"), so the AE plugin exposes them as ordinary
+  pick-whippable output params — the controller-null workflow, productized. **[I — plugin param wiring written to spec, not yet built in AE]**
 
-### 2d. UXP panel — **[X] for this workflow, today**
-Adobe is moving panels toward **UXP**, and UXP for After Effects has been
-arriving in stages. As of this writing UXP-for-AE scripting coverage has
-historically lagged the classic ExtendScript DOM for deep timeline/expression
-automation, so betting the prototype on it adds risk for no v1 payoff.
-**[I — verify current UXP-for-AE API coverage before any panel investment.]**
-Decision: stay on ExtendScript for the prototype; treat UXP as the eventual
-panel runtime once the workflow is proven and the DOM gaps are confirmed closed.
+**What was confirmed by building here**
+- `shaders/signal_core.wgsl` — full engine (7 sources, 8 output modes,
+  smoothing, gate, trigger). **[C]**
+- `core/` Compile() produces the exact 24-float `SignalParams` layout; parity
+  asserted in `examples/core_contract_test.cpp` (compiles + passes). **[C]**
+- WGSL embed (`tools/embed_wgsl.cmake`) generates the C header. **[C]**
+- CPU reference (`prototypes/webgpu-lab/signal-core-reference.js`) mirrors the
+  WGSL and passes `validate.js` (vary-over-time, determinism, profiles, gate,
+  trigger, chaining, smoothing, luma). **[C]**
 
-### 2e. Full node editor / patch-cable canvas — **[X] explicit non-goal**
-Out of scope by product mandate. Chaining is done by pick-whip, not cables.
+**What is written-to-spec but not yet executed in-target**
+- `runtime/dawn/*.cpp`, `examples/signal_smoke.cpp` — need a Dawn tree to
+  compile/link (same status as Etheros examples without `third_party/dawn`). **[I]**
+- The AE plugin (`plugin/SignalRackPlugin`) — stubbed; needs the Adobe SDK +
+  `WebGpuBackend` wiring modeled on Etheros TempBridge. **[I]**
 
 ---
 
-## 3. What is **not feasible without a native plugin** (Q12)
+## 2. Options rejected or deferred
 
-- **Fast, cached, full-frame pixel analysis.** `sampleImage` in an expression is
-  per-property, per-frame, CPU-side, and re-evaluated on every dependent read.
-  Real probing (motion vectors, histograms, multi-point) wants a plugin. **[C]**
-- **True stateful DSP** — genuine one-pole lag, hysteresis with memory,
-  sample-and-hold, slew limiting, feedback. Expressions can't read their own
-  past output without O(timeline) recursion. We approximate with finite-window
-  math; the real thing needs a plugin (or bake). **[C]**
-- **Guaranteed evaluation order / sample-rate independent timebase** (CHOP-style
-  sub-frame samples). AE evaluates per-frame; a plugin owns its own clock. **[C]**
-- **Custom in-effect UI** (a real scope inside Effect Controls, grouped/foldable
-  parameters beyond what Expression Controls give). **[C]**
+### 2a. AE-expression-only engine — **[X] retired as the engine**
+Was the first draft (a self-contained signal expression on an Output slider).
+Rejected per direction because it forks the engine away from the company
+WebGPU/Dawn runtime, can't share `.wcx`/shaders, and can't do real pixel work
+or stateful DSP. **Kept only** as `tooling/ae/SignalRack-binding-helper.jsx`: a
+convenience that pick-whips/bakes around the *plugin's* params. It is explicitly
+**not** the engine.
 
-## 4. What is **not feasible without a panel** (Q13)
+### 2b. Native plugin without the WGSL engine (CPU C++ DSP) — **[X]**
+Violates "WebGPU/Dawn is the only supported backend." The Etheros tree removed
+its CPU-tint route for the same reason; we don't reintroduce that pattern.
 
-Very little is *blocked* without a panel, but these are **clunky** without one:
-- One-click **target binding** with overwrite protection (you can pick-whip by
-  hand, but the assisted bind + range remap is nicer from UI). **[C]**
-- **Recipe browse / apply / save** UI. **[C]**
-- **Chaining picker** (you can pick-whip an Input slider by hand instead). **[C]**
-- **Bake controls** with simplify tolerance UI. **[C]**
+### 2c. CEP / UXP panel as the core — **[X] for v1]**
+A panel buys UI, not capability (it still drives AE through the same host).
+Deferred until one rack drives one property end-to-end. **[C — guardrail]**
 
-None of these are *capabilities* — they're ergonomics. The panel is sugar, not
-substrate. That is exactly the property we want for v1.
+### 2d. Full node editor / patch-cable canvas — **[X] explicit non-goal**
+Chaining is pick-whip into an Input param, not cables.
+
+---
+
+## 3. Not feasible **without the native plugin** (Q12)
+
+The browser WebGPU surface proves the *engine*; it cannot do the *AE
+integration*. These require the plugin + Dawn bridge:
+- Reading AE pixels for the **luma probe** at render time (the plugin feeds
+  per-sample luma into the shader's `lumaIn` buffer). **[C — contract defined]**
+- Exposing **pick-whippable output params** inside AE. **[I]**
+- Sharing AE's **Dawn device** so the engine renders in the AE pipeline. **[I]**
+- True **stateful DSP** (one-pole lag, hysteresis, S&H) — even on GPU this needs
+  a persistent state buffer the plugin owns across frames; the v1 shader uses
+  finite-window approximations + bake. **[C — documented in known-limitations]**
+
+## 4. Not feasible **without a panel** (Q13)
+
+Only ergonomics, not capability: assisted target binding with overwrite
+protection, recipe/`.wcx` browse-apply-save, the chaining picker, and bake
+controls. All are doable by hand (pick-whip + the binding helper script). The
+panel is sugar; ship it after the rack proves out. **[C]**
 
 ## 5. Deferred (Q14)
 
-- Native plugin engine · CEP/UXP shell · real audio analysis (lean on AE
-  *Convert Audio to Keyframes* + Visualizer later) · motion-vector probe ·
-  Wild Construct payload transport · keyframe-simplify-with-tolerance (ship
-  dense bake first) · color/point output profiles beyond the scalar core ·
-  MIDI/OSC/hardware/cloud (hard non-goals).
+CEP/UXP shell · real audio analysis (lean on AE *Convert Audio to Keyframes* +
+Visualizer) · motion-vector probe · stateful-DSP state buffers · Wild Construct
+payload transport beyond `.wcx` metadata · color/point output profiles beyond
+the scalar core · MIDI/OSC/hardware/cloud (hard non-goals).

@@ -1,5 +1,8 @@
-/* Runnable validation of the Signal Rack core. `node validate.js` */
-var SC = require("./signal-core.js");
+/* Headless validation of the Signal Rack engine LOGIC. `node validate.js`
+ * Uses the CPU reference port (signal-core-reference.js), which mirrors
+ * shaders/signal_core.wgsl 1:1 so the engine can be checked without a GPU.
+ * The WGSL is the canonical engine; this is the parity/regression oracle. */
+var SC = require("./signal-core-reference.js");
 var Rack = SC.Rack, SOURCE = SC.SOURCE, MODE = SC.MODE;
 var pass = 0, fail = 0;
 function ok(name, cond) { (cond ? pass++ : fail++); console.log((cond ? "  ok  " : " FAIL ") + name); }

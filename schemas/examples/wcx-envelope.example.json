@@ -1,0 +1,28 @@
+{
+  "_comment": "Preset path: SignalRecipe -> .wcx payload. A .wcx is the shared Wild Construct company preset envelope (same format Ethera/Etheros presets target). It wraps one or more product recipes with company-level metadata so presets are portable across tools and PSG. The 'recipe' here is exactly a signal-rack-recipe.schema.json document.",
+  "wcx": "1.0",
+  "kind": "signalRack",
+  "moniker": "Pulse Driver",
+  "author": "wildconstruct",
+  "created": "2026-06-13",
+  "compatibility": ["ae:plugin>=0.1", "engine:wgsl signal_core>=0.2"],
+  "recipe": {
+    "type": "wildconstruct.signalRecipe",
+    "name": "Pulse Driver",
+    "id": "sg_pulse_001",
+    "version": "0.2",
+    "rackType": "generator",
+    "inputs": { "A": null, "B": null, "C": null },
+    "source": { "type": "pulse", "rate": 2, "amount": 1, "phase": 0, "offset": 0 },
+    "process": { "smooth": 0.0 },
+    "outputs": {
+      "A": { "name": "Scale Pulse", "profile": "percentage", "range": [90, 110], "units": "percent" },
+      "B": { "name": "Glow Drive", "profile": "normalized_0_1", "range": [0, 1], "units": "none" },
+      "C": { "name": "Beat Gate", "profile": "gate", "range": [0, 1], "units": "none" }
+    },
+    "timebase": { "mode": "compTime", "seed": 1 },
+    "visualization": { "mode": "guide_waveform", "showProbe": false, "showOutputLabels": true },
+    "bake": { "mode": "none", "simplify": false, "preservePeaks": true },
+    "compatibilityTags": ["engine:wgsl"]
+  }
+}

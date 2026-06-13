@@ -1,16 +1,16 @@
 /*
- * SIGNAL RACK — signal core (browser + node)
+ * SIGNAL RACK — signal core CPU REFERENCE (browser + node)
  * -------------------------------------------------------------------------
- * A faithful JS port of the AE expression engine (prototypes/ae-expressions/
- * signal-engine.jsx) so the signal logic can be RUN and validated outside
- * After Effects. This is the "modular by composition" engine: a Rack reads
+ * A faithful CPU port of the canonical WGSL engine (shaders/signal_core.wgsl)
+ * so the signal logic can be RUN and validated WITHOUT a GPU. The WGSL is the
+ * product source of truth; this mirror is the parity/regression oracle used by
+ * validate.js. This is the "modular by composition" engine: a Rack reads
  * its params + optional Input A, evaluates a source, smooths it, and maps it
  * through three output profiles. Racks chain by feeding one rack's output
  * into another rack's inputA.
  *
- * NOTE ON NOISE: AE's noise()/seedRandom() are proprietary. Here we use a
- * deterministic value-noise so behaviour is reproducible and shape-correct.
- * Exact sample values will differ from AE; the WAVEFORM CLASS matches.
+ * NOTE ON NOISE: the value-noise here matches the WGSL value-noise exactly so
+ * the CPU reference and GPU engine agree. It is deterministic and seedable.
  * -------------------------------------------------------------------------
  */
 (function (root, factory) {
