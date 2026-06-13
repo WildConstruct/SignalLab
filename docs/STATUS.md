@@ -1,30 +1,35 @@
-# STATUS — pre-pivot checkpoint
+# STATUS — restructure complete
 
 **Date:** 2026-06-13
 
-This commit is a **work-in-progress checkpoint**, not the intended architecture.
+The WebGPU-first + Dawn-bridge restructure is **done**. This file previously
+tracked a pre-pivot checkpoint; that work has been carried out.
 
-## What changed in direction
-Per Wild Construct convention, tools are **developed in WebGPU first**, then the
-host-facing system (the After Effects plugin) is **exposed via the Dawn bridge**.
-The standalone ExtendScript/expression engine drafted here is being **replaced**:
-WebGPU/WGSL becomes the sole signal engine, and the AE side is generated through
-the Dawn bridge rather than hand-written expressions.
+## Architecture (now in place)
+The engine is **WGSL** (`shaders/signal_core.wgsl`), developed in WebGPU first
+and exposed natively through the **C++ Dawn bridge**, with a thin AE plugin as
+consumer — matching Wild Construct conventions (modeled on `ethera-etheros`;
+see `docs/conventions.md`). Canonical paths: `Recipe → CompiledConfig →
+runtime`, `Recipe → .wcx payload`, `Recipe → Moniker → name`.
 
-## Blocked on
-Reading the Notion tool-structure + Dawn-bridge conventions (Notion MCP auth
-pending). The restructure should follow those conventions for file layout,
-binding/naming, and bridge surface — so it is intentionally **not** started yet
-to avoid building against guessed conventions.
+## Conventions source
+Notion was unavailable this session (user said skip it), so conventions were
+extracted by reading the `ethera-etheros` repo directly and confirmed with the
+user (`.wcx` preset format, C++ Dawn bridge). See `docs/conventions.md` for the
+open items still flagged **[verify]** against Notion.
 
-## Disposition of current files
-| File / dir | Fate |
+## Disposition of the pre-pivot files (resolved)
+| File / dir | Outcome |
 |---|---|
-| `prototypes/browser-lab/` | **Keep** — becomes the WebGPU dev/preview surface (the "develop first" layer). To be re-authored as WGSL compute. |
-| `schemas/`, `schemas/examples/` | **Keep** — recipe + output-profile schemas are engine-agnostic. |
-| `docs/ae-implementation-options.md` | **Keep, revise** — add the WebGPU-first + Dawn-bridge decision as the chosen path. |
-| `prototypes/ae-expressions/signal-engine.jsx` | **Retire** as the engine (kept temporarily for reference/zero-install preview). |
-| `prototypes/ae-script/SignalRack.jsx` | **Shrink** to a thin host/binding helper over the bridged effect; drop the embedded engine string. |
+| `prototypes/browser-lab/` | Moved to `prototypes/webgpu-lab/`; now runs the real WGSL on `navigator.gpu`; CPU reference kept as the parity oracle. |
+| `schemas/`, `schemas/examples/` | Kept; added `.wcx` envelope example. |
+| `docs/ae-implementation-options.md` | Revised — WebGPU-first/Dawn-bridge is the chosen path. |
+| `prototypes/ae-expressions/signal-engine.jsx` | **Retired** (deleted). |
+| `prototypes/ae-script/SignalRack.jsx` | **Shrunk** to `tooling/ae/SignalRack-binding-helper.jsx` (bind/chain/bake over the plugin; no engine). |
 
-The browser-lab signal logic is validated (`node validate.js` → 10/10 passing),
-so the math is sound; the pivot is about where the engine *lives*, not whether it works.
+## Verified runnable here
+- `node prototypes/webgpu-lab/validate.js` → 10/10.
+- `examples/core_contract_test.cpp` compiles + passes (Compile() WGSL parity).
+- WGSL embed codegen (`tools/embed_wgsl.cmake`) works.
+
+See `IMPLEMENTATION-REPORT.md` for the full report and open questions.
