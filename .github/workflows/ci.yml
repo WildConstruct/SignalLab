@@ -20,11 +20,21 @@ jobs:
       - name: validate.js (signal engine logic)
         run: node prototypes/webgpu-lab/validate.js
 
+      # 2a. Live-courier value codec (CPU/GPU/expression parity oracle)
+      - name: value codec round-trip (validate.js)
+        run: node prototypes/webgpu-lab/codec-validate.js
+
       # 2. C++ contract: Recipe -> Compile() WGSL-parity + AE param mapping
       - name: core contract (compile + run)
         run: |
           g++ -std=c++17 -I include -I . examples/core_contract_test.cpp -o core_contract_test
           ./core_contract_test
+
+      # 2b. C++ value codec parity with the JS reference
+      - name: value codec parity (C++)
+        run: |
+          g++ -std=c++17 -I include examples/value_codec_test.cpp -o value_codec_test
+          ./value_codec_test
 
       # 3. WGSL embed codegen produces a valid header
       - name: wgsl embed codegen

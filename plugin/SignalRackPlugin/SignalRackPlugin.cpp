@@ -27,6 +27,7 @@
 
 #include "backend/WebGpuBackend.h"
 #include "plugins/after-effects/signalrack_bridge.h"
+#include "signalrack/value_codec.h"  // Pack24 / NormalizeForStrip for the live courier strip
 
 using namespace ItsAllNoise::SignalRack;
 
@@ -124,7 +125,12 @@ static PF_Err Render(PF_InData* in_data, PF_OutData* out_data,
     std::string message;
     if (gBackend.Evaluate(req, &ev, &message)) {
         // ev.current().a / .b / .c are this frame's interpreted scalar outputs.
-        // TODO: render a guide waveform/value readout into `output` from `ev`.
+        // LIVE COURIER: render a 3x1 value strip so a generated sampleImage
+        // expression can read each output live (see examples/courier-expression.md):
+        //   nA = NormalizeForStrip(ev.current().a, snap.outAMin, snap.outAMax);
+        //   write Pack24(nA) into output pixel column 0 (B->1, C->2)
+        // The strip MUST be linear/non-color-managed (value_codec.h caveat).
+        // TODO: also draw the optional guide waveform/value readout from `ev`.
         (void)output;
     } else {
         // No CPU fallback. Surface the error to AE.

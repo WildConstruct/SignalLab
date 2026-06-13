@@ -27,13 +27,16 @@ Three coupling modes, in order of robustness:
    primary path. `tooling/ae/SignalRack-binding-helper.jsx` already does the
    keyframe-writing half; the engine-evaluation half moves to the AEGP/Dawn side.
 
-2. **Live via a thin expression bridge.** Each Output slider carries a *one-line*
-   expression that returns a value the AEGP companion has cached for the current
-   time (e.g. the companion evaluates the engine on idle/preview and stores the
-   sample; the expression reads it). Downstream pick-whips read the slider as
-   normal. The heavy compute (probes, DSP) still lives in WGSL; the expression is
-   a courier, not the engine. **[I — needs prototyping; cache freshness during
-   playback is the risk.]**
+2. **Live via render-to-value (PROTOTYPED).** The plugin renders each output's
+   normalized value into a **3×1 pixel value strip** on the rack layer (computed
+   in WGSL during `Render()`). A generated one-shot expression on the target
+   reads the pixel with `sampleImage` and remaps it through the channel range —
+   so the value is **live** (updates on scrub/play) while the engine stays in
+   WGSL. The expression is a *decoder*, not the engine. Shared codec:
+   `include/signalrack/value_codec.h` ⇄ `prototypes/webgpu-lab/value-codec.js`
+   (bit-identical, 24-bit round-trip ~6e-8, tested). Full expression + risks:
+   `examples/courier-expression.md`. **[C codec/precision proven here · I in-AE
+   sampleImage + color-management behaviour still to verify.]**
 
 3. **Guide-layer preview (always available).** The effect renders the waveform /
    value / gate state into the comp viewer so the user *sees* the signal even

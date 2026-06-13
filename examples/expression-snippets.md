@@ -31,6 +31,13 @@ linear(s, 0, 1, 80, 120)   // e.g. scale 80%..120%
 Use target-side `linear()` only when a single target needs a different range
 than the rack's profile provides.
 
+## Live courier (auto-generated, do not hand-write)
+The snippets above assume the output value is readable as an ordinary param. In a
+native plugin that is only true after **bake**. For a **live** value the binding
+helper generates a `sampleImage`-decode courier instead — see
+`examples/courier-expression.md`. It is still effectively one logical read; the
+user never authors it.
+
 > Historical note: an earlier prototype put the *entire* signal engine in an
 > expression on the output slider. That approach is retired — the engine is now
 > `shaders/signal_core.wgsl` behind the plugin. These snippets are all that
