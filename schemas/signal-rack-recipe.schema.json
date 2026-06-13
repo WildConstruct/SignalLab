@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wildconstruct.dev/schemas/signal-rack-recipe.schema.json",
+  "title": "Signal Rack Recipe",
+  "description": "A portable description of a Signal Rack instance: source, process, three outputs, profiles, ranges/units, seed, timebase, visualization, bake, and optional Wild Construct payload metadata. A recipe is the saved behaviour; the AE rig is one rendering of it.",
+  "type": "object",
+  "required": ["type", "id", "version", "rackType", "source", "outputs"],
+  "properties": {
+    "type": { "const": "wildconstruct.signalRecipe" },
+    "name": { "type": "string" },
+    "id": { "type": "string", "description": "Stable recipe id, e.g. 'sg_pulse_001'." },
+    "version": { "type": "string", "description": "Recipe schema/content version, e.g. '0.2'." },
+    "rackType": {
+      "type": "string",
+      "enum": ["generator", "probe", "processor", "driver"],
+      "description": "generator = synthesizes a signal; probe = samples media; processor = shapes an input; driver = product-specific output mapping."
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Optional sidechain bindings. null = unconnected. A string is a reference id of another rack output, e.g. 'sg_audio_001:A'.",
+      "properties": {
+        "A": { "type": ["string", "null"] },
+        "B": { "type": ["string", "null"] },
+        "C": { "type": ["string", "null"] }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["sine", "pulse", "ramp", "noise", "randomWalk", "linked", "lumaProbe", "audioPlaceholder"]
+        },
+        "rate": { "type": "number", "description": "Hz (cycles per second)." },
+        "amount": { "type": "number" },
+        "phase": { "type": "number", "description": "Cycle offset in turns (0..1)." },
+        "offset": { "type": "number" },
+        "sourceLayer": { "type": "string", "description": "For probe sources." },
+        "position": { "type": "array", "items": { "type": "number" }, "description": "Probe sample point [x,y]." },
+        "sampleKernel": { "type": "string", "enum": ["1x1", "3x3_average", "5x5_average"] },
+        "sampleMode": { "type": "string", "enum": ["preEffect", "postEffect"] }
+      }
+    },
+    "process": {
+      "type": "object",
+      "description": "Optional shaping applied before output mapping.",
+      "properties": {
+        "smooth": { "type": "number", "description": "0..1 box-average lag amount." },
+        "threshold": { "type": "number" },
+        "hysteresis": { "type": "number" },
+        "invert": { "type": "boolean" },
+        "quantizeSteps": { "type": "integer" }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "required": ["A"],
+      "properties": {
+        "A": { "$ref": "#/definitions/outputDef" },
+        "B": { "$ref": "#/definitions/outputDef" },
+        "C": { "$ref": "#/definitions/outputDef" }
+      }
+    },
+    "timebase": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["compTime", "layerTime"] },
+        "seed": { "type": "integer", "description": "Deterministic seed. Random behaviour MUST be reproducible unless explicitly randomized." }
+      }
+    },
+    "visualization": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["none", "guide_waveform", "bar_meter", "gate_blocks", "value_readout"] },
+        "showProbe": { "type": "boolean" },
+        "showOutputLabels": { "type": "boolean" }
+      }
+    },
+    "bake": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["none", "outputKeyframes", "targetKeyframes"] },
+        "simplify": { "type": "boolean" },
+        "preservePeaks": { "type": "boolean" }
+      }
+    },
+    "wildConstruct": {
+      "type": "object",
+      "description": "Optional richer payload metadata for WC tools. Generic AE users never see this.",
+      "properties": {
+        "rackId": { "type": "string" },
+        "channels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "e.g. { 'A.norm':'normalized', 'A.gate':'gate', 'A.trigger':'trigger' }."
+        },
+        "targetIdentity": { "type": "string", "description": "e.g. 'entropy_birth_driver'." }
+      }
+    },
+    "compatibilityTags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "e.g. ['ae:expression-only', 'wc:entropy', 'wc:cathode']."
+    }
+  },
+  "definitions": {
+    "outputDef": {
+      "type": "object",
+      "required": ["name", "profile"],
+      "properties": {
+        "name": { "type": "string", "description": "AE effect/channel name, e.g. 'Luma Normalized'." },
+        "profile": { "type": "string", "description": "Output profile id, e.g. 'normalized_0_1', 'gate', 'entropy_birth_driver'." },
+        "range": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "units": { "type": "string" }
+      }
+    }
+  }
+}

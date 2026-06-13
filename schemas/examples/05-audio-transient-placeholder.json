@@ -1,0 +1,20 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Audio Transient Placeholder",
+  "id": "sg_audio_001",
+  "version": "0.2",
+  "rackType": "generator",
+  "inputs": { "A": null, "B": null, "C": null },
+  "source": { "type": "audioPlaceholder", "rate": 2.4, "amount": 1, "phase": 0, "offset": 0 },
+  "process": { "smooth": 0.05, "threshold": 0.7 },
+  "outputs": {
+    "A": { "name": "Envelope", "profile": "normalized_0_1", "range": [0, 1], "units": "none" },
+    "B": { "name": "Hit Level", "profile": "percentage", "range": [0, 100], "units": "percent" },
+    "C": { "name": "Transient Trigger", "profile": "trigger", "range": [0, 1], "units": "none" }
+  },
+  "timebase": { "mode": "compTime", "seed": 808 },
+  "visualization": { "mode": "bar_meter", "showProbe": false, "showOutputLabels": true },
+  "bake": { "mode": "none", "simplify": true, "preservePeaks": true },
+  "compatibilityTags": ["ae:expression-only", "wc:visualizer"],
+  "notes": "Placeholder for real audio analysis (handled later by Visualizer). Uses a pulse-like source so chains can be built before audio analysis exists. Real audio -> use AE 'Convert Audio to Keyframes' as the source, then probe that slider."
+}

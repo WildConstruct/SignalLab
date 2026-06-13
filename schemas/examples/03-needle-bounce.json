@@ -1,0 +1,20 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Needle Bounce",
+  "id": "sg_needle_001",
+  "version": "0.2",
+  "rackType": "processor",
+  "inputs": { "A": "sg_audio_001:C", "B": null, "C": null },
+  "source": { "type": "linked", "amount": 1, "offset": 0 },
+  "process": { "smooth": 0.08 },
+  "outputs": {
+    "A": { "name": "Scale Overshoot", "profile": "percentage", "range": [100, 118], "units": "percent" },
+    "B": { "name": "Rotation Kick", "profile": "degrees", "range": [-4, 4], "units": "degrees" },
+    "C": { "name": "Settle Gate", "profile": "gate", "range": [0, 1], "units": "none" }
+  },
+  "timebase": { "mode": "compTime", "seed": 7 },
+  "visualization": { "mode": "value_readout", "showProbe": false, "showOutputLabels": true },
+  "bake": { "mode": "targetKeyframes", "simplify": true, "preservePeaks": true },
+  "compatibilityTags": ["ae:expression-only"],
+  "notes": "Takes a trigger from an upstream rack (Input A = audio rack Output C) and turns it into an overshoot bounce. True spring/overshoot benefits from baking; expression path is a smoothed pulse."
+}

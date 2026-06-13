@@ -1,0 +1,20 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Unstable Oscillator",
+  "id": "sg_unstable_001",
+  "version": "0.2",
+  "rackType": "generator",
+  "inputs": { "A": null, "B": null, "C": null },
+  "source": { "type": "sine", "rate": 1.5, "amount": 1, "phase": 0, "offset": 0 },
+  "process": { "smooth": 0.15, "invert": false },
+  "outputs": {
+    "A": { "name": "Drift", "profile": "signed_-1_1", "range": [-1, 1], "units": "none" },
+    "B": { "name": "Wander Degrees", "profile": "degrees", "range": [-8, 8], "units": "degrees" },
+    "C": { "name": "Jitter Px", "profile": "pixels", "range": [-6, 6], "units": "pixels" }
+  },
+  "timebase": { "mode": "compTime", "seed": 4711 },
+  "visualization": { "mode": "guide_waveform", "showProbe": false, "showOutputLabels": true },
+  "bake": { "mode": "none", "simplify": false, "preservePeaks": true },
+  "compatibilityTags": ["ae:expression-only"],
+  "notes": "Sine with a noise-tinged feel via mild smoothing; pair with a Random Walk rack on Input A for true instability."
+}

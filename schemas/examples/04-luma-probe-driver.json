@@ -1,0 +1,32 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Luma Probe Driver",
+  "id": "sg_luma_001",
+  "version": "0.2",
+  "rackType": "probe",
+  "inputs": { "A": null, "B": null, "C": null },
+  "source": {
+    "type": "lumaProbe",
+    "sourceLayer": "Beam Reflection",
+    "position": [842, 416],
+    "sampleKernel": "5x5_average",
+    "sampleMode": "postEffect",
+    "offset": 0
+  },
+  "process": { "smooth": 0.12, "threshold": 0.62, "hysteresis": 0.08 },
+  "outputs": {
+    "A": { "name": "Luma Normalized", "profile": "normalized_0_1", "range": [0, 1], "units": "none" },
+    "B": { "name": "Particle Birth", "profile": "entropy_birth_driver", "range": [0, 250], "units": "particlesPerSecond" },
+    "C": { "name": "Beam Gate", "profile": "gate", "range": [0, 1], "units": "none" }
+  },
+  "timebase": { "mode": "compTime", "seed": 1941 },
+  "visualization": { "mode": "guide_waveform", "showProbe": true, "showOutputLabels": true },
+  "bake": { "mode": "targetKeyframes", "simplify": true, "preservePeaks": true },
+  "wildConstruct": {
+    "rackId": "sg_luma_001",
+    "channels": { "A.norm": "normalized", "B.value": "entropy_birth_driver", "C.gate": "gate" },
+    "targetIdentity": "entropy_birth_driver"
+  },
+  "compatibilityTags": ["ae:expression-only", "wc:entropy"],
+  "notes": "sampleImage-based luma probe. Production probing should be analyze-and-cache (bake) for performance; live expression path is a prototype-grade preview."
+}

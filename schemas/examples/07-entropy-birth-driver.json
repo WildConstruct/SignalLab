@@ -1,0 +1,25 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Entropy Birth Driver",
+  "id": "sg_entropy_001",
+  "version": "0.2",
+  "rackType": "driver",
+  "inputs": { "A": "sg_luma_001:A", "B": null, "C": null },
+  "source": { "type": "linked", "amount": 1, "offset": 0 },
+  "process": { "smooth": 0.1 },
+  "outputs": {
+    "A": { "name": "Birth Rate", "profile": "entropy_birth_driver", "range": [0, 250], "units": "particlesPerSecond" },
+    "B": { "name": "Particle Size", "profile": "custom_scalar", "range": [2, 12], "units": "px" },
+    "C": { "name": "Turbulence", "profile": "custom_scalar", "range": [0, 80], "units": "none" }
+  },
+  "timebase": { "mode": "compTime", "seed": 1941 },
+  "visualization": { "mode": "value_readout", "showProbe": false, "showOutputLabels": true },
+  "bake": { "mode": "outputKeyframes", "simplify": true, "preservePeaks": true },
+  "wildConstruct": {
+    "rackId": "sg_entropy_001",
+    "channels": { "A.value": "birthRate", "B.value": "size", "C.value": "turbulence" },
+    "targetIdentity": "entropy_birth_driver"
+  },
+  "compatibilityTags": ["ae:expression-only", "wc:entropy"],
+  "notes": "Consumes a luma probe rack (Input A = sg_luma_001 Output A) and maps it onto Entropy emission parameters. For generic AE, these are just three pick-whippable sliders."
+}

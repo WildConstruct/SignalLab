@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Signal Rack — Browser Lab</title>
+<style>
+  :root { --bg:#0d0f12; --panel:#15191f; --ink:#cfe; --dim:#7a8794; --line:#2bd47a; --grid:#222; }
+  body { background:var(--bg); color:var(--ink); font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif; margin:0; padding:18px; }
+  h1 { font-size:16px; margin:0 0 4px; } .sub{ color:var(--dim); margin:0 0 16px; }
+  .rack { background:var(--panel); border:1px solid #222; border-radius:8px; padding:12px; margin-bottom:14px; }
+  .rack h2 { font-size:13px; margin:0 0 8px; color:var(--line); }
+  .row { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; }
+  label { display:flex; flex-direction:column; gap:3px; color:var(--dim); font-size:11px; }
+  select, input { background:#0c0e11; color:var(--ink); border:1px solid #2a2f37; border-radius:4px; padding:4px 6px; }
+  input[type=range]{ width:120px; }
+  canvas { display:block; background:#0a0c0f; border:1px solid #20242b; border-radius:6px; margin-top:10px; }
+  .outs { display:flex; gap:12px; margin-top:8px; }
+  .out { flex:1; background:#0c0e11; border:1px solid #20242b; border-radius:6px; padding:8px; }
+  .out b { color:var(--line); } .val{ font-variant-numeric:tabular-nums; font-size:18px; }
+  .pill{ display:inline-block; padding:1px 6px; border-radius:10px; background:#22303a; color:#8fd; font-size:10px;}
+</style>
+</head>
+<body>
+  <h1>Signal Rack — Browser Lab</h1>
+  <p class="sub">Validates signal sources, profiles, the 3-output model, and rack→rack chaining. <span class="pill">modular by composition, no node graph</span></p>
+
+  <div class="rack" id="rackA">
+    <h2>Rack A — generator</h2>
+    <div class="row">
+      <label>Source
+        <select class="src">
+          <option value="1">Sine</option><option value="2">Pulse</option>
+          <option value="3">Ramp</option><option value="4">Noise</option>
+          <option value="5">Random Walk</option>
+        </select></label>
+      <label>Rate <input type="range" class="rate" min="0.1" max="6" step="0.1" value="1.5"></label>
+      <label>Amount <input type="range" class="amount" min="0" max="2" step="0.05" value="1"></label>
+      <label>Phase <input type="range" class="phase" min="0" max="1" step="0.01" value="0"></label>
+      <label>Smooth <input type="range" class="smooth" min="0" max="1" step="0.02" value="0"></label>
+      <label>Seed <input type="number" class="seed" value="1941" style="width:70px"></label>
+    </div>
+    <canvas width="900" height="120"></canvas>
+    <div class="outs">
+      <div class="out"><b>Output A</b> · Normalized 0..1<div class="val" data-ch="A">–</div></div>
+      <div class="out"><b>Output B</b> · Degrees −15..15<div class="val" data-ch="B">–</div></div>
+      <div class="out"><b>Output C</b> · Gate<div class="val" data-ch="C">–</div></div>
+    </div>
+  </div>
+
+  <div class="rack" id="rackB">
+    <h2>Rack B — processor · Input A ⟵ Rack A Output A (sidechain)</h2>
+    <div class="row">
+      <label>Smooth <input type="range" class="smooth" min="0" max="1" step="0.02" value="0.2"></label>
+      <span class="pill">Source = Linked (Input A)</span>
+    </div>
+    <canvas width="900" height="120"></canvas>
+    <div class="outs">
+      <div class="out"><b>Output A</b> · Percentage 90..118<div class="val" data-ch="A">–</div></div>
+    </div>
+  </div>
+
+<script src="signal-core.js"></script>
+<script>
+const { Rack, SOURCE, MODE } = SignalCore;
+const SPAN = 4, DUR = 6;           // seconds shown / loop length
+let playT = 0;
+
+const rackA = new Rack({ srcType: SOURCE.noise, rate: 1.5, seed: 1941, outputs: {
+  A: { mode: MODE.normalized, min: 0, max: 1 },
+  B: { mode: MODE.degrees, min: -15, max: 15 },
+  C: { mode: MODE.gate, min: 0, max: 1 }
+}});
+const rackB = new Rack({ srcType: SOURCE.linked, smooth: 0.2, outputs: {
+  A: { mode: MODE.percentage, min: 90, max: 118 }
+}});
+rackB.connectInputA(rackA, "A");
+
+function bind(id, rack) {
+  const el = document.getElementById(id);
+  el.querySelectorAll("[class]").forEach(inp => {
+    const k = inp.className;
+    if (!["src","rate","amount","phase","smooth","seed"].includes(k)) return;
+    inp.addEventListener("input", () => {
+      if (k === "src") rack.srcType = +inp.value;
+      else if (k === "seed") rack.seed = +inp.value;
+      else rack[k] = +inp.value;
+    });
+  });
+}
+bind("rackA", rackA); bind("rackB", rackB);
+
+function drawScope(canvas, rack, ch) {
+  const c = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
+  c.clearRect(0,0,W,H);
+  c.strokeStyle = "#1d2128"; c.beginPath(); c.moveTo(0,H/2); c.lineTo(W,H/2); c.stroke();
+  c.strokeStyle = "#2bd47a"; c.lineWidth = 2; c.beginPath();
+  for (let i=0;i<W;i++){
+    const t = playT - SPAN*(1 - i/W);
+    const nv = rack.normalized(ch, t);
+    const y = (1-nv)*(H-10)+5;
+    i ? c.lineTo(i,y) : c.moveTo(i,y);
+  }
+  c.stroke();
+  // playhead
+  c.strokeStyle="#445"; c.beginPath(); c.moveTo(W-1,0); c.lineTo(W-1,H); c.stroke();
+}
+
+function tick(){
+  playT = (performance.now()/1000) % DUR;
+  drawScope(document.querySelector("#rackA canvas"), rackA, "A");
+  drawScope(document.querySelector("#rackB canvas"), rackB, "A");
+  document.querySelectorAll("#rackA .val").forEach(v=>{
+    const ch=v.dataset.ch, val=rackA.output(ch, playT);
+    v.textContent = ch==="C" ? (val>=0.5?"GATE ▰":"– ▱") : val.toFixed(ch==="A"?3:1);
+  });
+  const bv = rackB.output("A", playT);
+  document.querySelector('#rackB .val').textContent = bv.toFixed(1) + "%";
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>
