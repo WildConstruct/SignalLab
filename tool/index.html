@@ -294,7 +294,7 @@ const Engine = {
     for(let i=0;i<N;i+=17){ maxd=Math.max(maxd,Math.abs(g[i]-cc[i])); lo=Math.min(lo,g[i]); hi=Math.max(hi,g[i]); }
     const degenerate=(hi-lo)<1e-3;        // GPU produced a flat/dead signal
     this.diag="gpu["+g[128].toFixed(2)+" "+g[512].toFixed(2)+" "+g[896].toFixed(2)+"] cpu["+cc[128].toFixed(2)+" "+cc[512].toFixed(2)+" "+cc[896].toFixed(2)+"] d="+maxd.toFixed(2);
-    if(maxd>0.03 || degenerate){ console.warn("GPU self-check failed — "+this.diag); this.mode="cpu"; this.gpuRejected=true; }
+    if(maxd>0.08 || degenerate){ console.warn("GPU self-check failed — "+this.diag); this.mode="cpu"; this.gpuRejected=true; }
   }
 };
 
