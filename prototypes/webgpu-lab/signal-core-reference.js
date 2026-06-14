@@ -62,6 +62,9 @@
     this.modDepth = (cfg.mod && cfg.mod.depth != null) ? cfg.mod.depth : 0;
     this.modInput = cfg.modInput || null;      // per-sample modulator 0..1 (sidechain)
     this.lumaInput= cfg.lumaInput || null;     // per-sample luma 0..1 (probe)
+    var w = cfg.win || {};                     // feathered region window
+    this.win = { left: w.left != null ? w.left : 0, right: w.right != null ? w.right : 1, featherL: w.featherL || 0, featherR: w.featherR || 0 };
+    this.sampleN = cfg.sampleN || 0;           // total samples (for window position)
     var d = cfg.outputs || {};
     this.outputs = { A: d.A || { mode: MODE.normalized, min: 0, max: 1 },
                      B: d.B || { mode: MODE.degrees, min: -15, max: 15 },
@@ -133,8 +136,18 @@
     return acc / wsum;
   };
 
+  Rack.prototype.windowEnv = function (idx) {
+    var w = this.win, L = w.left, R = w.right, fL = w.featherL, fR = w.featherR;
+    if (L <= 0 && R >= 1 && fL <= 0 && fR <= 0) return 1;
+    var pos = this.sampleN > 1 ? (idx || 0) / (this.sampleN - 1) : 0;
+    if (pos < L || pos > R) return 0;
+    var e = 1, ss = function (t) { return t * t * (3 - 2 * t); };
+    if (fL > 1e-4 && pos < L + fL) e *= ss(clamp((pos - L) / fL, 0, 1));
+    if (fR > 1e-4 && pos > R - fR) e *= ss(clamp((R - pos) / fR, 0, 1));
+    return e;
+  };
   Rack.prototype.output = function (ch, tt, idx) {
-    var o = this.outputs[ch], n = clamp01(this.normN(tt, idx));
+    var o = this.outputs[ch], n = clamp01(this.normN(tt, idx)) * this.windowEnv(idx);
     if (o.mode === MODE.gate) return n >= 0.5 ? o.max : o.min;
     if (o.mode === MODE.trigger) {
       for (var k = 1; k <= 3; k++) { var a = this.srcUni(tt - k * this.frameDur, idx) >= 0.5, b = this.srcUni(tt - (k - 1) * this.frameDur, idx) >= 0.5; if (b && !a) return o.max; }

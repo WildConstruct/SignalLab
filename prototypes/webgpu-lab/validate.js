@@ -113,5 +113,19 @@ var satChanged = false, satInRange = true;
 for (var ts = 0; ts < 2; ts += 1 / 60) { var sv = satOn.output("A", ts); if (sv < 0 || sv > 1) satInRange = false; if (Math.abs(sv - satId.output("A", ts)) > 0.02) satChanged = true; }
 ok("Saturate soft-distorts within [0,1]", satChanged && satInRange);
 
+// 9j. Feathered window: 0 outside [L,R], hard left edge, feathered right ramp
+var WN = 100;
+var win = new Rack({ srcType: SOURCE.sine, rate: 2, sampleN: WN, win: { left: 0.2, right: 0.8, featherL: 0, featherR: 0.2 }, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+ok("Window: zero before left edge", win.output("A", 0.05, Math.round(0.1 * (WN - 1))) === 0);
+ok("Window: zero after right edge", win.output("A", 0.95, Math.round(0.95 * (WN - 1))) === 0);
+// inside, full (away from feather)
+var insideIdx = Math.round(0.5 * (WN - 1));
+var base = new Rack({ srcType: SOURCE.sine, rate: 2, sampleN: WN, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+ok("Window: unscaled in the interior", approx(win.output("A", 0.5, insideIdx), base.output("A", 0.5, insideIdx), 1e-9));
+// right feather ramps down (value near right edge < interior envelope)
+var nearRight = Math.round(0.78 * (WN - 1));
+ok("Window: right feather attenuates", win.windowEnv(nearRight) < 1 && win.windowEnv(nearRight) > 0);
+ok("Window default (0..1) is a no-op", new Rack({ srcType: SOURCE.sine, sampleN: WN }).windowEnv(insideIdx) === 1);
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

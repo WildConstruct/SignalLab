@@ -25,10 +25,12 @@
 //  v6: pGain    pBias    pQuant   pGate
 //  v7: pLag     pInvert  pRectify modTarget
 //  v8: modDepth pWarp    pFold    pad2
+//  v9: winLeft   winRight winFeatherL winFeatherR   (feathered region window)
 struct SignalParams {
     v0 : vec4<f32>, v1 : vec4<f32>, v2 : vec4<f32>,
     v3 : vec4<f32>, v4 : vec4<f32>, v5 : vec4<f32>,
     v6 : vec4<f32>, v7 : vec4<f32>, v8 : vec4<f32>,
+    v9 : vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform>             P      : SignalParams;
@@ -61,6 +63,21 @@ fn pModDepth()-> f32 { return P.v8.x; }
 fn pWarp()    -> f32 { return P.v8.y; }
 fn pFold()    -> f32 { return P.v8.z; }
 fn pSat()     -> f32 { return P.v8.w; }
+fn pWinL()    -> f32 { return P.v9.x; }
+fn pWinR()    -> f32 { return P.v9.y; }
+fn pWinFL()   -> f32 { return P.v9.z; }
+fn pWinFR()   -> f32 { return P.v9.w; }
+
+// feathered region window: 0 outside [winL,winR], smooth ramps over each feather
+fn windowEnv(pos : f32) -> f32 {
+    let L = pWinL(); let R = pWinR(); let fL = pWinFL(); let fR = pWinFR();
+    if (L <= 0.0 && R >= 1.0 && fL <= 0.0 && fR <= 0.0) { return 1.0; }   // no-op fast path
+    if (pos < L || pos > R) { return 0.0; }
+    var e = 1.0;
+    if (fL > 0.0001 && pos < L + fL) { e = e * smoothstep01(clamp((pos - L) / fL, 0.0, 1.0)); }
+    if (fR > 0.0001 && pos > R - fR) { e = e * smoothstep01(clamp((R - pos) / fR, 0.0, 1.0)); }
+    return e;
+}
 
 // musical soft saturation (EchoBoy-flavoured): drive + asymmetric tanh warmth
 fn tanhApprox(x : f32) -> f32 { let c = clamp(x, -4.0, 4.0); let a = c * c; return c * (27.0 + a) / (27.0 + 9.0 * a); }
@@ -170,7 +187,8 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
     let idx = gid.x;
     if (idx >= u32(pSampleN())) { return; }
     let tt = pStart() + f32(idx) * pDt();
-    let n  = clamp(normN(tt, idx), 0.0, 1.0);
+    let pos = select(f32(idx) / max(pSampleN() - 1.0, 1.0), 0.0, pSampleN() <= 1.0);
+    let n  = clamp(normN(tt, idx), 0.0, 1.0) * windowEnv(pos);
     let A  = mapOut(n, tt, idx, P.v3.x, P.v3.y, P.v3.z);
     let B  = mapOut(n, tt, idx, P.v4.x, P.v4.y, P.v4.z);
     let C  = mapOut(n, tt, idx, P.v5.x, P.v5.y, P.v5.z);
