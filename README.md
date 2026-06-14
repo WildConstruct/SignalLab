@@ -3,6 +3,22 @@
 > Safe, visible, pick-whippable control outputs for After Effects — without a
 > modular programming environment.
 
+## ▶ First deliverable: the Signal Generator web tool
+
+A browser playground to **experiment with signals** — two generators driving an
+oscilloscope **waveform** and an X-Y **vectorscope** (Lissajous). Runs the real
+`signal_core.wgsl` on WebGPU, with a bit-identical CPU-reference fallback so it
+always shows. Tweak sources/rate/phase/offset live; presets; export any
+experiment as a recipe JSON.
+
+```bash
+python3 -m http.server 8000   # from the repo root
+# open http://localhost:8000/tool/
+```
+See `tool/README.md`.
+
+---
+
 Signal Rack is a chainable signal-output module for After Effects. Create or
 sample a time-varying signal, shape it, and expose three pick-whippable outputs
 that drive ordinary AE properties or Wild Construct plugin params. Chain racks by
