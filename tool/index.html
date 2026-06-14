@@ -626,9 +626,9 @@ function frame(){
       const crtCanvas=$("crt");
       if(crt.on && !crt.failed && Engine.device && typeof CathodeCRT!=="undefined"){
         try{
-          if(crt.pass && (crtCanvas.width!==W||crtCanvas.height!==H)) crt.pass=null;
-          if(!crt.pass){ crtCanvas.width=W; crtCanvas.height=H; crt.pass=CathodeCRT.create(Engine.device, crtCanvas); }
-          if(crt.pass){ crt.pass.render(cv, t, 0.85); crtCanvas.style.display="block"; } else { crt.failed=true; crtCanvas.style.display="none"; }
+          if(!crt.pass) crt.pass=CathodeCRT.create(Engine.device, crtCanvas);
+          const shown = crt.pass && crt.pass.render(cv, t);
+          crtCanvas.style.display = shown ? "block" : "none";
         }catch(e){ console.warn("CRT failed:",e); crt.failed=true; crtCanvas.style.display="none"; }
       } else { crtCanvas.style.display="none"; }
       const xc=bip(N-1), yc=bufY[N-1]*2-1;

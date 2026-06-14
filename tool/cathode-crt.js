@@ -1,13 +1,24 @@
 /*
- * cathode-crt.js — Cathode-modeled NTSC / CRT screen, as a REAL WebGPU pass.
+ * cathode-crt.js — REAL Cathode NTSC/CRT pipeline (WebGPU), first Signal Rack ↔
+ * Cathode interop.
  * -------------------------------------------------------------------------
- * Runs on the same WebGPU device as the signal engine. The 2D scope canvas is
- * uploaded to a texture each frame and a fullscreen fragment shader applies the
- * CRT/NTSC treatment, modeled on Cathode (WildConstruct/cathode):
- *   composite_decode.wgsl  -> NTSC chroma bleed / dot crawl
- *   crt_mask_beam.wgsl     -> aperture-grille mask, scanlines, beam bloom
- * This is a faithful model, not the Cathode library; swap in the real WGSL
- * (paste/vendor) for exactness. On/off; intensity baked toward a fixed look.
+ * Runs Cathode's ACTUAL vendored WGSL on the engine's WebGPU device:
+ *   vendor/cathode/src/shaders/signal/composite_decode.wgsl   (NTSC decode)
+ *   vendor/cathode/src/shaders/display/crt_mask_beam.wgsl      (CRT mask/beam)
+ *   + lib/math_utils.wgsl, lib/noise_utils.wgsl                (#include'd)
+ *
+ * Pipeline per frame:  scope 2D canvas
+ *   -> texScope (upload) -> [signal compute] -> texSig
+ *   -> [display compute] -> texDisp -> [blit] -> CRT canvas
+ *
+ * Uniform blocks mirror Cathode's C++ exactly (CathodeSignalUniformBlock 64B,
+ * CathodeDisplayUniformBlock 256B) seeded with the BroadcastCrt preset defaults
+ * from cathode_render_types.h. Glitch suite is off; temporal/history disabled
+ * (no feedback textures wired yet). On/off only — not tunable.
+ *
+ * NOTE: composite_decode uses textureLoad only (no sampler); crt_mask_beam uses
+ * textureSampleLevel (+samplers) and a displayMask texture (disabled via flags).
+ * Both are @compute @workgroup_size(8,8,1) writing rgba8unorm storage.
  * -------------------------------------------------------------------------
  */
 (function (root, factory) {
@@ -16,107 +27,124 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var WGSL = `
-struct U { res : vec2<f32>, time : f32, intensity : f32, };
-@group(0) @binding(0) var samp : sampler;
-@group(0) @binding(1) var tex  : texture_2d<f32>;
-@group(0) @binding(2) var<uniform> u : U;
-
-struct VsOut { @builtin(position) pos : vec4<f32>, @location(0) uv : vec2<f32>, };
-@vertex fn vs(@builtin(vertex_index) vid : u32) -> VsOut {
+  var BLIT = `
+@group(0) @binding(0) var s : sampler;
+@group(0) @binding(1) var tex : texture_2d<f32>;
+struct V { @builtin(position) pos : vec4<f32>, @location(0) uv : vec2<f32>, };
+@vertex fn vs(@builtin(vertex_index) i : u32) -> V {
   var p = array<vec2<f32>,3>(vec2<f32>(-1.,-1.), vec2<f32>(3.,-1.), vec2<f32>(-1.,3.));
-  var o : VsOut;
-  o.pos = vec4<f32>(p[vid], 0., 1.);
-  o.uv  = vec2<f32>((p[vid].x + 1.) * 0.5, 0.5 - p[vid].y * 0.5);
+  var o : V; o.pos = vec4<f32>(p[i], 0., 1.);
+  o.uv = vec2<f32>((p[i].x + 1.) * 0.5, 0.5 - p[i].y * 0.5);
   return o;
 }
-
-fn samp3(uv : vec2<f32>) -> vec3<f32> { return textureSample(tex, samp, uv).rgb; }
-
-@fragment fn fs(in : VsOut) -> @location(0) vec4<f32> {
-  let uv = in.uv;
-  let px = 1.0 / u.res;
-  let amt = u.intensity;
-
-  // NTSC chroma bleed: shift R/B horizontally (dot-crawl feel)
-  let sh = px.x * (1.5 + 1.5);
-  var col = vec3<f32>(samp3(uv + vec2<f32>(sh, 0.)).r, samp3(uv).g, samp3(uv - vec2<f32>(sh, 0.)).b);
-
-  // beam bloom: small additive blur of bright parts
-  var bloom = vec3<f32>(0.);
-  let k = px * 2.2;
-  bloom = bloom + samp3(uv + vec2<f32>( k.x, 0.));
-  bloom = bloom + samp3(uv + vec2<f32>(-k.x, 0.));
-  bloom = bloom + samp3(uv + vec2<f32>(0.,  k.y));
-  bloom = bloom + samp3(uv + vec2<f32>(0., -k.y));
-  bloom = bloom * 0.25;
-  bloom = max(bloom - 0.25, vec3<f32>(0.)) * 1.6;
-
-  // aperture grille (RGB triad by device column)
-  let colx = u32(floor(in.pos.x)) % 3u;
-  var mask = vec3<f32>(0.35, 0.35, 0.35);
-  if (colx == 0u) { mask.r = 1.0; } else if (colx == 1u) { mask.g = 1.0; } else { mask.b = 1.0; }
-
-  // scanline (~3px period)
-  let scan = 0.78 + 0.22 * sin(in.pos.y * 3.14159265 / 1.5);
-
-  col = col * mix(vec3<f32>(1.), mask, amt * 0.55);
-  col = col * mix(1.0, scan, amt * 0.6);
-  col = col + bloom * amt * 0.7;
-
-  // slight RF shimmer
-  let n = fract(sin(dot(in.pos.xy + vec2<f32>(u.time * 60.0, 0.0), vec2<f32>(12.9898, 78.233))) * 43758.5453);
-  col = col + (n - 0.5) * 0.03 * amt;
-
-  // vignette / tube falloff
-  let d = distance(uv, vec2<f32>(0.5));
-  let vig = smoothstep(0.9, 0.35, d);
-  col = col * mix(1.0, vig, amt * 0.85);
-
-  return vec4<f32>(col, 1.0);
-}`;
+@fragment fn fs(in : V) -> @location(0) vec4<f32> { return textureSampleLevel(tex, s, in.uv, 0.0); }`;
 
   function create(device, dstCanvas) {
     var ctx = dstCanvas.getContext("webgpu");
     if (!ctx) return null;
     var format = navigator.gpu.getPreferredCanvasFormat();
     ctx.configure({ device: device, format: format, alphaMode: "opaque" });
-    var module = device.createShaderModule({ code: WGSL });
-    var pipeline = device.createRenderPipeline({
-      layout: "auto",
-      vertex: { module: module, entryPoint: "vs" },
-      fragment: { module: module, entryPoint: "fs", targets: [{ format: format }] },
-      primitive: { topology: "triangle-list" },
-    });
-    var sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
-    var ubuf = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    var tex = null, tw = 0, th = 0, bind = null;
 
-    function ensureTex(w, h) {
-      if (tex && tw === w && th === h) return;
-      tw = w; th = h; if (tex && tex.destroy) tex.destroy();
-      tex = device.createTexture({
-        size: [w, h], format: "rgba8unorm",
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-      });
-      bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [
-        { binding: 0, resource: sampler },
-        { binding: 1, resource: tex.createView() },
-        { binding: 2, resource: { buffer: ubuf } },
-      ]});
+    var ready = false, failed = false;
+    var sigPipe, dispPipe, blitPipe, sampler, dummyTex, sigUBuf, dispUBuf;
+    var texScope, texSig, texDisp, W = 0, H = 0;
+
+    // --- uniform blocks (BroadcastCrt defaults from cathode_render_types.h) ---
+    var sigBuf = new ArrayBuffer(64), sU = new Uint32Array(sigBuf), sF = new Float32Array(sigBuf);
+    // signal0: bandwidth, dotCrawl, enable, hasHistory
+    sF[4] = 0.62; sF[5] = 0.20; sF[6] = 1.0; sF[7] = 0.0;
+    // signal1: chromaLag, chromaNoise, signalFlavor(Composite=0), componentMode
+    sF[8] = 0.0; sF[9] = 0.0; sF[10] = 0.0; sF[11] = 0.0;
+    // signal2: chromaSmearAmount, chromaSmearWidth, signalClip, signalRinging
+    sF[12] = 0.0; sF[13] = 0.35; sF[14] = 0.0; sF[15] = 0.0;
+
+    var dispBuf = new ArrayBuffer(256), dU = new Uint32Array(dispBuf), dF = new Float32Array(dispBuf);
+    dF[4] = 0.92; dF[5] = 0.9; dF[6] = 0.9; dF[7] = 0.2;            // display0: amount, beamSharpness, maskStrength, bloom
+    dF[8] = 0.84; dF[9] = 0.58; dF[10] = 0.42; dF[11] = 0.18;       // display1: scanStrength, scanDensity, scanSoftness, persistence
+    dF[12] = 0.1; dF[13] = 1.0; dF[14] = 1.0; dF[15] = 1.0;         // display2: curvature, maskPitch/pixelSize, enable, pixelSize
+    // personality0..3 (16..31) = 0 -> neutral grading
+    dF[32] = 0.0; dF[33] = 0.35; dF[34] = 0.0; dF[35] = 0.35;       // glitch0
+    dF[36] = 0.0; dF[37] = 0.0; dF[38] = 0.0; dF[39] = 0.35;        // glitch1
+    dF[40] = 8.0; dF[41] = 0.0; dF[42] = 0.35; dF[43] = 0.0;        // glitch2 (posterizeBits=8 -> off)
+    dF[44] = 0.0; dF[45] = 0.35; dF[46] = 0.35; dF[47] = 0.35;      // glitch3
+    dF[48] = 0.0; dF[49] = 0.0; dF[50] = 0.35; dF[51] = 0.0;        // glitch4
+    dF[52] = 0.0; dF[53] = 0.35; dF[54] = 0.0; dF[55] = 0.35;       // glitch5
+    dF[56] = 0.0; dF[57] = 0.0; dF[58] = 0.0; dF[59] = 0.0;         // glitch6
+    dU[60] = 0; dU[61] = 0; dU[62] = 0; dU[63] = 0;                 // flags0: maskMode=aperture, noMask, noHistory, phosphor=NtscColor
+
+    (async function () {
+      try {
+        var base = "../vendor/cathode/src/shaders/";
+        var srcs = await Promise.all([
+          fetch(base + "lib/math_utils.wgsl").then(function (r) { return r.text(); }),
+          fetch(base + "lib/noise_utils.wgsl").then(function (r) { return r.text(); }),
+          fetch(base + "signal/composite_decode.wgsl").then(function (r) { return r.text(); }),
+          fetch(base + "display/crt_mask_beam.wgsl").then(function (r) { return r.text(); }),
+        ]);
+        var strip = function (s) { return s.replace(/^[ \t]*#include.*$/gm, ""); };
+        var sigSrc = srcs[0] + "\n" + srcs[1] + "\n" + strip(srcs[2]);
+        var dispSrc = srcs[0] + "\n" + strip(srcs[3]);
+        sigPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: sigSrc }), entryPoint: "main" } });
+        dispPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: dispSrc }), entryPoint: "main" } });
+        var blitMod = device.createShaderModule({ code: BLIT });
+        blitPipe = device.createRenderPipeline({ layout: "auto", vertex: { module: blitMod, entryPoint: "vs" }, fragment: { module: blitMod, entryPoint: "fs", targets: [{ format: format }] }, primitive: { topology: "triangle-list" } });
+        sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
+        sigUBuf = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        dispUBuf = device.createBuffer({ size: 256, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+        dummyTex = device.createTexture({ size: [1, 1], format: "rgba8unorm", usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+        ready = true;
+      } catch (e) { failed = true; console.warn("Cathode pipeline load failed:", e); }
+    })();
+
+    function ensure(w, h) {
+      if (W === w && H === h && texScope) return;
+      W = w; H = h;
+      if (dstCanvas.width !== w || dstCanvas.height !== h) { dstCanvas.width = w; dstCanvas.height = h; ctx.configure({ device: device, format: format, alphaMode: "opaque" }); }
+      [texScope, texSig, texDisp].forEach(function (t) { if (t && t.destroy) t.destroy(); });
+      texScope = device.createTexture({ size: [w, h], format: "rgba8unorm", usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+      texSig = device.createTexture({ size: [w, h], format: "rgba8unorm", usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING });
+      texDisp = device.createTexture({ size: [w, h], format: "rgba8unorm", usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING });
     }
 
-    function render(src, t, intensity) {
-      var w = src.width, h = src.height; if (w < 2 || h < 2) return;
-      ensureTex(w, h);
-      device.queue.copyExternalImageToTexture({ source: src }, { texture: tex }, [w, h]);
-      device.queue.writeBuffer(ubuf, 0, new Float32Array([w, h, t, intensity]));
+    function render(src, t) {
+      if (failed || !ready) return false;
+      var w = src.width, h = src.height; if (w < 2 || h < 2) return false;
+      ensure(w, h);
+      device.queue.copyExternalImageToTexture({ source: src }, { texture: texScope }, [w, h]);
+      var fi = (t * 60) >>> 0;
+      sU[0] = w; sU[1] = h; sU[2] = fi; sU[3] = 0;
+      dU[0] = w; dU[1] = h; dU[2] = fi; dU[3] = 0;
+      device.queue.writeBuffer(sigUBuf, 0, sigBuf);
+      device.queue.writeBuffer(dispUBuf, 0, dispBuf);
+
+      var sigBind = device.createBindGroup({ layout: sigPipe.getBindGroupLayout(0), entries: [
+        { binding: 0, resource: texScope.createView() },
+        { binding: 1, resource: dummyTex.createView() },
+        { binding: 2, resource: texSig.createView() },
+        { binding: 3, resource: { buffer: sigUBuf } },
+      ]});
+      var dispBind = device.createBindGroup({ layout: dispPipe.getBindGroupLayout(0), entries: [
+        { binding: 0, resource: texSig.createView() },
+        { binding: 1, resource: dummyTex.createView() },
+        { binding: 2, resource: texDisp.createView() },
+        { binding: 3, resource: sampler },
+        { binding: 4, resource: dummyTex.createView() },
+        { binding: 5, resource: sampler },
+        { binding: 6, resource: { buffer: dispUBuf } },
+      ]});
+      var blitBind = device.createBindGroup({ layout: blitPipe.getBindGroupLayout(0), entries: [
+        { binding: 0, resource: sampler },
+        { binding: 1, resource: texDisp.createView() },
+      ]});
+
       var enc = device.createCommandEncoder();
-      var pass = enc.beginRenderPass({ colorAttachments: [{
-        view: ctx.getCurrentTexture().createView(), loadOp: "clear", storeOp: "store",
-        clearValue: { r: 0, g: 0, b: 0, a: 1 } }]});
-      pass.setPipeline(pipeline); pass.setBindGroup(0, bind); pass.draw(3); pass.end();
+      var gx = Math.ceil(w / 8), gy = Math.ceil(h / 8);
+      var p1 = enc.beginComputePass(); p1.setPipeline(sigPipe); p1.setBindGroup(0, sigBind); p1.dispatchWorkgroups(gx, gy); p1.end();
+      var p2 = enc.beginComputePass(); p2.setPipeline(dispPipe); p2.setBindGroup(0, dispBind); p2.dispatchWorkgroups(gx, gy); p2.end();
+      var rp = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), loadOp: "clear", storeOp: "store", clearValue: { r: 0, g: 0, b: 0, a: 1 } }] });
+      rp.setPipeline(blitPipe); rp.setBindGroup(0, blitBind); rp.draw(3); rp.end();
       device.queue.submit([enc.finish()]);
+      return true;
     }
     return { render: render };
   }
