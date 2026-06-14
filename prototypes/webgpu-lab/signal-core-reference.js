@@ -32,7 +32,7 @@
   function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
   function linear(t, t0, t1, v0, v1) { if (t <= t0) return v0; if (t >= t1) return v1; return v0 + (v1 - v0) * (t - t0) / (t1 - t0); }
 
-  var SOURCE = { sine:1, pulse:2, ramp:3, noise:4, randomWalk:5, linked:6, lumaProbe:7 };
+  var SOURCE = { sine:1, pulse:2, ramp:3, noise:4, randomWalk:5, linked:6, lumaProbe:7, triangle:8, pulseNarrow:9 };
   var MODE   = { normalized:1, signed:2, percentage:3, degrees:4, pixels:5, custom:6, gate:7, trigger:8 };
   var MOD    = { off:0, amp:1, rate:2, phase:3 };
 
@@ -84,13 +84,16 @@
       if (this.modTarget === MOD.rate)  rate   *= (1 + this.modDepth * (m * 2 - 1));
       if (this.modTarget === MOD.phase) phase  += this.modDepth * m;
     }
-    var x = tt * rate + phase, bp;
+    var seedPhase = (this.seed * 0.07) - Math.floor(this.seed * 0.07);   // Seed shifts the waveform
+    var x = tt * rate + phase + seedPhase, fx = x - Math.floor(x), bp;
     switch (this.srcType) {
-      case SOURCE.sine:  bp = Math.sin(x * Math.PI * 2); break;
-      case SOURCE.pulse: bp = (x - Math.floor(x)) < 0.5 ? 1 : -1; break;
-      case SOURCE.ramp:  bp = (x - Math.floor(x)) * 2 - 1; break;
-      case SOURCE.noise: bp = valueNoise(x + this.seed * 0.123); break;
-      case SOURCE.randomWalk: { var sum = 0, amp = 1, fr = 1, norm = 0; for (var o = 0; o < 4; o++) { sum += amp * valueNoise(x * fr + this.seed + o * 7.7); norm += amp; amp *= 0.5; fr *= 2; } bp = sum / norm; break; }
+      case SOURCE.sine:       bp = Math.sin(x * Math.PI * 2); break;                                  // 1
+      case SOURCE.pulse:      bp = fx < 0.5 ? 1 : -1; break;                                          // 2 Square
+      case SOURCE.ramp:       bp = fx * 2 - 1; break;                                                 // 3 Saw
+      case SOURCE.noise:      bp = valueNoise(x + this.seed * 0.123); break;                          // 4
+      case SOURCE.randomWalk: { var sum = 0, amp = 1, fr = 1, norm = 0; for (var o = 0; o < 4; o++) { sum += amp * valueNoise(x * fr + this.seed + o * 7.7); norm += amp; amp *= 0.5; fr *= 2; } bp = sum / norm; break; } // 5
+      case 8:                 bp = 4 * Math.abs(fx - 0.5) - 1; break;                                 // 8 Triangle
+      case 9:                 bp = fx < 0.2 ? 1 : -1; break;                                          // 9 Pulse (narrow)
       default: bp = 0;
     }
     bp *= amount;
@@ -109,7 +112,7 @@
   Rack.prototype.pointwise = function (n) {
     var p = this.process;
     if (p.gain !== 1 || p.bias) n = clamp01(0.5 + (n - 0.5) * p.gain + p.bias);
-    if (p.sat > 0) { var bp = n * 2 - 1, g = 1 + p.sat * 4, bias = p.sat * 0.2; var sh = (tanhA(bp * g + bias) - tanhA(bias)) / Math.max(tanhA(g), 0.001); n = ((bp * (1 - p.sat) + sh * p.sat) + 1) * 0.5; }
+    if (p.sat > 0) { var bp = n * 2 - 1, g = 1 + p.sat * 8, bias = p.sat * 0.25; var sh = tanhA(bp * g + bias) - tanhA(bias); n = ((bp * (1 - p.sat) + sh * p.sat) + 1) * 0.5; }
     if (p.warp) { var bp = n * 2 - 1, pw = Math.pow(3, -p.warp); n = ((bp < 0 ? -1 : 1) * Math.pow(Math.abs(bp), pw) + 1) * 0.5; }
     if (p.fold > 0) { var x = (n * 2 - 1) * (1 + p.fold * 6); var xm = (x - 1) - 4 * Math.floor((x - 1) / 4); n = Math.abs(xm - 2) * 0.5; }
     if (p.invert) n = 1 - n;

@@ -27,6 +27,8 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
+  // Blit + feathered additive bloom: spreads bright phosphor outward as a soft
+  // halo (screen blend) so the CRT "feels like light" instead of fattening lines.
   var BLIT = `
 @group(0) @binding(0) var s : sampler;
 @group(0) @binding(1) var tex : texture_2d<f32>;
@@ -37,7 +39,28 @@ struct V { @builtin(position) pos : vec4<f32>, @location(0) uv : vec2<f32>, };
   o.uv = vec2<f32>((p[i].x + 1.) * 0.5, 0.5 - p[i].y * 0.5);
   return o;
 }
-@fragment fn fs(in : V) -> @location(0) vec4<f32> { return textureSampleLevel(tex, s, in.uv, 0.0); }`;
+fn bright(uv : vec2<f32>) -> vec3<f32> {
+  let c = textureSampleLevel(tex, s, uv, 0.0).rgb;
+  return max(c - vec3<f32>(0.40), vec3<f32>(0.0));
+}
+@fragment fn fs(in : V) -> @location(0) vec4<f32> {
+  let texel = 1.0 / vec2<f32>(textureDimensions(tex));
+  let base = textureSampleLevel(tex, s, in.uv, 0.0).rgb;
+  let TAU = 6.28318530718;
+  var bloom = bright(in.uv) * 0.6;
+  for (var k : i32 = 0; k < 8; k = k + 1) {                 // inner ring (tight halo)
+    let a = TAU * f32(k) / 8.0;
+    bloom = bloom + bright(in.uv + vec2<f32>(cos(a), sin(a)) * texel * 3.0) * 0.46;
+  }
+  for (var k2 : i32 = 0; k2 < 8; k2 = k2 + 1) {             // outer ring (feathered)
+    let a = TAU * (f32(k2) + 0.5) / 8.0;
+    bloom = bloom + bright(in.uv + vec2<f32>(cos(a), sin(a)) * texel * 8.0) * 0.26;
+  }
+  bloom = bloom / 6.0;
+  let tint = vec3<f32>(1.0, 0.97, 0.92);
+  let lit = 1.0 - (1.0 - base) * (1.0 - clamp(bloom * tint * 1.6, vec3<f32>(0.0), vec3<f32>(1.0)));
+  return vec4<f32>(lit, 1.0);
+}`;
 
   function create(device, dstCanvas) {
     var ctx = dstCanvas.getContext("webgpu");
@@ -59,7 +82,7 @@ struct V { @builtin(position) pos : vec4<f32>, @location(0) uv : vec2<f32>, };
     sF[12] = 0.0; sF[13] = 0.35; sF[14] = 0.0; sF[15] = 0.0;
 
     var dispBuf = new ArrayBuffer(256), dU = new Uint32Array(dispBuf), dF = new Float32Array(dispBuf);
-    dF[4] = 0.92; dF[5] = 0.95; dF[6] = 0.9; dF[7] = 0.42;          // display0: amount, beamSharpness, maskStrength, bloom (glowier)
+    dF[4] = 0.92; dF[5] = 0.9; dF[6] = 0.9; dF[7] = 0.16;           // display0: amount, beamSharpness, maskStrength, bloom (kept low; feathered glow added in blit)
     dF[8] = 0.84; dF[9] = 0.58; dF[10] = 0.42; dF[11] = 0.18;       // display1: scanStrength, scanDensity, scanSoftness, persistence
     dF[12] = 0.1; dF[13] = 1.0; dF[14] = 1.0; dF[15] = 1.0;         // display2: curvature, maskPitch/pixelSize, enable, pixelSize
     // personality0..3 (16..31) = 0 -> neutral grading

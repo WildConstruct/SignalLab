@@ -149,7 +149,7 @@
   <div class="panel">
     <h2>Generator</h2>
     <div class="chan x" data-ch="x"><div class="name">Channel X</div>
-      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Pulse</option><option value="3">Ramp</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
+      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
       <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="2"><output></output></div>
       <div class="ctl"><label>Phase</label><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
       <div class="ctl"><label>Amount</label><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
@@ -158,13 +158,13 @@
       <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="1941"><output></output></div>
     </div>
     <div class="chan y" data-ch="y"><div class="name">Channel Y</div>
-      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Pulse</option><option value="3">Ramp</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
+      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
       <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="3"><output></output></div>
       <div class="ctl"><label>Phase</label><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
       <div class="ctl"><label>Amount</label><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
       <div class="ctl"><label>Offset</label><input type="range" data-p="offset" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Smooth</label><input type="range" data-p="smooth" min="0" max="1" step="0.02" value="0"><output></output></div>
-      <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="77"><output></output></div>
+      <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="1941"><output></output></div>
     </div>
   </div>
 
@@ -229,7 +229,7 @@ const N = 1024;
 let SPAN=3, PERSIST=0.8, FREEZE=false, frozenT=0, MODE_CUR="waveform";
 const state = {
   x:{ src:1, rate:2, phase:0, amount:1, offset:0, smooth:0, seed:1941 },
-  y:{ src:1, rate:3, phase:0, amount:1, offset:0, smooth:0, seed:77 },
+  y:{ src:1, rate:3, phase:0, amount:1, offset:0, smooth:0, seed:1941 },
 };
 const applied = { target:"scale", min:80, max:120 };
 const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, sat:0, invert:false, rectify:false };
@@ -299,7 +299,7 @@ const Engine = {
 };
 
 // ---------- UI wiring ----------
-function fmt(p,v){ if(p==="src")return["","Sine","Pulse","Ramp","Noise","Walk","Linked","Luma"][v]||v; if(p==="seed")return(+v).toFixed(0); if(p==="rate")return(+v).toFixed(1); return(+v).toFixed(2); }
+function fmt(p,v){ if(p==="src")return["","Sine","Square","Saw","Noise","Walk","Linked","Luma","Triangle","Pulse"][v]||v; if(p==="seed")return(+v).toFixed(0); if(p==="rate")return(+v).toFixed(1); return(+v).toFixed(2); }
 function bindCh(ch){ document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const p=el.dataset.p,o=el.parentElement.querySelector("output");
   const set=()=>{ state[ch][p]=+el.value; if(o)o.textContent=fmt(p,el.value); if(window._mathReady) updateMath(); }; el.addEventListener("input",set); set(); }); }
 bindCh("x"); bindCh("y");
@@ -317,8 +317,12 @@ const presetList=[
   { name:"Random Walk",    x:{src:5,rate:0.8,smooth:0.2},     y:{src:5,rate:1.0,smooth:0.2,seed:77} },
   { name:"Needle Bounce",  x:{src:2,rate:1.5},                y:{src:1,rate:1.5,phase:0.25}, proc:{lag:0.7} },
   { name:"Clock Gate",     x:{src:2,rate:4},                  y:{src:3,rate:2}, proc:{gate:0.5} },
+  { name:"Square × Saw",   x:{src:2,rate:2},                  y:{src:3,rate:3,phase:0.1} },
+  { name:"Triangle Lissa", x:{src:8,rate:2},                  y:{src:8,rate:3,phase:0.12} },
+  { name:"Pulse Train",    x:{src:9,rate:3},                  y:{src:1,rate:3,phase:0.25}, proc:{sat:0.4} },
+  { name:"Saturated Sine", x:{src:1,rate:1.5},                y:{src:1,rate:1.5,phase:0.25}, proc:{sat:0.85} },
 ];
-const X0={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1941}, Y0={src:1,rate:3,phase:0,amount:1,offset:0,smooth:0,seed:77};
+const X0={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1941}, Y0={src:1,rate:3,phase:0,amount:1,offset:0,smooth:0,seed:1941};
 const PROC0={gain:1,bias:0,quantize:0,gate:0,lag:0,warp:0,fold:0,sat:0,invert:false,rectify:false};
 function presetRack(base,cfg,pr){ const c=Object.assign({},base,cfg); return new Rack({srcType:+c.src,rate:c.rate,phase:c.phase,amount:c.amount,offset:c.offset,smooth:c.smooth,seed:c.seed,frameDur:1/60,process:pr||null,outputs:{A:{mode:MODE.normalized,min:0,max:1}}}); }
 function renderThumb(cvn,p){ const c=cvn.getContext("2d"), W=cvn.width, H=cvn.height; c.fillStyle="#05070a"; c.fillRect(0,0,W,H);
@@ -382,7 +386,7 @@ updateExpr();
 function num(v){ return (Math.round(v*1000)/1000).toString(); }
 function genMath(cfg){
   if(+cfg.src===7){ const n0=`lumaProbe(media)` + (cfg.offset?` + ${num(cfg.offset)}`:""); return { b:`lumaProbe(media; ${probe.mode})`, n0:`clamp(${n0}, 0, 1)`, probe:true }; }
-  const inner = `${num(cfg.rate)}·t` + (cfg.phase ? ` + ${num(cfg.phase)}` : "");
+  const sp=((cfg.seed*0.07)%1); const inner = `${num(cfg.rate)}·t` + (cfg.phase ? ` + ${num(cfg.phase)}` : "") + (sp ? ` + ${num(sp)}` : "");
   const sd = cfg.seed ? ` + ${num(0.123*cfg.seed)}` : "";
   let b;
   switch(+cfg.src){
@@ -391,6 +395,8 @@ function genMath(cfg){
     case 3: b=`2·frac(${inner}) − 1`; break;
     case 4: b=`noise(${inner}${sd})`; break;
     case 5: b=`Σ(k=0..3) 2^−k·noise(2^k·(${inner}) + ${num(cfg.seed)} + 7.7k) / 1.875`; break;
+    case 8: b=`4·|frac(${inner}) − 0.5| − 1`; break;
+    case 9: b=`sgn(0.2 − frac(${inner}))`; break;
     default: b="0";
   }
   if(cfg.amount!==1) b=`${num(cfg.amount)}·(${b})`;
@@ -438,12 +444,14 @@ function buildAEExpression(){
     L.push("function frac(x){ return x - Math.floor(x); }");
     L.push("function hsh(n){ var v=Math.sin(n)*43758.5453123; return v-Math.floor(v); }");
     L.push("function vnoise(x){ var i=Math.floor(x), f=x-i, a=hsh(i), b=hsh(i+1); return (a+(b-a)*(f*f*(3-2*f)))*2-1; }");
-    L.push("function srcUni(tt){ var x=tt*rate+phase, bp;");
+    L.push("function srcUni(tt){ var x=tt*rate+phase+(seed*0.07-Math.floor(seed*0.07)), fx=x-Math.floor(x), bp;");
     if(+s.src===1) L.push("  bp = Math.sin(x*2*Math.PI);");
-    else if(+s.src===2) L.push("  bp = frac(x)<0.5 ? 1 : -1;");
-    else if(+s.src===3) L.push("  bp = frac(x)*2-1;");
+    else if(+s.src===2) L.push("  bp = fx<0.5 ? 1 : -1;");
+    else if(+s.src===3) L.push("  bp = fx*2-1;");
     else if(+s.src===4) L.push("  bp = vnoise(x + seed*0.123);");
     else if(+s.src===5) L.push("  var sum=0,a=1,fr=1,nm=0; for(var o=0;o<4;o++){ sum+=a*vnoise(x*fr+seed+o*7.7); nm+=a; a*=0.5; fr*=2; } bp=sum/nm;");
+    else if(+s.src===8) L.push("  bp = 4*Math.abs(fx-0.5)-1;");
+    else if(+s.src===9) L.push("  bp = fx<0.2 ? 1 : -1;");
     else L.push("  bp = 0;");
     L.push("  bp*=amount; return (bp+1)/2 + offset; }");
     L.push("function smoothed(tt){ if(smooth<=0) return srcUni(tt);");

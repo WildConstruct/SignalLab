@@ -71,8 +71,8 @@ fn vnoise(x : f32) -> f32 { let i = floor(x); let f = x - i; let a = hash1(i); l
 
 fn srcUni(tt : f32, idx : u32) -> f32 {
     let st = pSrc();
-    if (st >= 5.5 && st < 6.5) { return clamp(pInputA(), 0.0, 1.0); }       // Linked
-    if (st >= 6.5) { return clamp(lumaIn[idx] + pOffset(), 0.0, 1.0); }     // Luma probe
+    if (st >= 5.5 && st < 6.5) { return clamp(pInputA(), 0.0, 1.0); }       // 6 Linked
+    if (st >= 6.5 && st < 7.5) { return clamp(lumaIn[idx] + pOffset(), 0.0, 1.0); } // 7 Luma probe
 
     var rate = pRate(); var amount = pAmount(); var phase = pPhase();
     if (pModTgt() > 0.5) {                                                  // sidechain modulation
@@ -81,17 +81,21 @@ fn srcUni(tt : f32, idx : u32) -> f32 {
         else if (pModTgt() < 2.5) { rate   = rate   * (1.0 + d * (m * 2.0 - 1.0)); }
         else                      { phase  = phase  + d * m; }
     }
-    let x = tt * rate + phase;
+    let seedPhase = fract(pSeed() * 0.07);                                  // Seed shifts the waveform (deterministic)
+    let x = tt * rate + phase + seedPhase;
+    let fx = x - floor(x);
     var bp : f32 = 0.0;
-    if (st < 1.5) { bp = sin(x * 6.28318530718); }
-    else if (st < 2.5) { bp = select(-1.0, 1.0, (x - floor(x)) < 0.5); }
-    else if (st < 3.5) { bp = (x - floor(x)) * 2.0 - 1.0; }
-    else if (st < 4.5) { bp = vnoise(x + pSeed() * 0.123); }
-    else {
+    if (st < 1.5) { bp = sin(x * 6.28318530718); }                         // 1 Sine
+    else if (st < 2.5) { bp = select(-1.0, 1.0, fx < 0.5); }               // 2 Square
+    else if (st < 3.5) { bp = fx * 2.0 - 1.0; }                            // 3 Saw
+    else if (st < 4.5) { bp = vnoise(x + pSeed() * 0.123); }               // 4 Noise
+    else if (st < 5.5) {                                                    // 5 Random Walk
         var sum : f32 = 0.0; var amp : f32 = 1.0; var fr : f32 = 1.0; var norm : f32 = 0.0;
         for (var o : i32 = 0; o < 4; o = o + 1) { sum = sum + amp * vnoise(x*fr + pSeed() + f32(o)*7.7); norm = norm + amp; amp = amp * 0.5; fr = fr * 2.0; }
         bp = sum / norm;
     }
+    else if (st < 8.5) { bp = 4.0 * abs(fx - 0.5) - 1.0; }                 // 8 Triangle
+    else { bp = select(-1.0, 1.0, fx < 0.2); }                            // 9 Pulse (narrow)
     bp = bp * amount;
     return (bp + 1.0) * 0.5 + pOffset();
 }
@@ -111,10 +115,9 @@ fn pointwise(n0 : f32) -> f32 {
     if (pGain() != 1.0 || pBias() != 0.0) { n = clamp(0.5 + (n - 0.5) * pGain() + pBias(), 0.0, 1.0); }
     if (pSat() > 0.0) {                                    // soft saturation (drive + asymmetric warmth)
         let bp = n * 2.0 - 1.0;
-        let g = 1.0 + pSat() * 4.0;
-        let bias = pSat() * 0.2;
-        var sh = tanhApprox(bp * g + bias) - tanhApprox(bias);
-        sh = sh / max(tanhApprox(g), 0.001);
+        let g = 1.0 + pSat() * 8.0;
+        let bias = pSat() * 0.25;
+        let sh = tanhApprox(bp * g + bias) - tanhApprox(bias);
         n = ((bp * (1.0 - pSat()) + sh * pSat()) + 1.0) * 0.5;
     }
     if (pWarp() != 0.0) {
