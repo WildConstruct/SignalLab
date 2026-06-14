@@ -26,17 +26,19 @@
 //  v7: pLag     pInvert  pRectify modTarget
 //  v8: modDepth pWarp    pFold    pad2
 //  v9: winLeft   winRight winFeatherL winFeatherR   (feathered region window)
+//  v10: zDepth   _        _           _             (third-signal distort depth)
 struct SignalParams {
     v0 : vec4<f32>, v1 : vec4<f32>, v2 : vec4<f32>,
     v3 : vec4<f32>, v4 : vec4<f32>, v5 : vec4<f32>,
     v6 : vec4<f32>, v7 : vec4<f32>, v8 : vec4<f32>,
-    v9 : vec4<f32>,
+    v9 : vec4<f32>, v10 : vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform>             P      : SignalParams;
 @group(0) @binding(1) var<storage, read_write> outBuf : array<vec4<f32>>;
 @group(0) @binding(2) var<storage, read>       lumaIn : array<f32>;
 @group(0) @binding(3) var<storage, read>       modIn  : array<f32>;
+@group(0) @binding(4) var<storage, read>       zIn    : array<f32>;   // third signal (distorts X & Y)
 
 // named accessors (keep the body readable; compile to direct vec lane reads)
 fn pSrc()     -> f32 { return P.v0.x; }
@@ -67,6 +69,7 @@ fn pWinL()    -> f32 { return P.v9.x; }
 fn pWinR()    -> f32 { return P.v9.y; }
 fn pWinFL()   -> f32 { return P.v9.z; }
 fn pWinFR()   -> f32 { return P.v9.w; }
+fn pZDepth()  -> f32 { return P.v10.x; }
 
 // feathered region window: 0 outside [winL,winR], smooth ramps over each feather
 fn windowEnv(pos : f32) -> f32 {
@@ -99,7 +102,8 @@ fn srcUni(tt : f32, idx : u32) -> f32 {
         else                      { phase  = phase  + d * m; }
     }
     let seedPhase = fract(pSeed() * 0.07);                                  // Seed shifts the waveform (deterministic)
-    let x = tt * rate + phase + seedPhase;
+    let zBend = pZDepth() * (zIn[idx] * 2.0 - 1.0);                         // third signal phase-bends X & Y
+    let x = tt * rate + phase + seedPhase + zBend;
     let fx = x - floor(x);
     var bp : f32 = 0.0;
     if (st < 1.5) { bp = sin(x * 6.28318530718); }                         // 1 Sine

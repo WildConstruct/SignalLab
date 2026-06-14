@@ -202,6 +202,13 @@
   </div>
 
   <div class="panel">
+    <h2>Distort <span class="lite">— third signal bends X &amp; Y</span></h2>
+    <div class="ctl"><label>Amount</label><input type="range" id="zAmt" min="0" max="0.6" step="0.01" value="0"><output></output></div>
+    <div class="ctl"><label>Rate</label><input type="range" id="zRate" min="0.1" max="6" step="0.1" value="1"><output></output></div>
+    <div class="ctl"><label>Shape</label><select id="zShape"><option value="1">Sine</option><option value="8">Triangle</option><option value="4">Noise</option></select><output></output></div>
+  </div>
+
+  <div class="panel">
     <h2>Luma probe</h2>
     <div class="row"><input type="file" id="probeFile" accept="image/*,video/*" style="font-size:11px;color:var(--dim)"></div>
     <div class="ctl" style="margin-top:8px"><label>Mode</label><select id="probeMode"><option value="scan">line scan</option><option value="avg">average</option></select><output></output></div>
@@ -217,8 +224,8 @@
     <div class="ctl"><label>Freeze</label><input type="checkbox" id="freeze"><output></output></div>
     <div class="ctl"><label>CRT</label><input type="checkbox" id="crtToggle" checked><output>Cathode</output></div>
     <div class="ctl"><label>Y opacity</label><input type="range" id="yopac" min="0" max="1" step="0.05" value="0.7"><output id="yopacv"></output></div>
-    <div class="row" style="margin-top:10px"><button id="exportBtn">Export recipe JSON</button></div>
-    <textarea id="recipeOut" readonly></textarea>
+    <div class="row" style="margin-top:10px"><button id="exportBtn">Export recipe JSON</button><button id="importBtn">Import</button></div>
+    <textarea id="recipeOut" placeholder="Export fills this; or paste a recipe here and tap Import"></textarea>
   </div>
 
   <div class="drawer" id="drawer">
@@ -245,8 +252,10 @@ const applied = { target:"scale", min:80, max:120 };
 const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, sat:0, invert:false, rectify:false };
 const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied property
 const side = { target:"off", depth:0.5 };
+const z = { shape:1, rate:1, amount:0 };   // third signal — gently distorts X & Y (phase bend)
 const probe = { mode:"scan", loaded:false, el:null, kind:null };
 const lumaHistory = new Float32Array(N).fill(0.5);
+const zBuffer = new Float32Array(N).fill(0.5);   // third-signal (distort) per-sample
 const crt = { on:true, pass:null, failed:false };
 const win = { left:0, right:1, featherL:0, featherR:0 };   // feathered region window (drives Channel X)   // Cathode CRT/NTSC WebGPU overlay (default on)
 
@@ -258,7 +267,7 @@ const Engine = {
   mode:"cpu", gpuRejected:false, device:null, pipeline:null, bufs:null, bind:null,
   cpuRack(c,dt){ return new Rack({ srcType:+c.src, rate:c.rate, phase:c.phase, amount:c.amount, offset:c.offset||0,
     smooth:c.smooth, seed:c.seed, frameDur:dt, process:c.process||null, mod:c.mod||null,
-    modInput:c.modInput||null, lumaInput:c.lumaInput||null, win:c.win||null, sampleN:N, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
+    modInput:c.modInput||null, lumaInput:c.lumaInput||null, win:c.win||null, sampleN:N, z:c.z||null, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
   sampleCPU(c,start,dt,out){ const r=this.cpuRack(c,dt); for(let i=0;i<N;i++) out[i]=r.output("A",start+i*dt,i); return out; },
   async tryWebGPU(){ if(!navigator.gpu) return false;
     try{ const a=await navigator.gpu.requestAdapter(); if(!a) return false; this.device=await a.requestDevice();
@@ -266,17 +275,18 @@ const Engine = {
       const m=this.device.createShaderModule({code});
       this.pipeline=this.device.createComputePipeline({layout:"auto",compute:{module:m,entryPoint:"main"}});
       const d=this.device;
-      this.bufs={ param:d.createBuffer({size:40*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
+      this.bufs={ param:d.createBuffer({size:44*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
+        z:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         out:d.createBuffer({size:N*16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),
         luma:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         mod:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         read:d.createBuffer({size:N*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}) };
       this.bind=d.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[
         {binding:0,resource:{buffer:this.bufs.param}},{binding:1,resource:{buffer:this.bufs.out}},
-        {binding:2,resource:{buffer:this.bufs.luma}},{binding:3,resource:{buffer:this.bufs.mod}}]});
+        {binding:2,resource:{buffer:this.bufs.luma}},{binding:3,resource:{buffer:this.bufs.mod}},{binding:4,resource:{buffer:this.bufs.z}}]});
       this.mode="webgpu"; return true;
     }catch(e){ console.warn("WebGPU init failed:",e); return false; } },
-  async sampleGPU(c,start,dt,out){ const p=new Float32Array(40), pr=c.process||{}, w=c.win||{};
+  async sampleGPU(c,start,dt,out){ const p=new Float32Array(44), pr=c.process||{}, w=c.win||{}, zc=c.z||{};
     p[0]=+c.src;p[1]=c.rate;p[2]=c.amount;p[3]=c.phase;p[4]=c.seed;p[5]=c.offset||0;p[6]=c.smooth;
     p[8]=start;p[9]=dt;p[10]=dt;p[11]=N;p[12]=MODE.normalized;p[13]=0;p[14]=1;p[16]=MODE.normalized;p[20]=MODE.normalized;
     p[24]=pr.gain!=null?pr.gain:1;p[25]=pr.bias||0;p[26]=pr.quantize||0;p[27]=pr.gate||0;
@@ -284,8 +294,10 @@ const Engine = {
     p[31]=c.mod?(MODNUM[c.mod.target]||0):0;p[32]=c.mod?c.mod.depth:0;
     p[33]=pr.warp||0;p[34]=pr.fold||0;p[35]=pr.sat||0;
     p[36]=w.left!=null?w.left:0;p[37]=w.right!=null?w.right:1;p[38]=w.featherL||0;p[39]=w.featherR||0;
+    p[40]=zc.depth||0;
     const d=this.device,b=this.bufs; d.queue.writeBuffer(b.param,0,p);
     if(c.lumaInput) d.queue.writeBuffer(b.luma,0,c.lumaInput);
+    if(zc.input) d.queue.writeBuffer(b.z,0,zc.input);
     if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
     const e=d.createCommandEncoder(); const pass=e.beginComputePass(); pass.setPipeline(this.pipeline); pass.setBindGroup(0,this.bind);
     pass.dispatchWorkgroups(Math.ceil(N/64)); pass.end(); e.copyBufferToBuffer(b.out,0,b.read,0,N*16); d.queue.submit([e.finish()]);
@@ -352,6 +364,14 @@ function reflectInputs(){
   document.querySelectorAll("#proc [data-qb]").forEach(el=>{ el.checked=!!proc[el.dataset.qb]; });
   if(document.getElementById("driveMode")) document.getElementById("driveMode").value=drive.mode;
   [["winL",win.left],["winR",win.right],["winFL",win.featherL],["winFR",win.featherR]].forEach(([id,v])=>{ const el=document.getElementById(id); if(el){ el.value=v; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(+v).toFixed(2); } });
+  if(document.getElementById("sideMode")) document.getElementById("sideMode").value=side.target;
+  if(document.getElementById("sideDepth")) document.getElementById("sideDepth").value=side.depth;
+  if(document.getElementById("target")){ document.getElementById("target").value=applied.target; }
+  if(document.getElementById("tmin")) document.getElementById("tmin").value=applied.min;
+  if(document.getElementById("tmax")) document.getElementById("tmax").value=applied.max;
+  if(typeof updateExpr==="function") updateExpr();
+  { const yo=document.getElementById("yopac"); if(yo){ yo.value=YOPAC; const o=document.getElementById("yopacv"); if(o)o.textContent=(+YOPAC).toFixed(2); } }
+  [["zShape",z.shape],["zRate",z.rate],["zAmt",z.amount]].forEach(([id,v])=>{ const el=document.getElementById(id); if(el){ el.value=v; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(id==="zShape"?["","Sine","","","Noise","","","","Triangle"][v]||v:(+v).toFixed(2)); } });
 }
 function applyPreset(p){
   Object.assign(proc,PROC0); drive.mode=p.drive||"x"; Object.assign(win,{left:0,right:1,featherL:0,featherR:0});
@@ -387,14 +407,42 @@ function combine(a,b){ switch(drive.mode){
   case "diff": return Math.abs(a-b); case "min": return Math.min(a,b); case "max": return Math.max(a,b);
   default: return a; } }
 
-const SRC=["","sine","pulse","ramp","noise","randomWalk"];
-$("exportBtn").onclick=()=>{ const rec={ type:"wildconstruct.signalRecipe", name:"Experiment", id:"sg_experiment", version:"0.2", rackType:"generator",
-  source:{ type:SRC[state.x.src], rate:state.x.rate, amount:state.x.amount, phase:state.x.phase, offset:state.x.offset },
-  process:{ smooth:state.x.smooth, gain:proc.gain, bias:proc.bias, quantize:proc.quantize, gate:proc.gate, lag:proc.lag, invert:proc.invert, rectify:proc.rectify },
+const SRC=["","sine","square","saw","noise","randomWalk","linked","lumaProbe","triangle","pulse"];
+function srcName(v){ return SRC[v]||"sine"; }
+const SRCIDX={sine:1,square:2,saw:3,pulse:9,ramp:3,noise:4,randomWalk:5,linked:6,lumaProbe:7,triangle:8,pulseNarrow:9};
+function buildFullRecipe(){ return {
+  type:"wildconstruct.signalRecipe", name:"Experiment", id:"sg_experiment", version:"0.2", rackType:"generator",
+  source:{ type:srcName(state.x.src), rate:state.x.rate, amount:state.x.amount, phase:state.x.phase, offset:state.x.offset },
+  process:{ smooth:state.x.smooth, gain:proc.gain, bias:proc.bias, quantize:proc.quantize, gate:proc.gate, lag:proc.lag, warp:proc.warp, fold:proc.fold, sat:proc.sat, invert:proc.invert, rectify:proc.rectify, winLeft:win.left, winRight:win.right, winFeatherL:win.featherL, winFeatherR:win.featherR },
   outputs:{ A:{name:"X",profile:"normalized_0_1",range:[0,1]}, B:{name:"Y",profile:"normalized_0_1",range:[0,1]}, C:{name:"Gate",profile:"gate",range:[0,1]} },
-  timebase:{ mode:"compTime", seed:state.x.seed }, _channelY:{ type:SRC[state.y.src], rate:state.y.rate, phase:state.y.phase, offset:state.y.offset },
-  compatibilityTags:["engine:wgsl","tool:signal-lab"] };
-  const t=$("recipeOut"); t.style.display="block"; t.value=JSON.stringify(rec,null,2); t.select(); try{navigator.clipboard.writeText(t.value);}catch(e){} };
+  timebase:{ mode:"compTime", seed:state.x.seed },
+  _channelY:{ type:srcName(state.y.src), rate:state.y.rate, amount:state.y.amount, phase:state.y.phase, offset:state.y.offset, smooth:state.y.smooth, seed:state.y.seed },
+  visualization:{ mode:MODE_CUR },
+  _tool:{ x:Object.assign({},state.x), y:Object.assign({},state.y), proc:Object.assign({},proc), win:Object.assign({},win), drive:drive.mode, side:{target:side.target,depth:side.depth}, z:Object.assign({},z), view:MODE_CUR, crt:crt.on, yOpacity:YOPAC, applied:{target:applied.target,min:applied.min,max:applied.max} },
+  compatibilityTags:["engine:wgsl","tool:signal-lab"] }; }
+function applyToolState(t){
+  if(t.x) Object.assign(state.x,t.x); if(t.y) Object.assign(state.y,t.y);
+  if(t.proc) Object.assign(proc,t.proc); if(t.win) Object.assign(win,t.win);
+  if(t.drive) drive.mode=t.drive; if(t.side){ side.target=t.side.target; side.depth=t.side.depth; }
+  if(t.z) Object.assign(z,t.z);
+  if(t.applied){ applied.target=t.applied.target; applied.min=t.applied.min; applied.max=t.applied.max; }
+  if(typeof t.crt==="boolean"){ crt.on=t.crt; const c=$("crtToggle"); if(c)c.checked=t.crt; }
+  if(t.yOpacity!=null) YOPAC=t.yOpacity;
+  if(t.view){ MODE_CUR=t.view; [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===t.view)); $("appliedPanel").classList.toggle("show",t.view==="applied"); needGraticule=true; }
+}
+function importRecipe(txt){ let r; try{ r=JSON.parse(txt); }catch(e){ alert("Invalid recipe JSON"); return; }
+  if(r._tool){ applyToolState(r._tool); }
+  else {
+    if(r.source) Object.assign(state.x,{src:SRCIDX[r.source.type]||1, rate:r.source.rate, amount:r.source.amount, phase:r.source.phase, offset:r.source.offset});
+    if(r.process){ const p=r.process; Object.assign(proc,{gain:p.gain!=null?p.gain:1,bias:p.bias||0,quantize:p.quantize||0,gate:p.gate||0,lag:p.lag||0,warp:p.warp||0,fold:p.fold||0,sat:p.sat||0,invert:!!p.invert,rectify:!!p.rectify}); state.x.smooth=p.smooth||0; Object.assign(win,{left:p.winLeft!=null?p.winLeft:0,right:p.winRight!=null?p.winRight:1,featherL:p.winFeatherL||0,featherR:p.winFeatherR||0}); }
+    if(r.timebase&&r.timebase.seed!=null) state.x.seed=r.timebase.seed;
+    if(r._channelY){ const y=r._channelY; Object.assign(state.y,{src:SRCIDX[y.type]||1,rate:y.rate,phase:y.phase,offset:y.offset}); if(y.amount!=null)state.y.amount=y.amount; if(y.smooth!=null)state.y.smooth=y.smooth; if(y.seed!=null)state.y.seed=y.seed; }
+    if(r.visualization&&r.visualization.mode){ MODE_CUR=r.visualization.mode; [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===MODE_CUR)); $("appliedPanel").classList.toggle("show",MODE_CUR==="applied"); needGraticule=true; }
+  }
+  reflectInputs(); updateMath();
+}
+$("exportBtn").onclick=()=>{ const t=$("recipeOut"); t.style.display="block"; t.value=JSON.stringify(buildFullRecipe(),null,2); t.select(); try{navigator.clipboard.writeText(t.value);}catch(e){} };
+$("importBtn").onclick=()=>{ const t=$("recipeOut"); t.style.display="block"; if(!t.value.trim()){ alert("Paste a recipe JSON into the box below, then tap Import."); t.focus(); return; } importRecipe(t.value); };
 
 function updateExpr(){ const tgt=applied.target, mn=applied.min, mx=applied.max;
   $("expr").innerHTML = `<span class="k">// Channel X drives ${tgt} — generated AE expression</span>\n`+
@@ -547,6 +595,11 @@ function bindWin(){ const map={winL:"left",winR:"right",winFL:"featherL",winFR:"
   Object.keys(map).forEach(id=>{ const el=document.getElementById(id), o=el.parentElement.querySelector("output");
     const set=()=>{ win[map[id]]=+el.value; if(o)o.textContent=(+el.value).toFixed(2); updateMath(); }; el.addEventListener("input",set); set(); }); }
 bindWin();
+function bindZ(){ const map={zAmt:["amount",v=>(+v).toFixed(2)],zRate:["rate",v=>(+v).toFixed(1)],zShape:["shape",v=>(["","Sine","","","Noise","","","","Triangle"][v]||v)]};
+  Object.keys(map).forEach(id=>{ const el=document.getElementById(id), o=el.parentElement.querySelector("output"), key=map[id][0], f=map[id][1];
+    const set=()=>{ z[key]=+el.value; if(o)o.textContent=f(el.value); if(window._mathReady) updateMath(); };
+    el.addEventListener("input",set); el.addEventListener("change",set); set(); }); }
+bindZ();
 document.getElementById("dhead").onclick=()=>document.getElementById("drawer").classList.toggle("open");
 // "Copy AE expression" lives inside the (re-rendered) drawer body — delegate the click.
 document.getElementById("dinner").addEventListener("click", e=>{
@@ -685,16 +738,17 @@ function sampleMediaLuma(t){ if(!probe.el) return 0.5;
 }
 function pushLuma(t){ const v=sampleMediaLuma(t); lumaHistory.copyWithin(0,1); lumaHistory[N-1]=v; }
 
-function cfgX(){ return Object.assign({}, state.x, { process: proc, win: win, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
+function cfgX(){ return Object.assign({}, state.x, { process: proc, win: win, z:{input:zBuffer,depth:z.amount}, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
 function cfgY(){ return Object.assign({}, state.y, {
     mod: (side.target!=="off" ? { target:side.target, depth:side.depth } : null),
     modInput: (side.target!=="off" ? bufX : null),
-    lumaInput: (+state.y.src===7 ? lumaHistory : null) }); }
+    lumaInput: (+state.y.src===7 ? lumaHistory : null), z:{input:zBuffer,depth:z.amount} }); }
 
 // ---------- loop ----------
 function frame(){
   const t=FREEZE?frozenT:now(); const dt=SPAN/N, start=t-SPAN;
   if(probe.loaded) pushLuma(t);
+  if(z.amount>0){ const zr=Engine.cpuRack({src:z.shape,rate:z.rate,phase:0,amount:1,offset:0,smooth:0,seed:7},dt); for(let i=0;i<N;i++) zBuffer[i]=zr.output("A",start+i*dt,i); }
   Engine.sample(cfgX(),start,dt,bufX)
     .then(()=> Engine.sample(cfgY(),start,dt,bufY))
     .then(()=>{
