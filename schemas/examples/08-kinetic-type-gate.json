@@ -1,0 +1,20 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Kinetic Type Gate",
+  "id": "sg_typegate_001",
+  "version": "0.2",
+  "rackType": "generator",
+  "inputs": { "A": null, "B": null, "C": null },
+  "source": { "type": "pulse", "rate": 4, "amount": 1, "phase": 0, "offset": 0 },
+  "process": { "smooth": 0.0 },
+  "outputs": {
+    "A": { "name": "Reveal Step", "profile": "normalized_0_1", "range": [0, 1], "units": "none" },
+    "B": { "name": "Voltage Gate", "profile": "gate", "range": [0, 1], "units": "none" },
+    "C": { "name": "Flash Trigger", "profile": "trigger", "range": [0, 1], "units": "none" }
+  },
+  "timebase": { "mode": "compTime", "seed": 2 },
+  "visualization": { "mode": "gate_blocks", "showProbe": false, "showOutputLabels": true },
+  "bake": { "mode": "none", "simplify": false, "preservePeaks": true },
+  "compatibilityTags": ["ae:expression-only", "wc:kinetic-type"],
+  "notes": "Clock-style gate to step kinetic type reveals. Drive a text animator's range selector Offset or a per-character opacity with Output B; use Output C trigger for accent flashes. Combine with a Clock-Divider rack on Input A for divided reveals."
+}

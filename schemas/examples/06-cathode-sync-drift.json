@@ -1,0 +1,25 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Cathode Sync Drift",
+  "id": "sg_cathode_001",
+  "version": "0.2",
+  "rackType": "driver",
+  "inputs": { "A": null, "B": null, "C": null },
+  "source": { "type": "randomWalk", "rate": 0.15, "amount": 1, "phase": 0, "offset": 0 },
+  "process": { "smooth": 0.4 },
+  "outputs": {
+    "A": { "name": "Sync Drift", "profile": "pixels", "range": [-3, 3], "units": "pixels" },
+    "B": { "name": "Chroma Phase", "profile": "degrees", "range": [-6, 6], "units": "degrees" },
+    "C": { "name": "Dropout Gate", "profile": "gate", "range": [0, 1], "units": "none" }
+  },
+  "timebase": { "mode": "compTime", "seed": 1972 },
+  "visualization": { "mode": "guide_waveform", "showProbe": false, "showOutputLabels": true },
+  "bake": { "mode": "none", "simplify": false, "preservePeaks": false },
+  "wildConstruct": {
+    "rackId": "sg_cathode_001",
+    "channels": { "A.value": "sync_drift", "B.value": "chroma_phase", "C.gate": "dropout" },
+    "targetIdentity": "cathode_instability_driver"
+  },
+  "compatibilityTags": ["ae:expression-only", "wc:cathode"],
+  "notes": "Slow heavily-smoothed random walk = restrained broadcast instability. Dropout gate fires rarely; raise Offset to make dropouts more frequent."
+}

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Signal Rack — WebGPU Lab</title>
+<style>
+  :root { --bg:#0d0f12; --panel:#15191f; --ink:#cfe; --dim:#7a8794; --line:#2bd47a; }
+  body { background:var(--bg); color:var(--ink); font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif; margin:0; padding:18px; }
+  h1 { font-size:16px; margin:0 0 2px; } .sub{ color:var(--dim); margin:0 0 14px; }
+  .rack { background:var(--panel); border:1px solid #222; border-radius:8px; padding:12px; margin-bottom:14px; }
+  .rack h2 { font-size:13px; margin:0 0 8px; color:var(--line); }
+  .row { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; }
+  label { display:flex; flex-direction:column; gap:3px; color:var(--dim); font-size:11px; }
+  select, input { background:#0c0e11; color:var(--ink); border:1px solid #2a2f37; border-radius:4px; padding:4px 6px; }
+  input[type=range]{ width:120px; }
+  canvas { display:block; background:#0a0c0f; border:1px solid #20242b; border-radius:6px; margin-top:10px; width:100%; height:120px; }
+  .outs { display:flex; gap:12px; margin-top:8px; }
+  .out { flex:1; background:#0c0e11; border:1px solid #20242b; border-radius:6px; padding:8px; }
+  .out b { color:var(--line); } .val{ font-variant-numeric:tabular-nums; font-size:18px; }
+  .pill{ display:inline-block; padding:1px 6px; border-radius:10px; background:#22303a; color:#8fd; font-size:10px;}
+  #err{ background:#2a1414; border:1px solid #5a2222; color:#f9b; padding:10px 12px; border-radius:6px; display:none; }
+  code{ color:#9fd; }
+</style>
+</head>
+<body>
+  <h1>Signal Rack — WebGPU Lab</h1>
+  <p class="sub">Runs <code>shaders/signal_core.wgsl</code> on <code>navigator.gpu</code>. This is the develop-in-WebGPU-first surface; the Dawn bridge drives the identical shader natively. <span class="pill">WebGPU only — no CPU fallback</span></p>
+  <div id="err"></div>
+
+  <div class="rack" id="rackA">
+    <h2>Rack A — generator (compute dispatch → interpreted scalar outputs)</h2>
+    <div class="row">
+      <label>Source
+        <select class="src">
+          <option value="1">Sine</option><option value="2">Pulse</option>
+          <option value="3">Ramp</option><option value="4" selected>Noise</option>
+          <option value="5">Random Walk</option>
+        </select></label>
+      <label>Rate <input type="range" class="rate" min="0.1" max="6" step="0.1" value="1.5"></label>
+      <label>Amount <input type="range" class="amount" min="0" max="2" step="0.05" value="1"></label>
+      <label>Phase <input type="range" class="phase" min="0" max="1" step="0.01" value="0"></label>
+      <label>Smooth <input type="range" class="smooth" min="0" max="1" step="0.02" value="0"></label>
+      <label>Seed <input type="number" class="seed" value="1941" style="width:70px"></label>
+    </div>
+    <canvas></canvas>
+    <div class="outs">
+      <div class="out"><b>Output A</b> · Normalized 0..1<div class="val" data-ch="1">–</div></div>
+      <div class="out"><b>Output B</b> · Degrees −15..15<div class="val" data-ch="2">–</div></div>
+      <div class="out"><b>Output C</b> · Gate<div class="val" data-ch="3">–</div></div>
+    </div>
+  </div>
+
+  <div class="rack" id="rackB">
+    <h2>Rack B — processor · Input A ⟵ Rack A Output A (sidechain, host-resolved scalar)</h2>
+    <div class="row">
+      <label>Smooth <input type="range" class="smooth" min="0" max="1" step="0.02" value="0.2"></label>
+      <span class="pill">Source = Linked (Input A)</span>
+    </div>
+    <canvas></canvas>
+    <div class="outs"><div class="out"><b>Output A</b> · Percentage 90..118<div class="val" data-ch="1b">–</div></div></div>
+  </div>
+
+<script type="module">
+const SOURCE = { sine:1, pulse:2, ramp:3, noise:4, randomWalk:5, linked:6, lumaProbe:7 };
+const MODE   = { normalized:1, signed:2, percentage:3, degrees:4, pixels:5, custom:6, gate:7, trigger:8 };
+const SAMPLES = 512, SPAN = 4.0, DUR = 6.0;
+
+function fail(msg){ const e=document.getElementById("err"); e.style.display="block";
+  e.innerHTML = msg; throw new Error(msg); }
+
+if (!navigator.gpu) fail("This browser has no WebGPU (<code>navigator.gpu</code> is undefined). " +
+  "Per Wild Construct convention the engine is WebGPU-only — there is no CPU fallback. " +
+  "Use Chrome/Edge 113+ or Safari 17+, then reload. For headless logic checks run <code>node validate.js</code>.");
+
+const adapter = await navigator.gpu.requestAdapter();
+if (!adapter) fail("No WebGPU adapter available.");
+const device = await adapter.requestDevice();
+
+const wgsl = await (await fetch("../../shaders/signal_core.wgsl")).text();
+const module = device.createShaderModule({ code: wgsl });
+const pipeline = device.createComputePipeline({ layout: "auto", compute: { module, entryPoint: "main" } });
+
+// buffers (params now 36 floats; bindings 0..3 incl. luma + modulation inputs)
+const F32_PARAMS = 36;
+const paramBuf = device.createBuffer({ size: F32_PARAMS*4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+const outBuf   = device.createBuffer({ size: SAMPLES*4*4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+const lumaBuf  = device.createBuffer({ size: SAMPLES*4,   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+const modBuf   = device.createBuffer({ size: SAMPLES*4,   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+const readBuf  = device.createBuffer({ size: SAMPLES*4*4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [
+  { binding:0, resource:{ buffer: paramBuf } },
+  { binding:1, resource:{ buffer: outBuf } },
+  { binding:2, resource:{ buffer: lumaBuf } },
+  { binding:3, resource:{ buffer: modBuf } },
+]});
+
+// one dispatch: pack params, run, read back SAMPLES vec4 (n,A,B,C)
+async function dispatch(cfg){
+  const p = new Float32Array(F32_PARAMS);
+  p[0]=cfg.srcType; p[1]=cfg.rate; p[2]=cfg.amount; p[3]=cfg.phase;
+  p[4]=cfg.seed; p[5]=cfg.offset||0; p[6]=cfg.smooth||0; p[7]=cfg.inputA||0;
+  p[8]=cfg.startTime; p[9]=cfg.dt; p[10]=cfg.frameDur; p[11]=SAMPLES;
+  p[12]=cfg.modeA; p[13]=cfg.minA; p[14]=cfg.maxA;
+  p[16]=cfg.modeB; p[17]=cfg.minB; p[18]=cfg.maxB;
+  p[20]=cfg.modeC; p[21]=cfg.minC; p[22]=cfg.maxC;
+  p[24]=1;  // pGain default = 1 (processor pass-through); other processor fields 0
+  device.queue.writeBuffer(paramBuf, 0, p);
+
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginComputePass();
+  pass.setPipeline(pipeline); pass.setBindGroup(0, bind);
+  pass.dispatchWorkgroups(Math.ceil(SAMPLES/64));
+  pass.end();
+  enc.copyBufferToBuffer(outBuf, 0, readBuf, 0, SAMPLES*4*4);
+  device.queue.submit([enc.finish()]);
+  await readBuf.mapAsync(GPUMapMode.READ);
+  const out = new Float32Array(readBuf.getMappedRange().slice(0));
+  readBuf.unmap();
+  return out; // [n,A,B,C] * SAMPLES
+}
+
+// ---- rack configs from UI --------------------------------------------------
+const ui = (id, cls) => document.querySelector(`#${id} .${cls}`);
+const cfgA = () => ({
+  srcType:+ui("rackA","src").value, rate:+ui("rackA","rate").value, amount:+ui("rackA","amount").value,
+  phase:+ui("rackA","phase").value, seed:+ui("rackA","seed").value, smooth:+ui("rackA","smooth").value, offset:0,
+  modeA:MODE.normalized, minA:0, maxA:1, modeB:MODE.degrees, minB:-15, maxB:15, modeC:MODE.gate, minC:0, maxC:1,
+});
+
+function draw(canvas, data, chOffset, mn, mx){
+  const c=canvas.getContext("2d"); const W=canvas.width=canvas.clientWidth, H=canvas.height=120;
+  c.clearRect(0,0,W,H);
+  c.strokeStyle="#1d2128"; c.beginPath(); c.moveTo(0,H/2); c.lineTo(W,H/2); c.stroke();
+  c.strokeStyle="#2bd47a"; c.lineWidth=2; c.beginPath();
+  for (let i=0;i<SAMPLES;i++){
+    const v = data[i*4+chOffset];
+    const nv = (mx===mn)?0:Math.min(1,Math.max(0,(v-mn)/(mx-mn)));
+    const x = i/(SAMPLES-1)*W, y=(1-nv)*(H-10)+5;
+    i?c.lineTo(x,y):c.moveTo(x,y);
+  }
+  c.stroke();
+}
+
+async function frame(){
+  const t = (performance.now()/1000) % DUR;
+  const dt = SPAN/SAMPLES;
+  const startTime = t - SPAN;
+
+  // Rack A
+  const a = cfgA();
+  const dataA = await dispatch({ ...a, startTime, dt, frameDur:1/30 });
+  draw(document.querySelector("#rackA canvas"), dataA, 0, 0, 1);   // normalized base
+  // current-frame interpreted scalars = last sample
+  const last = (SAMPLES-1)*4;
+  document.querySelector('#rackA [data-ch="1"]').textContent = dataA[last+1].toFixed(3);
+  document.querySelector('#rackA [data-ch="2"]').textContent = dataA[last+2].toFixed(1)+"°";
+  document.querySelector('#rackA [data-ch="3"]').textContent = dataA[last+3]>=0.5?"GATE ▰":"– ▱";
+
+  // Rack B — Linked: host resolves inputA per sample by feeding Rack A's Output A.
+  // (The Dawn bridge does exactly this: sidechain is a host-resolved scalar.)
+  // We approximate per-frame with the current Output A value (single scalar),
+  // which is the real contract — Input A is one number at evaluation time.
+  const inputA = dataA[last+1];                 // Rack A Output A (normalized 0..1)
+  const dataB = await dispatch({
+    srcType:SOURCE.linked, rate:1, amount:1, phase:0, seed:1, offset:0,
+    smooth:+ui("rackB","smooth").value, inputA, startTime, dt, frameDur:1/30,
+    modeA:MODE.percentage, minA:90, maxA:118, modeB:MODE.normalized, minB:0, maxB:1, modeC:MODE.gate, minC:0, maxC:1,
+  });
+  draw(document.querySelector("#rackB canvas"), dataB, 1, 90, 118);
+  document.querySelector('#rackB [data-ch="1b"]').textContent = dataB[last+1].toFixed(1)+"%";
+
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Signal Rack — Signal Lab</title>
+<style>
+  :root{ --bg:#07090b; --panel:#0f1318; --edge:#1c242c; --ink:#cdd9e1; --dim:#6b7a87; --x:#36f09a; --y:#f0b23a; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:13px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,sans-serif; }
+  header{ display:flex; align-items:baseline; gap:12px; padding:14px 18px 8px; }
+  header h1{ font-size:15px; margin:0; letter-spacing:.3px; }
+  header .tag{ color:var(--dim); font-size:11px; }
+  #engine{ margin-left:auto; font-size:11px; padding:2px 8px; border-radius:10px; border:1px solid var(--edge); color:var(--dim); cursor:pointer; user-select:none; }
+  #engine.web{ color:#8fe; border-color:#2b6; } #engine.cpu{ color:#fb9; border-color:#a63; }
+  .wrap{ display:grid; grid-template-columns:300px 1fr; gap:14px; padding:0 18px 18px; }
+  @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
+  .panel{ background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:12px; }
+  .panel h2{ font-size:12px; margin:0 0 10px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px; }
+  .chan{ border-left:3px solid var(--x); padding-left:10px; margin-bottom:14px; }
+  .chan.y{ border-color:var(--y); }
+  .chan .name{ font-weight:600; margin-bottom:6px; } .chan.x .name{ color:var(--x);} .chan.y .name{ color:var(--y); }
+  .ctl{ display:grid; grid-template-columns:60px 1fr 44px; align-items:center; gap:8px; margin:5px 0; }
+  .ctl label{ color:var(--dim); font-size:11px; }
+  .ctl output{ font-variant-numeric:tabular-nums; text-align:right; font-size:11px; }
+  input[type=range]{ width:100%; accent-color:#3a7; }
+  select{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:5px; padding:3px 5px; width:100%; }
+  .row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .row button{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:6px; padding:4px 9px; font-size:11px; cursor:pointer; }
+  .row button:hover{ border-color:#3a6; color:#bfe; }
+  .tabs{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .tabs button{ background:#0b0e12; color:var(--dim); border:1px solid var(--edge); border-radius:7px; padding:6px 12px; font-size:12px; cursor:pointer; }
+  .tabs button.on{ color:#04120b; background:var(--x); border-color:var(--x); font-weight:600; }
+  .stagewrap{ background:#05070a; border:1px solid var(--edge); border-radius:10px; padding:10px; position:relative; }
+  .stagewrap .read{ position:absolute; top:10px; right:14px; font-size:11px; color:var(--dim); font-variant-numeric:tabular-nums; }
+  canvas{ display:block; width:100%; }
+  #stage{ height:440px; }
+  .applied{ display:none; margin-top:12px; }
+  .applied.show{ display:block; }
+  .expr{ margin-top:10px; background:#0b0e12; border:1px solid var(--edge); border-radius:8px; padding:10px;
+         font:11px/1.5 ui-monospace,Menlo,monospace; color:#bfe; white-space:pre-wrap; }
+  .expr .k{ color:#6b7a87; }
+  textarea{ display:none; width:100%; height:140px; margin-top:8px; background:#0b0e12; color:#bfe; border:1px solid var(--edge); border-radius:6px; font:11px/1.4 ui-monospace,Menlo,monospace; padding:8px; }
+  body{ padding-bottom:46px; }
+  .drawer{ position:fixed; left:0; right:0; bottom:0; background:#0b0e12; border-top:1px solid var(--edge); z-index:50; box-shadow:0 -8px 24px #0008; }
+  .dhead{ padding:9px 18px; cursor:pointer; display:flex; gap:10px; align-items:center; font:12px/1 ui-monospace,Menlo,monospace; color:var(--dim); user-select:none; }
+  .dhead .fx{ color:var(--x); font-weight:700; }
+  .dhead .teaser{ color:#7d8b97; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .dhead .chev{ transition:transform .2s; }
+  .drawer.open .dhead .chev{ transform:rotate(180deg); }
+  .dbody{ max-height:0; overflow:hidden; transition:max-height .25s ease; }
+  .drawer.open .dbody{ max-height:54vh; overflow:auto; }
+  .dinner{ padding:4px 18px 18px; font:12px/1.7 ui-monospace,Menlo,monospace; }
+  .dinner .lbl{ color:#6b7a87; margin-top:10px; }
+  .dinner .math{ color:#bfe; }
+  .dinner .punch{ color:#fff; background:#0f1620; border:1px solid #24343f; border-radius:8px; padding:10px 12px; margin-top:8px; }
+  .dinner .punch .cap{ color:#6b7a87; display:block; margin-top:6px; font-size:11px; }
+  .dinner .legend{ color:#52606b; font-size:11px; margin-top:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Signal Rack</h1>
+  <span class="tag">signal lab · generate · represent · apply</span>
+  <span id="engine" class="cpu" title="Click to try the WebGPU engine">engine: …</span>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <h2>Generator</h2>
+    <div class="chan x" data-ch="x"><div class="name">Channel X</div>
+      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Pulse</option><option value="3">Ramp</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
+      <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="2"><output></output></div>
+      <div class="ctl"><label>Phase</label><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
+      <div class="ctl"><label>Amount</label><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
+      <div class="ctl"><label>Offset</label><input type="range" data-p="offset" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Smooth</label><input type="range" data-p="smooth" min="0" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="1941"><output></output></div>
+    </div>
+    <div class="chan y" data-ch="y"><div class="name">Channel Y</div>
+      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Pulse</option><option value="3">Ramp</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
+      <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="3"><output></output></div>
+      <div class="ctl"><label>Phase</label><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
+      <div class="ctl"><label>Amount</label><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
+      <div class="ctl"><label>Offset</label><input type="range" data-p="offset" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Smooth</label><input type="range" data-p="smooth" min="0" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="77"><output></output></div>
+    </div>
+    <h2 style="margin-top:4px">Processor <span style="text-transform:none;color:#52606b">— shapes Channel X</span></h2>
+    <div id="proc">
+      <div class="ctl"><label>Gain</label><input type="range" data-q="gain" min="0" max="3" step="0.05" value="1"><output></output></div>
+      <div class="ctl"><label>Bias</label><input type="range" data-q="bias" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Quantize</label><input type="range" data-q="quantize" min="0" max="16" step="1" value="0"><output></output></div>
+      <div class="ctl"><label>Gate ≥</label><input type="range" data-q="gate" min="0" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Lag</label><input type="range" data-q="lag" min="0" max="0.97" step="0.01" value="0"><output></output></div>
+      <div class="row" style="margin-top:4px">
+        <label style="color:var(--dim)"><input type="checkbox" data-qb="invert"> invert</label>
+        <label style="color:var(--dim)"><input type="checkbox" data-qb="rectify"> rectify</label>
+      </div>
+    </div>
+
+    <h2 style="margin-top:12px">Sidechain <span style="text-transform:none;color:#52606b">— X modulates Y</span></h2>
+    <div class="ctl"><label>Mode</label><select id="sideMode"><option value="off">off</option><option value="amp">amplitude</option><option value="rate">rate (FM)</option><option value="phase">phase</option></select><output></output></div>
+    <div class="ctl"><label>Depth</label><input type="range" id="sideDepth" min="0" max="1" step="0.02" value="0.5"><output></output></div>
+
+    <h2 style="margin-top:12px">Luma probe</h2>
+    <div class="row"><input type="file" id="probeFile" accept="image/*,video/*" style="font-size:11px;color:var(--dim)"></div>
+    <div class="ctl"><label>Mode</label><select id="probeMode"><option value="scan">line scan</option><option value="avg">average</option></select><output></output></div>
+    <div style="color:#52606b;font-size:11px;margin-top:4px">Then set a channel Source → “Luma Probe”.</div>
+
+    <h2 style="margin-top:12px">Presets</h2>
+    <div class="row" id="presets">
+      <button data-preset="circle">Circle</button><button data-preset="lissa23">Lissa 2:3</button>
+      <button data-preset="lissa34">Lissa 3:4</button><button data-preset="pulsegate">Pulse×Sine</button>
+      <button data-preset="noise">Noise</button>
+    </div>
+    <h2 style="margin-top:12px">Display</h2>
+    <div class="ctl"><label>Window</label><input type="range" id="span" min="0.5" max="8" step="0.5" value="3"><output id="spanv"></output></div>
+    <div class="ctl"><label>Persist</label><input type="range" id="persist" min="0" max="0.95" step="0.05" value="0.8"><output id="persistv"></output></div>
+    <div class="ctl"><label>Freeze</label><input type="checkbox" id="freeze"><output></output></div>
+    <div class="row" style="margin-top:8px"><button id="exportBtn">Export recipe JSON</button></div>
+    <textarea id="recipeOut" readonly></textarea>
+  </div>
+
+  <div>
+    <div class="tabs" id="tabs">
+      <button data-mode="waveform" class="on">Waveform</button>
+      <button data-mode="bars">Bars</button>
+      <button data-mode="vector">Vectorscope</button>
+      <button data-mode="polar">Polar</button>
+      <button data-mode="heat">Heat strip</button>
+      <button data-mode="applied">Applied ▸</button>
+    </div>
+    <div class="stagewrap">
+      <span class="read" id="stageRead">—</span>
+      <canvas id="stage" height="440"></canvas>
+    </div>
+
+    <div class="applied panel" id="appliedPanel">
+      <h2>Applied — Channel X drives a property (the controller workflow)</h2>
+      <div class="row">
+        <select id="target" style="max-width:200px">
+          <option value="scale">Scale</option>
+          <option value="rotation">Rotation</option>
+          <option value="position">Position X</option>
+          <option value="opacity">Opacity / flicker</option>
+          <option value="glow">Glow</option>
+          <option value="color">Color (hue)</option>
+          <option value="meter">Bar meter + gate</option>
+          <option value="particles">Particles (birth driver)</option>
+          <option value="type">Kinetic type reveal</option>
+        </select>
+        <div class="ctl" style="grid-template-columns:auto 80px"><label>Min</label><input type="number" id="tmin" value="80" step="1"></div>
+        <div class="ctl" style="grid-template-columns:auto 80px"><label>Max</label><input type="number" id="tmax" value="120" step="1"></div>
+      </div>
+      <div class="expr" id="expr"></div>
+    </div>
+  </div>
+</div>
+
+<div class="drawer" id="drawer">
+  <div class="dhead" id="dhead">
+    <span class="fx">ƒ(t)</span>
+    <span class="teaser" id="dteaser">the math behind this signal…</span>
+    <span class="chev">▾</span>
+  </div>
+  <div class="dbody"><div class="dinner" id="dinner"></div></div>
+</div>
+
+<script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
+<script>
+const { Rack, SOURCE, MODE } = SignalCore;
+const N = 1024;
+let SPAN=3, PERSIST=0.8, FREEZE=false, frozenT=0, MODE_CUR="waveform";
+const state = {
+  x:{ src:1, rate:2, phase:0, amount:1, offset:0, smooth:0, seed:1941 },
+  y:{ src:1, rate:3, phase:0, amount:1, offset:0, smooth:0, seed:77 },
+};
+const applied = { target:"scale", min:80, max:120 };
+const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, invert:false, rectify:false };
+const side = { target:"off", depth:0.5 };                        // X modulates Y
+const probe = { mode:"scan", loaded:false, el:null, kind:null }; // luma probe source
+const lumaHistory = new Float32Array(N).fill(0.5);               // scrolling probe signal
+
+// The processor stage is NOT computed here — it lives in the engine
+// (ProcessParams -> signal_core.wgsl). The `proc` object is just the config the
+// host hands to the engine each frame. Same for sidechain (`side`) and luma.
+
+// ---------- engine (WebGPU primary, CPU reference fallback) ----------
+// The host (this tool) only CONFIGURES and CALLS the engine. All signal math —
+// source, smoothing, processor, sidechain modulation, luma mapping — lives in
+// the engine (shaders/signal_core.wgsl ⇄ signal-core-reference.js). Same code
+// the AE plugin runs through the Dawn bridge: "we run the demo how it ships."
+const MODNUM = { off:0, amp:1, rate:2, phase:3 };
+const Engine = {
+  mode:"cpu", device:null, pipeline:null, bufs:null, bind:null,
+  cpuRack(c,dt){ return new Rack({ srcType:+c.src, rate:c.rate, phase:c.phase, amount:c.amount, offset:c.offset||0,
+    smooth:c.smooth, seed:c.seed, frameDur:dt, process:c.process||null, mod:c.mod||null,
+    modInput:c.modInput||null, lumaInput:c.lumaInput||null, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
+  sampleCPU(c,start,dt,out){ const r=this.cpuRack(c,dt); for(let i=0;i<N;i++) out[i]=r.output("A",start+i*dt,i); return out; },
+  async tryWebGPU(){ if(!navigator.gpu) return false;
+    try{ const a=await navigator.gpu.requestAdapter(); if(!a) return false; this.device=await a.requestDevice();
+      const code=await (await fetch("../shaders/signal_core.wgsl")).text();
+      const m=this.device.createShaderModule({code});
+      this.pipeline=this.device.createComputePipeline({layout:"auto",compute:{module:m,entryPoint:"main"}});
+      const d=this.device;
+      this.bufs={ param:d.createBuffer({size:36*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
+        out:d.createBuffer({size:N*16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),
+        luma:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
+        mod:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
+        read:d.createBuffer({size:N*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}) };
+      this.bind=d.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[
+        {binding:0,resource:{buffer:this.bufs.param}},{binding:1,resource:{buffer:this.bufs.out}},
+        {binding:2,resource:{buffer:this.bufs.luma}},{binding:3,resource:{buffer:this.bufs.mod}}]});
+      this.mode="webgpu"; return true;
+    }catch(e){ console.warn("WebGPU init failed:",e); return false; } },
+  async sampleGPU(c,start,dt,out){ const p=new Float32Array(36), pr=c.process||{};
+    p[0]=+c.src;p[1]=c.rate;p[2]=c.amount;p[3]=c.phase;p[4]=c.seed;p[5]=c.offset||0;p[6]=c.smooth;
+    p[8]=start;p[9]=dt;p[10]=dt;p[11]=N;p[12]=MODE.normalized;p[13]=0;p[14]=1;p[16]=MODE.normalized;p[20]=MODE.normalized;
+    p[24]=pr.gain!=null?pr.gain:1;p[25]=pr.bias||0;p[26]=pr.quantize||0;p[27]=pr.gate||0;
+    p[28]=pr.lag||0;p[29]=pr.invert?1:0;p[30]=pr.rectify?1:0;
+    p[31]=c.mod?(MODNUM[c.mod.target]||0):0;p[32]=c.mod?c.mod.depth:0;
+    const d=this.device,b=this.bufs; d.queue.writeBuffer(b.param,0,p);
+    if(c.lumaInput) d.queue.writeBuffer(b.luma,0,c.lumaInput);
+    if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
+    const e=d.createCommandEncoder(); const pass=e.beginComputePass(); pass.setPipeline(this.pipeline); pass.setBindGroup(0,this.bind);
+    pass.dispatchWorkgroups(Math.ceil(N/64)); pass.end(); e.copyBufferToBuffer(b.out,0,b.read,0,N*16); d.queue.submit([e.finish()]);
+    await b.read.mapAsync(GPUMapMode.READ); const arr=new Float32Array(b.read.getMappedRange()); for(let i=0;i<N;i++) out[i]=arr[i*4]; b.read.unmap(); return out; },
+  sample(c,start,dt,out){ return this.mode==="webgpu" ? this.sampleGPU(c,start,dt,out) : Promise.resolve(this.sampleCPU(c,start,dt,out)); }
+};
+
+// ---------- UI wiring ----------
+function fmt(p,v){ if(p==="src")return["","Sine","Pulse","Ramp","Noise","Walk","Linked","Luma"][v]||v; if(p==="seed")return(+v).toFixed(0); if(p==="rate")return(+v).toFixed(1); return(+v).toFixed(2); }
+function bindCh(ch){ document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const p=el.dataset.p,o=el.parentElement.querySelector("output");
+  const set=()=>{ state[ch][p]=+el.value; if(o)o.textContent=fmt(p,el.value); if(window._mathReady) updateMath(); }; el.addEventListener("input",set); set(); }); }
+bindCh("x"); bindCh("y");
+const presets={ circle:{x:{src:1,rate:1,phase:0},y:{src:1,rate:1,phase:0.25}}, lissa23:{x:{src:1,rate:2,phase:0},y:{src:1,rate:3,phase:0}},
+  lissa34:{x:{src:1,rate:3,phase:0},y:{src:1,rate:4,phase:0.12}}, pulsegate:{x:{src:2,rate:2,phase:0},y:{src:1,rate:2,phase:0.25}},
+  noise:{x:{src:5,rate:1.2,smooth:0.3},y:{src:5,rate:1.4,smooth:0.3,seed:412}} };
+document.getElementById("presets").onclick=e=>{ const k=e.target.dataset.preset; if(!k)return;
+  for(const ch of ["x","y"]) Object.assign(state[ch],presets[k][ch]||{});
+  for(const ch of ["x","y"]) document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const p=el.dataset.p; if(state[ch][p]!=null){ el.value=state[ch][p]; el.dispatchEvent(new Event("input")); }}); updateMath(); };
+const $=id=>document.getElementById(id);
+$("span").oninput=()=>{SPAN=+$("span").value;$("spanv").textContent=SPAN.toFixed(1)+"s";}; $("span").oninput();
+$("persist").oninput=()=>{PERSIST=+$("persist").value;$("persistv").textContent=PERSIST.toFixed(2);}; $("persist").oninput();
+$("freeze").onchange=()=>{FREEZE=$("freeze").checked; if(FREEZE)frozenT=now();};
+$("tabs").onclick=e=>{ const m=e.target.dataset.mode; if(!m)return; MODE_CUR=m;
+  [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===m));
+  $("appliedPanel").classList.toggle("show",m==="applied"); needGraticule=true; updateMath(); };
+$("target").onchange=()=>{ applied.target=$("target").value; const d=defaults[applied.target]; if(d){$("tmin").value=d[0];$("tmax").value=d[1];applied.min=d[0];applied.max=d[1];} updateExpr(); updateMath(); };
+$("tmin").oninput=()=>{applied.min=+$("tmin").value; updateExpr(); updateMath();}; $("tmax").oninput=()=>{applied.max=+$("tmax").value; updateExpr(); updateMath();};
+const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100], particles:[0,250], type:[0,1] };
+
+// export recipe
+const SRC=["","sine","pulse","ramp","noise","randomWalk"];
+$("exportBtn").onclick=()=>{ const rec={ type:"wildconstruct.signalRecipe", name:"Experiment", id:"sg_experiment", version:"0.2", rackType:"generator",
+  source:{ type:SRC[state.x.src], rate:state.x.rate, amount:state.x.amount, phase:state.x.phase, offset:state.x.offset },
+  process:{ smooth:state.x.smooth }, outputs:{ A:{name:"X",profile:"normalized_0_1",range:[0,1]}, B:{name:"Y",profile:"normalized_0_1",range:[0,1]}, C:{name:"Gate",profile:"gate",range:[0,1]} },
+  timebase:{ mode:"compTime", seed:state.x.seed }, _channelY:{ type:SRC[state.y.src], rate:state.y.rate, phase:state.y.phase, offset:state.y.offset },
+  compatibilityTags:["engine:wgsl","tool:signal-lab"] };
+  const t=$("recipeOut"); t.style.display="block"; t.value=JSON.stringify(rec,null,2); t.select(); try{navigator.clipboard.writeText(t.value);}catch(e){} };
+
+function updateExpr(){ const tgt=applied.target, mn=applied.min, mx=applied.max;
+  $("expr").innerHTML = `<span class="k">// Channel X drives ${tgt} — generated AE expression</span>\n`+
+    `s = thisComp.layer("SR · Experiment").effect("Signal Rack")("Output A");\n`+
+    `linear(s, 0, 1, ${mn}, ${mx})`; }
+updateExpr();
+
+// ---------- live mathematical expression (bottom drawer) ----------
+function num(v){ return (Math.round(v*1000)/1000).toString(); }
+function genMath(cfg){
+  if(+cfg.src===7){ const n0=`lumaProbe(media)` + (cfg.offset?` + ${num(cfg.offset)}`:""); return { b:`lumaProbe(media; ${probe.mode})`, n0:`clamp(${n0}, 0, 1)`, probe:true }; }
+  const inner = `${num(cfg.rate)}·t` + (cfg.phase ? ` + ${num(cfg.phase)}` : "");
+  const sd = cfg.seed ? ` + ${num(0.123*cfg.seed)}` : "";
+  let b;
+  switch(+cfg.src){
+    case 1: b=`sin(2π·(${inner}))`; break;
+    case 2: b=`sgn(0.5 − frac(${inner}))`; break;
+    case 3: b=`2·frac(${inner}) − 1`; break;
+    case 4: b=`noise(${inner}${sd})`; break;
+    case 5: b=`Σ(k=0..3) 2^−k·noise(2^k·(${inner}) + ${num(cfg.seed)} + 7.7k) / 1.875`; break;
+    default: b="0";
+  }
+  if(cfg.amount!==1) b=`${num(cfg.amount)}·(${b})`;
+  const n0 = `0.5·(1 + ${b})` + (cfg.offset ? ` + ${num(cfg.offset)}` : "");
+  return { b, n0 };
+}
+function smoothMath(n0, cfg){
+  if(cfg.smooth<=0) return `clamp(${n0}, 0, 1)`;
+  const w=cfg.smooth*0.5, Nn=Math.round(Math.min(24,Math.max(1,cfg.smooth*24)));
+  return `clamp( (1/${Nn})·Σ(i=0..${Nn-1}) [${n0}]ₜ₋${num(w)}·i/${Nn-1} , 0, 1)`;
+}
+function procMath(t){
+  let e=t, p=proc;
+  if(p.gain!==1||p.bias!==0) e=`clamp(0.5 + (${e} − 0.5)·${num(p.gain)}${p.bias?` + ${num(p.bias)}`:""}, 0, 1)`;
+  if(p.invert) e=`1 − (${e})`;
+  if(p.rectify) e=`|2·(${e}) − 1|`;
+  if(p.quantize>1) e=`round((${e})·${p.quantize-1}) / ${p.quantize-1}`;
+  if(p.gate>0) e=`[ (${e}) ≥ ${num(p.gate)} ]`;
+  if(p.lag>0) e=`lag₍${num(p.lag)}₎(${e})`;
+  return e;
+}
+function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rectify||p.quantize>1||p.gate>0||p.lag>0; }
+function updateMath(){
+  const gx=genMath(state.x), nx=smoothMath(gx.n0, state.x);
+  let html = `<div class="lbl">Channel X — source</div><div class="math">x(t) = ${gx.b}</div>`;
+  html += `<div class="lbl">Channel X — normalized${state.x.smooth>0?" + smoothing":""}</div><div class="math">n(t) = ${nx}</div>`;
+  if(anyProc()) html += `<div class="lbl">Processor — shaped</div><div class="math">x′(t) = ${procMath("n(t)")}</div>`;
+  const gy=genMath(state.y);
+  html += `<div class="lbl">Channel Y</div><div class="math">y(t) = ${gy.b}</div>`;
+  if(side.target!=="off"){ const w={amp:"amplitude",rate:"rate",phase:"phase"}[side.target];
+    html += `<div class="lbl">Sidechain — X modulates Y ${w}</div><div class="math">y(t) = Y( ${w} ⊕ ${num(side.depth)}·x′(t) )</div>`; }
+  const driver = anyProc() ? procMath("n(t)").replace(/n\(t\)/g, `(${nx})`) : nx;
+  let punch, cap;
+  if(MODE_CUR==="applied"){
+    punch = `${applied.target}(t) = ${num(applied.min)} + ${num(applied.max-applied.min)}·${driver}`;
+    cap = `You could dial that in above — or figure out and write this by hand.  · AE: s = …("Output A"); linear(s, 0, 1, ${num(applied.min)}, ${num(applied.max)})`;
+  } else {
+    punch = `signal(t) = ${driver}`;
+    cap = `You could dial that in above — or figure out and write this by hand.`;
+  }
+  html += `<div class="punch">${punch}<span class="cap">${cap}</span></div>`;
+  html += `<div class="legend">t = seconds · frac = fractional part · noise = value noise · clamp(v,0,1) bounds · [P] = 1 if P else 0 · lag = one-pole smoothing</div>`;
+  document.getElementById("dinner").innerHTML = html;
+  const tz=document.getElementById("dteaser"); tz.textContent = punch.length>96 ? punch.slice(0,96)+"…" : punch;
+}
+function bindProc(){
+  document.querySelectorAll("#proc [data-q]").forEach(el=>{ const q=el.dataset.q, o=el.parentElement.querySelector("output");
+    const set=()=>{ proc[q]=+el.value; if(o) o.textContent=(q==="quantize"?proc[q].toFixed(0):proc[q].toFixed(2)); updateMath(); };
+    el.addEventListener("input",set); set(); });
+  document.querySelectorAll("#proc [data-qb]").forEach(el=>{ const q=el.dataset.qb;
+    el.addEventListener("change",()=>{ proc[q]=el.checked; updateMath(); }); });
+}
+bindProc();
+document.getElementById("dhead").onclick=()=>document.getElementById("drawer").classList.toggle("open");
+window._mathReady=true;
+updateMath();
+
+// engine badge
+const badge=$("engine");
+function setBadge(){ badge.textContent="engine: "+(Engine.mode==="webgpu"?"WebGPU (signal_core.wgsl)":"CPU reference"); badge.className=Engine.mode==="webgpu"?"web":"cpu"; }
+badge.onclick=async()=>{ if(Engine.mode==="webgpu")return; badge.textContent="engine: starting WebGPU…"; await Engine.tryWebGPU(); setBadge(); };
+
+// ---------- representations ----------
+const cv=$("stage"), ctx=cv.getContext("2d");
+const bufX=new Float32Array(N), bufY=new Float32Array(N);
+let parts=[]; let needGraticule=true; let lastGate=false;
+function now(){ return performance.now()/1000; }
+function sizeCanvas(){ const r=cv.getBoundingClientRect(); const dpr=Math.min(devicePixelRatio||1,2);
+  const w=Math.round(r.width*dpr), h=Math.round(440*dpr); if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;needGraticule=true;} }
+function bip(i){ return bufX[i]*2-1; }
+function heatColor(v){ const r=Math.round(255*Math.min(1,Math.max(0,1.6-Math.abs(4*v-3)))), g=Math.round(255*Math.min(1,Math.max(0,1.6-Math.abs(4*v-2)))), b=Math.round(255*Math.min(1,Math.max(0,1.6-Math.abs(4*v-1)))); return `rgb(${r},${g},${b})`; }
+
+const Render = {
+  waveform(W,H){ ctx.clearRect(0,0,W,H); grid(W,H);
+    line(bufX,W,H,"#36f09a"); line(bufY,W,H,"#f0b23a"); },
+  bars(W,H){ ctx.clearRect(0,0,W,H); grid(W,H); const B=64, bw=W/B;
+    for(let k=0;k<B;k++){ const v=bufX[Math.floor(k/B*N)]; const h=v*(H-16); ctx.fillStyle="#36f09a";
+      ctx.globalAlpha=0.85; ctx.fillRect(k*bw+1,H-h,bw-2,h); }
+    ctx.globalAlpha=1; ctx.strokeStyle="#1d2a34"; ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); },
+  vector(W,H){ persistFade(W,H); const S=Math.min(W,H), cx=W/2, cy=H/2, R=S/2-14;
+    if(needGraticule){ vGrat(W,H,cx,cy,R); needGraticule=false; }
+    ctx.strokeStyle="#36f09a"; ctx.lineWidth=1.5; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath();
+    for(let i=0;i<N;i++){ const px=cx+bip(i)*R, py=cy-(bufY[i]*2-1)*R; i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.stroke(); ctx.shadowBlur=0; },
+  polar(W,H){ persistFade(W,H); const cx=W/2, cy=H/2, R=Math.min(W,H)/2-14;
+    if(needGraticule){ vGrat(W,H,cx,cy,R); needGraticule=false; }
+    ctx.strokeStyle="#36f09a"; ctx.lineWidth=1.5; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath();
+    for(let i=0;i<N;i++){ const a=i/(N-1)*Math.PI*2; const rr=(0.15+0.85*bufX[i])*R; const px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr; i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.stroke(); ctx.shadowBlur=0; },
+  heat(W,H){ ctx.clearRect(0,0,W,H); const cw=W/N+1;
+    for(let i=0;i<N;i++){ ctx.fillStyle=heatColor(bufX[i]); ctx.fillRect(i/N*W,0,cw,H); } },
+  applied(W,H){ ctx.clearRect(0,0,W,H); drawApplied(W,H); },
+};
+function grid(W,H){ ctx.strokeStyle="#101820"; ctx.lineWidth=1;
+  for(let i=0;i<=8;i++){const x=i/8*W; ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let j=0;j<=4;j++){const y=j/4*H; ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.strokeStyle="#1d2a34"; ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); }
+function line(buf,W,H,c){ ctx.strokeStyle=c; ctx.lineWidth=2; ctx.shadowColor=c; ctx.shadowBlur=6; ctx.beginPath();
+  for(let i=0;i<N;i++){ const x=i/(N-1)*W, y=(0.5-(buf[i]*2-1)*0.46)*H; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke(); ctx.shadowBlur=0; }
+function vGrat(W,H,cx,cy,R){ ctx.fillStyle="#05070a"; ctx.fillRect(0,0,W,H); ctx.strokeStyle="#101a20"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(cx,cy-R-6); ctx.lineTo(cx,cy+R+6); ctx.moveTo(cx-R-6,cy); ctx.lineTo(cx+R+6,cy); ctx.stroke();
+  ctx.strokeStyle="#13202899"; for(let r=1;r<=3;r++){ ctx.beginPath(); ctx.arc(cx,cy,(r/3)*R,0,Math.PI*2); ctx.stroke(); } }
+function persistFade(W,H){ ctx.fillStyle=`rgba(5,7,10,${1-PERSIST})`; ctx.fillRect(0,0,W,H); }
+
+// ----- applied: signal drives a real property -----
+function drawApplied(W,H){
+  const n=bufX[N-1]; const val=applied.min+(applied.max-applied.min)*n; const cx=W/2, cy=H/2;
+  ctx.save();
+  switch(applied.target){
+    case "scale":{ const s=val/100; const d=120*s; ctx.fillStyle="#36f09a"; ctx.translate(cx,cy); ctx.fillRect(-d/2,-d/2,d,d); break; }
+    case "rotation":{ ctx.translate(cx,cy); ctx.rotate(val*Math.PI/180); ctx.fillStyle="#36f09a"; ctx.fillRect(-8,-90,16,180); ctx.beginPath(); ctx.arc(0,0,12,0,7); ctx.fill(); break; }
+    case "position":{ ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx+val,cy,40,0,7); ctx.fill(); break; }
+    case "opacity":{ ctx.globalAlpha=Math.max(0,Math.min(1,val/100)); ctx.fillStyle="#36f09a"; ctx.fillRect(cx-80,cy-80,160,160); break; }
+    case "glow":{ ctx.shadowColor="#36f09a"; ctx.shadowBlur=val; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx,cy,55,0,7); ctx.fill(); break; }
+    case "color":{ ctx.fillStyle=`hsl(${n*320},80%,55%)`; ctx.beginPath(); ctx.arc(cx,cy,80,0,7); ctx.fill(); break; }
+    case "meter":{ const bw=120, bh=300, x=cx-bw/2, y=cy+bh/2; const f=Math.max(0,Math.min(1,(val-applied.min)/(applied.max-applied.min)));
+      ctx.strokeStyle="#1d2a34"; ctx.strokeRect(x,y-bh,bw,bh); ctx.fillStyle=f>0.85?"#f0683a":"#36f09a"; ctx.fillRect(x,y-bh*f,bw,bh*f);
+      const gate=n>=0.5; ctx.fillStyle=gate?"#f0683a":"#16221c"; ctx.beginPath(); ctx.arc(cx,cy-bh/2-40,12,0,7); ctx.fill(); break; }
+    case "particles":{ const birth=Math.round(n*(applied.max/60)); for(let i=0;i<birth;i++) parts.push({x:cx,y:cy,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,l:1});
+      parts=parts.filter(p=>p.l>0); for(const p of parts){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.l-=0.02; ctx.globalAlpha=Math.max(0,p.l); ctx.fillStyle="#36f09a"; ctx.fillRect(p.x,p.y,3,3);} ctx.globalAlpha=1; break; }
+    case "type":{ const txt="SIGNAL RACK"; const vis=Math.round(n*txt.length); ctx.font="bold 48px ui-monospace,Menlo,monospace"; ctx.textAlign="center";
+      for(let i=0;i<txt.length;i++){ ctx.fillStyle=i<vis?"#36f09a":"#16221c"; ctx.fillText(txt[i], cx-txt.length*16+i*32, cy+16); } break; }
+  }
+  ctx.restore();
+  ctx.fillStyle="#6b7a87"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="left";
+  ctx.fillText(`n=${n.toFixed(3)}  →  ${applied.target} = ${val.toFixed(1)}`, 14, H-14);
+}
+
+// ---------- luma probe + sidechain ----------
+const mcvs=document.createElement("canvas"); mcvs.width=120; mcvs.height=68;
+const mctx=mcvs.getContext("2d",{willReadFrequently:true});
+const probeFile=$("probeFile");
+if(probeFile) probeFile.onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const url=URL.createObjectURL(f);
+  if(f.type.indexOf("video")===0){ const v=document.createElement("video"); v.src=url; v.loop=true; v.muted=true; v.playsInline=true; v.play().catch(()=>{}); probe.el=v; probe.kind="video"; }
+  else { const im=new Image(); im.src=url; probe.el=im; probe.kind="image"; }
+  probe.loaded=true; };
+$("probeMode").onchange=()=>{ probe.mode=$("probeMode").value; updateMath(); };
+$("sideMode").onchange=()=>{ side.target=$("sideMode").value; updateMath(); };
+$("sideDepth").oninput=()=>{ side.depth=+$("sideDepth").value; updateMath(); };
+
+function sampleMediaLuma(t){ if(!probe.el) return 0.5;
+  try{ mctx.drawImage(probe.el,0,0,mcvs.width,mcvs.height); }catch(e){ return 0.5; }
+  let data; try{ data=mctx.getImageData(0,0,mcvs.width,mcvs.height).data; }catch(e){ return 0.5; }
+  const MW=mcvs.width, MH=mcvs.height;
+  if(probe.mode==="scan"){ const col=Math.floor(((t*0.25)%1)*MW); let s=0; for(let y=0;y<MH;y++){ const o=(y*MW+col)*4; s+=0.299*data[o]+0.587*data[o+1]+0.114*data[o+2]; } return s/MH/255; }
+  let s=0,c=0; for(let i=0;i<data.length;i+=4){ s+=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]; c++; } return s/c/255;
+}
+function pushLuma(t){ const v=sampleMediaLuma(t); lumaHistory.copyWithin(0,1); lumaHistory[N-1]=v; }
+
+// Build the per-channel engine config (the host configures; the engine computes).
+function cfgX(){ return Object.assign({}, state.x, { process: proc, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
+function cfgY(){ return Object.assign({}, state.y, {
+    mod: (side.target!=="off" ? { target:side.target, depth:side.depth } : null),
+    modInput: (side.target!=="off" ? bufX : null),
+    lumaInput: (+state.y.src===7 ? lumaHistory : null) }); }
+
+// ---------- loop ----------
+function frame(){
+  const t=FREEZE?frozenT:now(); const dt=SPAN/N, start=t-SPAN;
+  if(probe.loaded) pushLuma(t);
+  Engine.sample(cfgX(),start,dt,bufX)            // engine: source+smooth+processor+luma
+    .then(()=> Engine.sample(cfgY(),start,dt,bufY))  // engine: Y, sidechain-modulated by bufX
+    .then(()=>{
+      sizeCanvas(); const W=cv.width,H=cv.height; (Render[MODE_CUR]||Render.waveform)(W,H);
+      const xc=bip(N-1), yc=bufY[N-1]*2-1;
+      $("stageRead").textContent = `${Engine.mode==="webgpu"?"GPU":"CPU"} · X ${xc>=0?"+":""}${xc.toFixed(3)} · Y ${yc>=0?"+":""}${yc.toFixed(3)}`;
+      requestAnimationFrame(frame);
+    });
+}
+setBadge();
+Engine.tryWebGPU().then(()=>{ setBadge(); requestAnimationFrame(frame); });
+</script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wildconstruct.dev/schemas/output-profile.schema.json",
+  "title": "Signal Rack Output Profile",
+  "description": "An output profile is not just a label. It defines units, range, clamp behaviour, signal class (continuous/gate/trigger), the AE property type it serializes into, and suggested targets. Profiles are the layer that hides complexity from the user.",
+  "type": "object",
+  "required": ["id", "label", "signalClass", "aeType", "range", "clamp"],
+  "properties": {
+    "id": { "type": "string", "description": "Stable machine id, e.g. 'normalized_0_1'." },
+    "label": { "type": "string", "description": "User-facing name shown in the Output Mode dropdown." },
+    "units": { "type": "string", "description": "Human units, e.g. 'percent', 'degrees', 'pixels', 'particlesPerSecond', 'none'." },
+    "signalClass": {
+      "type": "string",
+      "enum": ["continuous", "gate", "trigger"],
+      "description": "continuous = smooth scalar; gate = sustained 0/1 with threshold; trigger = short pulse on rising edge."
+    },
+    "aeType": {
+      "type": "string",
+      "enum": ["slider", "angle", "point", "color", "checkbox", "hidden"],
+      "description": "Which AE Expression Control type best serializes this profile. 'slider' is the default because expressions read it most cheaply and pick-whip works everywhere."
+    },
+    "range": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "[min, max] default output range."
+    },
+    "clamp": { "type": "boolean", "description": "Whether the output is hard-clamped to range." },
+    "gate": {
+      "type": "object",
+      "description": "Present when signalClass = gate.",
+      "properties": {
+        "threshold": { "type": "number" },
+        "hysteresis": { "type": "number", "description": "Documented but only fully honoured in baked / stateful paths; expression-only gate is a plain threshold." }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "description": "Present when signalClass = trigger.",
+      "properties": {
+        "pulseWidthFrames": { "type": "integer" },
+        "cooldownFrames": { "type": "integer", "description": "Best honoured after bake; expression-only path approximates within the look-back window." }
+      }
+    },
+    "suggestedAeTargets": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "e.g. ['Transform > Scale', 'Effect > Gaussian Blur > Blurriness']."
+    },
+    "suggestedWcTargets": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "e.g. ['Entropy.birthRate', 'Cathode.syncDrift']."
+    }
+  }
+}

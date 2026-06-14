@@ -1,0 +1,19 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Pulse Driver",
+  "id": "sg_pulse_001",
+  "version": "0.2",
+  "rackType": "generator",
+  "inputs": { "A": null, "B": null, "C": null },
+  "source": { "type": "pulse", "rate": 2, "amount": 1, "phase": 0, "offset": 0 },
+  "process": { "smooth": 0.0 },
+  "outputs": {
+    "A": { "name": "Scale Pulse", "profile": "percentage", "range": [90, 110], "units": "percent" },
+    "B": { "name": "Glow Drive", "profile": "normalized_0_1", "range": [0, 1], "units": "none" },
+    "C": { "name": "Beat Gate", "profile": "gate", "range": [0, 1], "units": "none" }
+  },
+  "timebase": { "mode": "compTime", "seed": 1 },
+  "visualization": { "mode": "guide_waveform", "showProbe": false, "showOutputLabels": true },
+  "bake": { "mode": "none", "simplify": false, "preservePeaks": true },
+  "compatibilityTags": ["ae:expression-only"]
+}
