@@ -2,58 +2,69 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Signal Rack — Signal Lab</title>
 <style>
   :root{ --bg:#07090b; --panel:#0f1318; --edge:#1c242c; --ink:#cdd9e1; --dim:#6b7a87; --x:#36f09a; --y:#f0b23a; }
-  *{ box-sizing:border-box; }
-  body{ margin:0; background:var(--bg); color:var(--ink); font:13px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,sans-serif; }
-  header{ display:flex; align-items:baseline; gap:12px; padding:14px 18px 8px; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+        font:13px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,sans-serif;
+        display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+  header{ flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:10px 14px 6px; }
   header h1{ font-size:15px; margin:0; letter-spacing:.3px; }
   header .tag{ color:var(--dim); font-size:11px; }
-  #engine{ margin-left:auto; font-size:11px; padding:2px 8px; border-radius:10px; border:1px solid var(--edge); color:var(--dim); cursor:pointer; user-select:none; }
+  @media (max-width:560px){ header .tag{ display:none; } }
+  #engine{ margin-left:auto; font-size:11px; padding:3px 9px; border-radius:10px; border:1px solid var(--edge); color:var(--dim); cursor:pointer; user-select:none; white-space:nowrap; }
   #engine.web{ color:#8fe; border-color:#2b6; } #engine.cpu{ color:#fb9; border-color:#a63; }
-  .wrap{ display:grid; grid-template-columns:300px 1fr; gap:14px; padding:0 18px 18px; }
-  @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
-  .panel{ background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:12px; }
+
+  /* graph stays on top; controls scroll underneath */
+  #top{ flex:0 0 auto; padding:0 12px; }
+  .tabs{ display:flex; gap:6px; overflow-x:auto; padding:6px 0 8px; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tabs button{ flex:0 0 auto; background:#0b0e12; color:var(--dim); border:1px solid var(--edge); border-radius:8px; padding:8px 13px; font-size:12px; cursor:pointer; }
+  .tabs button.on{ color:#04120b; background:var(--x); border-color:var(--x); font-weight:600; }
+  .stagewrap{ position:relative; background:#05070a; border:1px solid var(--edge); border-radius:12px; padding:8px;
+              height:clamp(200px, 40dvh, 460px); }
+  #stage{ width:100%; height:100%; display:block; }
+  .stagewrap .read{ position:absolute; top:12px; right:16px; font-size:11px; color:var(--dim); font-variant-numeric:tabular-nums; pointer-events:none; }
+  .applied{ display:none; margin-top:8px; }
+  .applied.show{ display:block; }
+  .expr{ margin-top:8px; background:#0b0e12; border:1px solid var(--edge); border-radius:8px; padding:8px 10px;
+         font:11px/1.5 ui-monospace,Menlo,monospace; color:#bfe; white-space:pre-wrap; max-height:96px; overflow:auto; }
+  .expr .k{ color:#6b7a87; }
+
+  #scroll{ flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 12px calc(24px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:12px; }
+  .panel{ background:var(--panel); border:1px solid var(--edge); border-radius:12px; padding:12px; }
   .panel h2{ font-size:12px; margin:0 0 10px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px; }
+  .panel h2 .lite{ text-transform:none; color:#52606b; }
   .chan{ border-left:3px solid var(--x); padding-left:10px; margin-bottom:14px; }
   .chan.y{ border-color:var(--y); }
   .chan .name{ font-weight:600; margin-bottom:6px; } .chan.x .name{ color:var(--x);} .chan.y .name{ color:var(--y); }
-  .ctl{ display:grid; grid-template-columns:60px 1fr 44px; align-items:center; gap:8px; margin:5px 0; }
+  .ctl{ display:grid; grid-template-columns:64px 1fr 46px; align-items:center; gap:10px; margin:7px 0; }
   .ctl label{ color:var(--dim); font-size:11px; }
   .ctl output{ font-variant-numeric:tabular-nums; text-align:right; font-size:11px; }
-  input[type=range]{ width:100%; accent-color:#3a7; }
-  select{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:5px; padding:3px 5px; width:100%; }
-  .row{ display:flex; flex-wrap:wrap; gap:6px; }
-  .row button{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:6px; padding:4px 9px; font-size:11px; cursor:pointer; }
-  .row button:hover{ border-color:#3a6; color:#bfe; }
-  .tabs{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
-  .tabs button{ background:#0b0e12; color:var(--dim); border:1px solid var(--edge); border-radius:7px; padding:6px 12px; font-size:12px; cursor:pointer; }
-  .tabs button.on{ color:#04120b; background:var(--x); border-color:var(--x); font-weight:600; }
-  .stagewrap{ background:#05070a; border:1px solid var(--edge); border-radius:10px; padding:10px; position:relative; }
-  .stagewrap .read{ position:absolute; top:10px; right:14px; font-size:11px; color:var(--dim); font-variant-numeric:tabular-nums; }
-  canvas{ display:block; width:100%; }
-  #stage{ height:440px; }
-  .applied{ display:none; margin-top:12px; }
-  .applied.show{ display:block; }
-  .expr{ margin-top:10px; background:#0b0e12; border:1px solid var(--edge); border-radius:8px; padding:10px;
-         font:11px/1.5 ui-monospace,Menlo,monospace; color:#bfe; white-space:pre-wrap; }
-  .expr .k{ color:#6b7a87; }
-  textarea{ display:none; width:100%; height:140px; margin-top:8px; background:#0b0e12; color:#bfe; border:1px solid var(--edge); border-radius:6px; font:11px/1.4 ui-monospace,Menlo,monospace; padding:8px; }
-  body{ padding-bottom:46px; }
-  .drawer{ position:fixed; left:0; right:0; bottom:0; background:#0b0e12; border-top:1px solid var(--edge); z-index:50; box-shadow:0 -8px 24px #0008; }
-  .dhead{ padding:9px 18px; cursor:pointer; display:flex; gap:10px; align-items:center; font:12px/1 ui-monospace,Menlo,monospace; color:var(--dim); user-select:none; }
+  input[type=range]{ width:100%; accent-color:#3a7; height:26px; }
+  input[type=checkbox]{ width:18px; height:18px; accent-color:#3a7; }
+  select,input[type=number]{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:6px; padding:6px 8px; width:100%; font-size:13px; }
+  .row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .row button{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer; }
+  .row button:active{ border-color:#3a6; color:#bfe; }
+  textarea{ display:none; width:100%; height:140px; margin-top:8px; background:#0b0e12; color:#bfe; border:1px solid var(--edge); border-radius:8px; font:11px/1.4 ui-monospace,Menlo,monospace; padding:8px; }
+
+  /* math expression — now a normal collapsible panel at the end of the scroll */
+  .drawer{ background:var(--panel); border:1px solid var(--edge); border-radius:12px; overflow:hidden; }
+  .dhead{ padding:12px; cursor:pointer; display:flex; gap:10px; align-items:center; font:12px/1 ui-monospace,Menlo,monospace; color:var(--dim); user-select:none; }
   .dhead .fx{ color:var(--x); font-weight:700; }
   .dhead .teaser{ color:#7d8b97; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
   .dhead .chev{ transition:transform .2s; }
   .drawer.open .dhead .chev{ transform:rotate(180deg); }
-  .dbody{ max-height:0; overflow:hidden; transition:max-height .25s ease; }
-  .drawer.open .dbody{ max-height:54vh; overflow:auto; }
-  .dinner{ padding:4px 18px 18px; font:12px/1.7 ui-monospace,Menlo,monospace; }
+  .dbody{ max-height:0; overflow:hidden; transition:max-height .28s ease; }
+  .drawer.open .dbody{ max-height:1400px; }
+  .dinner{ padding:0 12px 14px; font:12px/1.7 ui-monospace,Menlo,monospace; }
   .dinner .lbl{ color:#6b7a87; margin-top:10px; }
-  .dinner .math{ color:#bfe; }
-  .dinner .punch{ color:#fff; background:#0f1620; border:1px solid #24343f; border-radius:8px; padding:10px 12px; margin-top:8px; }
+  .dinner .math{ color:#bfe; word-break:break-word; }
+  .dinner .punch{ color:#fff; background:#0f1620; border:1px solid #24343f; border-radius:8px; padding:10px 12px; margin-top:8px; word-break:break-word; }
   .dinner .punch .cap{ color:#6b7a87; display:block; margin-top:6px; font-size:11px; }
   .dinner .legend{ color:#52606b; font-size:11px; margin-top:12px; }
 </style>
@@ -61,11 +72,42 @@
 <body>
 <header>
   <h1>Signal Rack</h1>
-  <span class="tag">signal lab · generate · represent · apply</span>
-  <span id="engine" class="cpu" title="Click to try the WebGPU engine">engine: …</span>
+  <span class="tag">generate · process · represent · apply</span>
+  <span id="engine" class="cpu" title="engine">engine: …</span>
 </header>
 
-<div class="wrap">
+<!-- GRAPH (sticky top) -->
+<div id="top">
+  <div class="tabs" id="tabs">
+    <button data-mode="waveform" class="on">Waveform</button>
+    <button data-mode="bars">Bars</button>
+    <button data-mode="vector">Vectorscope</button>
+    <button data-mode="polar">Polar</button>
+    <button data-mode="heat">Heat</button>
+    <button data-mode="applied">Applied ▸</button>
+  </div>
+  <div class="stagewrap">
+    <span class="read" id="stageRead">—</span>
+    <canvas id="stage"></canvas>
+  </div>
+  <div class="applied" id="appliedPanel">
+    <div class="row" style="margin-top:8px">
+      <select id="target" style="flex:1; min-width:140px">
+        <option value="scale">Scale</option><option value="rotation">Rotation</option>
+        <option value="position">Position X</option><option value="opacity">Opacity / flicker</option>
+        <option value="glow">Glow</option><option value="color">Color (hue)</option>
+        <option value="meter">Bar meter + gate</option><option value="particles">Particles</option>
+        <option value="type">Kinetic type</option>
+      </select>
+      <div class="ctl" style="grid-template-columns:auto 70px; flex:0 0 auto"><label>Min</label><input type="number" id="tmin" value="80" step="1"></div>
+      <div class="ctl" style="grid-template-columns:auto 70px; flex:0 0 auto"><label>Max</label><input type="number" id="tmax" value="120" step="1"></div>
+    </div>
+    <div class="expr" id="expr"></div>
+  </div>
+</div>
+
+<!-- CONTROLS (scrollable) -->
+<div id="scroll">
   <div class="panel">
     <h2>Generator</h2>
     <div class="chan x" data-ch="x"><div class="name">Channel X</div>
@@ -86,85 +128,59 @@
       <div class="ctl"><label>Smooth</label><input type="range" data-p="smooth" min="0" max="1" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="77"><output></output></div>
     </div>
-    <h2 style="margin-top:4px">Processor <span style="text-transform:none;color:#52606b">— shapes Channel X</span></h2>
+  </div>
+
+  <div class="panel">
+    <h2>Processor <span class="lite">— shapes Channel X</span></h2>
     <div id="proc">
       <div class="ctl"><label>Gain</label><input type="range" data-q="gain" min="0" max="3" step="0.05" value="1"><output></output></div>
       <div class="ctl"><label>Bias</label><input type="range" data-q="bias" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Quantize</label><input type="range" data-q="quantize" min="0" max="16" step="1" value="0"><output></output></div>
       <div class="ctl"><label>Gate ≥</label><input type="range" data-q="gate" min="0" max="1" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Lag</label><input type="range" data-q="lag" min="0" max="0.97" step="0.01" value="0"><output></output></div>
-      <div class="row" style="margin-top:4px">
-        <label style="color:var(--dim)"><input type="checkbox" data-qb="invert"> invert</label>
-        <label style="color:var(--dim)"><input type="checkbox" data-qb="rectify"> rectify</label>
+      <div class="row" style="margin-top:6px">
+        <label style="color:var(--dim);display:flex;align-items:center;gap:6px"><input type="checkbox" data-qb="invert"> invert</label>
+        <label style="color:var(--dim);display:flex;align-items:center;gap:6px"><input type="checkbox" data-qb="rectify"> rectify</label>
       </div>
     </div>
+  </div>
 
-    <h2 style="margin-top:12px">Sidechain <span style="text-transform:none;color:#52606b">— X modulates Y</span></h2>
+  <div class="panel">
+    <h2>Sidechain <span class="lite">— X modulates Y</span></h2>
     <div class="ctl"><label>Mode</label><select id="sideMode"><option value="off">off</option><option value="amp">amplitude</option><option value="rate">rate (FM)</option><option value="phase">phase</option></select><output></output></div>
     <div class="ctl"><label>Depth</label><input type="range" id="sideDepth" min="0" max="1" step="0.02" value="0.5"><output></output></div>
+  </div>
 
-    <h2 style="margin-top:12px">Luma probe</h2>
+  <div class="panel">
+    <h2>Luma probe</h2>
     <div class="row"><input type="file" id="probeFile" accept="image/*,video/*" style="font-size:11px;color:var(--dim)"></div>
-    <div class="ctl"><label>Mode</label><select id="probeMode"><option value="scan">line scan</option><option value="avg">average</option></select><output></output></div>
-    <div style="color:#52606b;font-size:11px;margin-top:4px">Then set a channel Source → “Luma Probe”.</div>
+    <div class="ctl" style="margin-top:8px"><label>Mode</label><select id="probeMode"><option value="scan">line scan</option><option value="avg">average</option></select><output></output></div>
+    <div style="color:#52606b;font-size:11px;margin-top:6px">Then set a channel Source → “Luma Probe”.</div>
+  </div>
 
-    <h2 style="margin-top:12px">Presets</h2>
+  <div class="panel">
+    <h2>Presets</h2>
     <div class="row" id="presets">
       <button data-preset="circle">Circle</button><button data-preset="lissa23">Lissa 2:3</button>
       <button data-preset="lissa34">Lissa 3:4</button><button data-preset="pulsegate">Pulse×Sine</button>
       <button data-preset="noise">Noise</button>
     </div>
-    <h2 style="margin-top:12px">Display</h2>
+    <h2 style="margin-top:14px">Display</h2>
     <div class="ctl"><label>Window</label><input type="range" id="span" min="0.5" max="8" step="0.5" value="3"><output id="spanv"></output></div>
     <div class="ctl"><label>Persist</label><input type="range" id="persist" min="0" max="0.95" step="0.05" value="0.8"><output id="persistv"></output></div>
     <div class="ctl"><label>Freeze</label><input type="checkbox" id="freeze"><output></output></div>
-    <div class="row" style="margin-top:8px"><button id="exportBtn">Export recipe JSON</button></div>
+    <div class="row" style="margin-top:10px"><button id="exportBtn">Export recipe JSON</button></div>
     <textarea id="recipeOut" readonly></textarea>
   </div>
 
-  <div>
-    <div class="tabs" id="tabs">
-      <button data-mode="waveform" class="on">Waveform</button>
-      <button data-mode="bars">Bars</button>
-      <button data-mode="vector">Vectorscope</button>
-      <button data-mode="polar">Polar</button>
-      <button data-mode="heat">Heat strip</button>
-      <button data-mode="applied">Applied ▸</button>
+  <div class="drawer" id="drawer">
+    <div class="dhead" id="dhead">
+      <span class="fx">ƒ(t)</span>
+      <span class="teaser" id="dteaser">the math behind this signal…</span>
+      <span class="chev">▾</span>
     </div>
-    <div class="stagewrap">
-      <span class="read" id="stageRead">—</span>
-      <canvas id="stage" height="440"></canvas>
-    </div>
-
-    <div class="applied panel" id="appliedPanel">
-      <h2>Applied — Channel X drives a property (the controller workflow)</h2>
-      <div class="row">
-        <select id="target" style="max-width:200px">
-          <option value="scale">Scale</option>
-          <option value="rotation">Rotation</option>
-          <option value="position">Position X</option>
-          <option value="opacity">Opacity / flicker</option>
-          <option value="glow">Glow</option>
-          <option value="color">Color (hue)</option>
-          <option value="meter">Bar meter + gate</option>
-          <option value="particles">Particles (birth driver)</option>
-          <option value="type">Kinetic type reveal</option>
-        </select>
-        <div class="ctl" style="grid-template-columns:auto 80px"><label>Min</label><input type="number" id="tmin" value="80" step="1"></div>
-        <div class="ctl" style="grid-template-columns:auto 80px"><label>Max</label><input type="number" id="tmax" value="120" step="1"></div>
-      </div>
-      <div class="expr" id="expr"></div>
-    </div>
+    <div class="dbody"><div class="dinner" id="dinner"></div></div>
   </div>
-</div>
-
-<div class="drawer" id="drawer">
-  <div class="dhead" id="dhead">
-    <span class="fx">ƒ(t)</span>
-    <span class="teaser" id="dteaser">the math behind this signal…</span>
-    <span class="chev">▾</span>
-  </div>
-  <div class="dbody"><div class="dinner" id="dinner"></div></div>
 </div>
 
 <script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
@@ -178,22 +194,16 @@ const state = {
 };
 const applied = { target:"scale", min:80, max:120 };
 const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, invert:false, rectify:false };
-const side = { target:"off", depth:0.5 };                        // X modulates Y
-const probe = { mode:"scan", loaded:false, el:null, kind:null }; // luma probe source
-const lumaHistory = new Float32Array(N).fill(0.5);               // scrolling probe signal
+const side = { target:"off", depth:0.5 };
+const probe = { mode:"scan", loaded:false, el:null, kind:null };
+const lumaHistory = new Float32Array(N).fill(0.5);
 
-// The processor stage is NOT computed here — it lives in the engine
-// (ProcessParams -> signal_core.wgsl). The `proc` object is just the config the
-// host hands to the engine each frame. Same for sidechain (`side`) and luma.
-
-// ---------- engine (WebGPU primary, CPU reference fallback) ----------
-// The host (this tool) only CONFIGURES and CALLS the engine. All signal math —
-// source, smoothing, processor, sidechain modulation, luma mapping — lives in
-// the engine (shaders/signal_core.wgsl ⇄ signal-core-reference.js). Same code
-// the AE plugin runs through the Dawn bridge: "we run the demo how it ships."
+// The processor/sidechain/luma are NOT computed here — they live in the engine
+// (signal_core.wgsl ⇄ signal-core-reference.js). This host only configures and
+// calls the engine, the same way the AE plugin drives it through the Dawn bridge.
 const MODNUM = { off:0, amp:1, rate:2, phase:3 };
 const Engine = {
-  mode:"cpu", device:null, pipeline:null, bufs:null, bind:null,
+  mode:"cpu", gpuRejected:false, device:null, pipeline:null, bufs:null, bind:null,
   cpuRack(c,dt){ return new Rack({ srcType:+c.src, rate:c.rate, phase:c.phase, amount:c.amount, offset:c.offset||0,
     smooth:c.smooth, seed:c.seed, frameDur:dt, process:c.process||null, mod:c.mod||null,
     modInput:c.modInput||null, lumaInput:c.lumaInput||null, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
@@ -225,8 +235,23 @@ const Engine = {
     if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
     const e=d.createCommandEncoder(); const pass=e.beginComputePass(); pass.setPipeline(this.pipeline); pass.setBindGroup(0,this.bind);
     pass.dispatchWorkgroups(Math.ceil(N/64)); pass.end(); e.copyBufferToBuffer(b.out,0,b.read,0,N*16); d.queue.submit([e.finish()]);
-    await b.read.mapAsync(GPUMapMode.READ); const arr=new Float32Array(b.read.getMappedRange()); for(let i=0;i<N;i++) out[i]=arr[i*4]; b.read.unmap(); return out; },
-  sample(c,start,dt,out){ return this.mode==="webgpu" ? this.sampleGPU(c,start,dt,out) : Promise.resolve(this.sampleCPU(c,start,dt,out)); }
+    await b.read.mapAsync(GPUMapMode.READ,0,N*16);
+    const arr=new Float32Array(b.read.getMappedRange(0,N*16).slice(0)); b.read.unmap();
+    for(let i=0;i<N;i++) out[i]=arr[i*4]; return out; },
+  sample(c,start,dt,out){ return this.mode==="webgpu" ? this.sampleGPU(c,start,dt,out) : Promise.resolve(this.sampleCPU(c,start,dt,out)); },
+  // Validate the GPU path against the proven CPU reference; fall back on mismatch.
+  async selfCheck(){
+    if(this.mode!=="webgpu") return;
+    const cfg={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1234,
+      process:{gain:1,bias:0,quantize:0,gate:0,lag:0,invert:false,rectify:false}};
+    const g=new Float32Array(N), cc=new Float32Array(N);
+    try{ await this.sampleGPU(cfg,0,1/60,g); }catch(e){ this.mode="cpu"; this.gpuRejected=true; return; }
+    this.sampleCPU(cfg,0,1/60,cc);
+    let maxd=0, lo=2, hi=-2;
+    for(let i=0;i<N;i+=17){ maxd=Math.max(maxd,Math.abs(g[i]-cc[i])); lo=Math.min(lo,g[i]); hi=Math.max(hi,g[i]); }
+    const degenerate=(hi-lo)<1e-3;        // GPU produced a flat/dead signal
+    if(maxd>0.03 || degenerate){ console.warn("GPU self-check failed (maxDiff="+maxd.toFixed(4)+", flat="+degenerate+") — using CPU reference engine"); this.mode="cpu"; this.gpuRejected=true; }
+  }
 };
 
 // ---------- UI wiring ----------
@@ -251,11 +276,11 @@ $("target").onchange=()=>{ applied.target=$("target").value; const d=defaults[ap
 $("tmin").oninput=()=>{applied.min=+$("tmin").value; updateExpr(); updateMath();}; $("tmax").oninput=()=>{applied.max=+$("tmax").value; updateExpr(); updateMath();};
 const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100], particles:[0,250], type:[0,1] };
 
-// export recipe
 const SRC=["","sine","pulse","ramp","noise","randomWalk"];
 $("exportBtn").onclick=()=>{ const rec={ type:"wildconstruct.signalRecipe", name:"Experiment", id:"sg_experiment", version:"0.2", rackType:"generator",
   source:{ type:SRC[state.x.src], rate:state.x.rate, amount:state.x.amount, phase:state.x.phase, offset:state.x.offset },
-  process:{ smooth:state.x.smooth }, outputs:{ A:{name:"X",profile:"normalized_0_1",range:[0,1]}, B:{name:"Y",profile:"normalized_0_1",range:[0,1]}, C:{name:"Gate",profile:"gate",range:[0,1]} },
+  process:{ smooth:state.x.smooth, gain:proc.gain, bias:proc.bias, quantize:proc.quantize, gate:proc.gate, lag:proc.lag, invert:proc.invert, rectify:proc.rectify },
+  outputs:{ A:{name:"X",profile:"normalized_0_1",range:[0,1]}, B:{name:"Y",profile:"normalized_0_1",range:[0,1]}, C:{name:"Gate",profile:"gate",range:[0,1]} },
   timebase:{ mode:"compTime", seed:state.x.seed }, _channelY:{ type:SRC[state.y.src], rate:state.y.rate, phase:state.y.phase, offset:state.y.offset },
   compatibilityTags:["engine:wgsl","tool:signal-lab"] };
   const t=$("recipeOut"); t.style.display="block"; t.value=JSON.stringify(rec,null,2); t.select(); try{navigator.clipboard.writeText(t.value);}catch(e){} };
@@ -266,7 +291,7 @@ function updateExpr(){ const tgt=applied.target, mn=applied.min, mx=applied.max;
     `linear(s, 0, 1, ${mn}, ${mx})`; }
 updateExpr();
 
-// ---------- live mathematical expression (bottom drawer) ----------
+// ---------- live mathematical expression ----------
 function num(v){ return (Math.round(v*1000)/1000).toString(); }
 function genMath(cfg){
   if(+cfg.src===7){ const n0=`lumaProbe(media)` + (cfg.offset?` + ${num(cfg.offset)}`:""); return { b:`lumaProbe(media; ${probe.mode})`, n0:`clamp(${n0}, 0, 1)`, probe:true }; }
@@ -322,7 +347,7 @@ function updateMath(){
   html += `<div class="punch">${punch}<span class="cap">${cap}</span></div>`;
   html += `<div class="legend">t = seconds · frac = fractional part · noise = value noise · clamp(v,0,1) bounds · [P] = 1 if P else 0 · lag = one-pole smoothing</div>`;
   document.getElementById("dinner").innerHTML = html;
-  const tz=document.getElementById("dteaser"); tz.textContent = punch.length>96 ? punch.slice(0,96)+"…" : punch;
+  const tz=document.getElementById("dteaser"); tz.textContent = punch.length>70 ? punch.slice(0,70)+"…" : punch;
 }
 function bindProc(){
   document.querySelectorAll("#proc [data-q]").forEach(el=>{ const q=el.dataset.q, o=el.parentElement.querySelector("output");
@@ -338,25 +363,27 @@ updateMath();
 
 // engine badge
 const badge=$("engine");
-function setBadge(){ badge.textContent="engine: "+(Engine.mode==="webgpu"?"WebGPU (signal_core.wgsl)":"CPU reference"); badge.className=Engine.mode==="webgpu"?"web":"cpu"; }
-badge.onclick=async()=>{ if(Engine.mode==="webgpu")return; badge.textContent="engine: starting WebGPU…"; await Engine.tryWebGPU(); setBadge(); };
+function setBadge(){
+  if(Engine.mode==="webgpu"){ badge.textContent="engine: WebGPU"; badge.className="web"; }
+  else { badge.textContent= Engine.gpuRejected ? "engine: CPU (GPU mismatch)" : "engine: CPU reference"; badge.className="cpu"; }
+}
+badge.onclick=async()=>{ if(Engine.mode==="webgpu")return; badge.textContent="engine: starting WebGPU…"; if(await Engine.tryWebGPU()){ await Engine.selfCheck(); } setBadge(); };
 
 // ---------- representations ----------
 const cv=$("stage"), ctx=cv.getContext("2d");
 const bufX=new Float32Array(N), bufY=new Float32Array(N);
-let parts=[]; let needGraticule=true; let lastGate=false;
+let parts=[]; let needGraticule=true;
 function now(){ return performance.now()/1000; }
 function sizeCanvas(){ const r=cv.getBoundingClientRect(); const dpr=Math.min(devicePixelRatio||1,2);
-  const w=Math.round(r.width*dpr), h=Math.round(440*dpr); if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;needGraticule=true;} }
+  const w=Math.round(r.width*dpr), h=Math.round(r.height*dpr); if(w<2||h<2)return;
+  if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; needGraticule=true; } }
 function bip(i){ return bufX[i]*2-1; }
 function heatColor(v){ const r=Math.round(255*Math.min(1,Math.max(0,1.6-Math.abs(4*v-3)))), g=Math.round(255*Math.min(1,Math.max(0,1.6-Math.abs(4*v-2)))), b=Math.round(255*Math.min(1,Math.max(0,1.6-Math.abs(4*v-1)))); return `rgb(${r},${g},${b})`; }
 
 const Render = {
-  waveform(W,H){ ctx.clearRect(0,0,W,H); grid(W,H);
-    line(bufX,W,H,"#36f09a"); line(bufY,W,H,"#f0b23a"); },
+  waveform(W,H){ ctx.clearRect(0,0,W,H); grid(W,H); line(bufX,W,H,"#36f09a"); line(bufY,W,H,"#f0b23a"); },
   bars(W,H){ ctx.clearRect(0,0,W,H); grid(W,H); const B=64, bw=W/B;
-    for(let k=0;k<B;k++){ const v=bufX[Math.floor(k/B*N)]; const h=v*(H-16); ctx.fillStyle="#36f09a";
-      ctx.globalAlpha=0.85; ctx.fillRect(k*bw+1,H-h,bw-2,h); }
+    for(let k=0;k<B;k++){ const v=bufX[Math.floor(k/B*N)]; const h=v*(H-16); ctx.fillStyle="#36f09a"; ctx.globalAlpha=0.85; ctx.fillRect(k*bw+1,H-h,bw-2,h); }
     ctx.globalAlpha=1; ctx.strokeStyle="#1d2a34"; ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); },
   vector(W,H){ persistFade(W,H); const S=Math.min(W,H), cx=W/2, cy=H/2, R=S/2-14;
     if(needGraticule){ vGrat(W,H,cx,cy,R); needGraticule=false; }
@@ -366,8 +393,7 @@ const Render = {
     if(needGraticule){ vGrat(W,H,cx,cy,R); needGraticule=false; }
     ctx.strokeStyle="#36f09a"; ctx.lineWidth=1.5; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath();
     for(let i=0;i<N;i++){ const a=i/(N-1)*Math.PI*2; const rr=(0.15+0.85*bufX[i])*R; const px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr; i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.stroke(); ctx.shadowBlur=0; },
-  heat(W,H){ ctx.clearRect(0,0,W,H); const cw=W/N+1;
-    for(let i=0;i<N;i++){ ctx.fillStyle=heatColor(bufX[i]); ctx.fillRect(i/N*W,0,cw,H); } },
+  heat(W,H){ ctx.clearRect(0,0,W,H); const cw=W/N+1; for(let i=0;i<N;i++){ ctx.fillStyle=heatColor(bufX[i]); ctx.fillRect(i/N*W,0,cw,H); } },
   applied(W,H){ ctx.clearRect(0,0,W,H); drawApplied(W,H); },
 };
 function grid(W,H){ ctx.strokeStyle="#101820"; ctx.lineWidth=1;
@@ -381,28 +407,27 @@ function vGrat(W,H,cx,cy,R){ ctx.fillStyle="#05070a"; ctx.fillRect(0,0,W,H); ctx
   ctx.strokeStyle="#13202899"; for(let r=1;r<=3;r++){ ctx.beginPath(); ctx.arc(cx,cy,(r/3)*R,0,Math.PI*2); ctx.stroke(); } }
 function persistFade(W,H){ ctx.fillStyle=`rgba(5,7,10,${1-PERSIST})`; ctx.fillRect(0,0,W,H); }
 
-// ----- applied: signal drives a real property -----
 function drawApplied(W,H){
   const n=bufX[N-1]; const val=applied.min+(applied.max-applied.min)*n; const cx=W/2, cy=H/2;
   ctx.save();
   switch(applied.target){
-    case "scale":{ const s=val/100; const d=120*s; ctx.fillStyle="#36f09a"; ctx.translate(cx,cy); ctx.fillRect(-d/2,-d/2,d,d); break; }
-    case "rotation":{ ctx.translate(cx,cy); ctx.rotate(val*Math.PI/180); ctx.fillStyle="#36f09a"; ctx.fillRect(-8,-90,16,180); ctx.beginPath(); ctx.arc(0,0,12,0,7); ctx.fill(); break; }
-    case "position":{ ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx+val,cy,40,0,7); ctx.fill(); break; }
-    case "opacity":{ ctx.globalAlpha=Math.max(0,Math.min(1,val/100)); ctx.fillStyle="#36f09a"; ctx.fillRect(cx-80,cy-80,160,160); break; }
-    case "glow":{ ctx.shadowColor="#36f09a"; ctx.shadowBlur=val; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx,cy,55,0,7); ctx.fill(); break; }
-    case "color":{ ctx.fillStyle=`hsl(${n*320},80%,55%)`; ctx.beginPath(); ctx.arc(cx,cy,80,0,7); ctx.fill(); break; }
-    case "meter":{ const bw=120, bh=300, x=cx-bw/2, y=cy+bh/2; const f=Math.max(0,Math.min(1,(val-applied.min)/(applied.max-applied.min)));
+    case "scale":{ const s=val/100; const d=Math.min(W,H)*0.55*s; ctx.fillStyle="#36f09a"; ctx.translate(cx,cy); ctx.fillRect(-d/2,-d/2,d,d); break; }
+    case "rotation":{ ctx.translate(cx,cy); ctx.rotate(val*Math.PI/180); ctx.fillStyle="#36f09a"; const L=Math.min(W,H)*0.4; ctx.fillRect(-8,-L,16,2*L); ctx.beginPath(); ctx.arc(0,0,12,0,7); ctx.fill(); break; }
+    case "position":{ ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx+val*Math.min(1,W/520),cy,36,0,7); ctx.fill(); break; }
+    case "opacity":{ ctx.globalAlpha=Math.max(0,Math.min(1,val/100)); ctx.fillStyle="#36f09a"; const d=Math.min(W,H)*0.5; ctx.fillRect(cx-d/2,cy-d/2,d,d); break; }
+    case "glow":{ ctx.shadowColor="#36f09a"; ctx.shadowBlur=val; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx,cy,48,0,7); ctx.fill(); break; }
+    case "color":{ ctx.fillStyle=`hsl(${n*320},80%,55%)`; ctx.beginPath(); ctx.arc(cx,cy,Math.min(W,H)*0.32,0,7); ctx.fill(); break; }
+    case "meter":{ const bw=90, bh=Math.min(H*0.7,260), x=cx-bw/2, y=cy+bh/2; const f=Math.max(0,Math.min(1,(val-applied.min)/(applied.max-applied.min)));
       ctx.strokeStyle="#1d2a34"; ctx.strokeRect(x,y-bh,bw,bh); ctx.fillStyle=f>0.85?"#f0683a":"#36f09a"; ctx.fillRect(x,y-bh*f,bw,bh*f);
-      const gate=n>=0.5; ctx.fillStyle=gate?"#f0683a":"#16221c"; ctx.beginPath(); ctx.arc(cx,cy-bh/2-40,12,0,7); ctx.fill(); break; }
+      ctx.fillStyle=(n>=0.5)?"#f0683a":"#16221c"; ctx.beginPath(); ctx.arc(cx,y-bh-26,11,0,7); ctx.fill(); break; }
     case "particles":{ const birth=Math.round(n*(applied.max/60)); for(let i=0;i<birth;i++) parts.push({x:cx,y:cy,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,l:1});
       parts=parts.filter(p=>p.l>0); for(const p of parts){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.l-=0.02; ctx.globalAlpha=Math.max(0,p.l); ctx.fillStyle="#36f09a"; ctx.fillRect(p.x,p.y,3,3);} ctx.globalAlpha=1; break; }
-    case "type":{ const txt="SIGNAL RACK"; const vis=Math.round(n*txt.length); ctx.font="bold 48px ui-monospace,Menlo,monospace"; ctx.textAlign="center";
-      for(let i=0;i<txt.length;i++){ ctx.fillStyle=i<vis?"#36f09a":"#16221c"; ctx.fillText(txt[i], cx-txt.length*16+i*32, cy+16); } break; }
+    case "type":{ const txt="SIGNAL RACK"; const vis=Math.round(n*txt.length); const fs=Math.max(20,Math.min(48,W/12)); ctx.font=`bold ${fs}px ui-monospace,Menlo,monospace`; ctx.textAlign="center";
+      for(let i=0;i<txt.length;i++){ ctx.fillStyle=i<vis?"#36f09a":"#16221c"; ctx.fillText(txt[i], cx-txt.length*fs*0.33+i*fs*0.66, cy+fs*0.34); } break; }
   }
   ctx.restore();
   ctx.fillStyle="#6b7a87"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="left";
-  ctx.fillText(`n=${n.toFixed(3)}  →  ${applied.target} = ${val.toFixed(1)}`, 14, H-14);
+  ctx.fillText(`n=${n.toFixed(3)}  →  ${applied.target} = ${val.toFixed(1)}`, 12, H-12);
 }
 
 // ---------- luma probe + sidechain ----------
@@ -426,7 +451,6 @@ function sampleMediaLuma(t){ if(!probe.el) return 0.5;
 }
 function pushLuma(t){ const v=sampleMediaLuma(t); lumaHistory.copyWithin(0,1); lumaHistory[N-1]=v; }
 
-// Build the per-channel engine config (the host configures; the engine computes).
 function cfgX(){ return Object.assign({}, state.x, { process: proc, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
 function cfgY(){ return Object.assign({}, state.y, {
     mod: (side.target!=="off" ? { target:side.target, depth:side.depth } : null),
@@ -437,17 +461,16 @@ function cfgY(){ return Object.assign({}, state.y, {
 function frame(){
   const t=FREEZE?frozenT:now(); const dt=SPAN/N, start=t-SPAN;
   if(probe.loaded) pushLuma(t);
-  Engine.sample(cfgX(),start,dt,bufX)            // engine: source+smooth+processor+luma
-    .then(()=> Engine.sample(cfgY(),start,dt,bufY))  // engine: Y, sidechain-modulated by bufX
+  Engine.sample(cfgX(),start,dt,bufX)
+    .then(()=> Engine.sample(cfgY(),start,dt,bufY))
     .then(()=>{
       sizeCanvas(); const W=cv.width,H=cv.height; (Render[MODE_CUR]||Render.waveform)(W,H);
       const xc=bip(N-1), yc=bufY[N-1]*2-1;
       $("stageRead").textContent = `${Engine.mode==="webgpu"?"GPU":"CPU"} · X ${xc>=0?"+":""}${xc.toFixed(3)} · Y ${yc>=0?"+":""}${yc.toFixed(3)}`;
       requestAnimationFrame(frame);
-    });
+    }).catch(err=>{ console.warn("frame error, falling back to CPU:",err); Engine.mode="cpu"; Engine.gpuRejected=true; setBadge(); requestAnimationFrame(frame); });
 }
-setBadge();
-Engine.tryWebGPU().then(()=>{ setBadge(); requestAnimationFrame(frame); });
+(async()=>{ if(await Engine.tryWebGPU()){ await Engine.selfCheck(); } setBadge(); requestAnimationFrame(frame); })();
 </script>
 </body>
 </html>
