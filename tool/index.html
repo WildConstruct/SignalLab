@@ -249,6 +249,7 @@ const Engine = {
     if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
     const e=d.createCommandEncoder(); const pass=e.beginComputePass(); pass.setPipeline(this.pipeline); pass.setBindGroup(0,this.bind);
     pass.dispatchWorkgroups(Math.ceil(N/64)); pass.end(); e.copyBufferToBuffer(b.out,0,b.read,0,N*16); d.queue.submit([e.finish()]);
+    if(d.queue.onSubmittedWorkDone) await d.queue.onSubmittedWorkDone(); // WebKit: ensure compute finished before map
     await b.read.mapAsync(GPUMapMode.READ,0,N*16);
     const arr=new Float32Array(b.read.getMappedRange(0,N*16).slice(0)); b.read.unmap();
     for(let i=0;i<N;i++) out[i]=arr[i*4]; return out; },
