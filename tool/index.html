@@ -92,15 +92,24 @@
   </div>
   <div class="applied" id="appliedPanel">
     <div class="row" style="margin-top:8px">
-      <select id="target" style="flex:1; min-width:140px">
+      <select id="target" style="flex:1; min-width:130px">
         <option value="scale">Scale</option><option value="rotation">Rotation</option>
         <option value="position">Position X</option><option value="opacity">Opacity / flicker</option>
         <option value="glow">Glow</option><option value="color">Color (hue)</option>
         <option value="meter">Bar meter + gate</option><option value="particles">Particles</option>
-        <option value="type">Kinetic type</option>
+        <option value="type">Kinetic type</option><option value="trace">Trace (wave-runner)</option>
       </select>
-      <div class="ctl" style="grid-template-columns:auto 70px; flex:0 0 auto"><label>Min</label><input type="number" id="tmin" value="80" step="1"></div>
-      <div class="ctl" style="grid-template-columns:auto 70px; flex:0 0 auto"><label>Max</label><input type="number" id="tmax" value="120" step="1"></div>
+      <div class="ctl" style="grid-template-columns:auto 64px; flex:0 0 auto"><label>Min</label><input type="number" id="tmin" value="80" step="1"></div>
+      <div class="ctl" style="grid-template-columns:auto 64px; flex:0 0 auto"><label>Max</label><input type="number" id="tmax" value="120" step="1"></div>
+    </div>
+    <div class="row" style="margin-top:8px; align-items:center">
+      <label style="color:var(--dim);font-size:11px">Drive</label>
+      <select id="driveMode" style="flex:1; min-width:130px">
+        <option value="x">Channel X</option><option value="y">Channel Y</option>
+        <option value="mult">X × Y (ring)</option><option value="mix">Mix (X+Y)/2</option>
+        <option value="diff">Difference |X−Y|</option><option value="min">Min(X,Y)</option><option value="max">Max(X,Y)</option>
+      </select>
+      <span style="color:#52606b;font-size:11px;flex:1 1 100%">The driver feeds the property. PIP (bottom-right) shows X (green), Y (amber), driver (white).</span>
     </div>
     <div class="expr" id="expr"></div>
   </div>
@@ -136,6 +145,8 @@
       <div class="ctl"><label>Gain</label><input type="range" data-q="gain" min="0" max="3" step="0.05" value="1"><output></output></div>
       <div class="ctl"><label>Bias</label><input type="range" data-q="bias" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Quantize</label><input type="range" data-q="quantize" min="0" max="16" step="1" value="0"><output></output></div>
+      <div class="ctl"><label>Warp</label><input type="range" data-q="warp" min="-1" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Fold</label><input type="range" data-q="fold" min="0" max="1" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Gate ≥</label><input type="range" data-q="gate" min="0" max="1" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Lag</label><input type="range" data-q="lag" min="0" max="0.97" step="0.01" value="0"><output></output></div>
       <div class="row" style="margin-top:6px">
@@ -193,7 +204,8 @@ const state = {
   y:{ src:1, rate:3, phase:0, amount:1, offset:0, smooth:0, seed:77 },
 };
 const applied = { target:"scale", min:80, max:120 };
-const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, invert:false, rectify:false };
+const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, invert:false, rectify:false };
+const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied property
 const side = { target:"off", depth:0.5 };
 const probe = { mode:"scan", loaded:false, el:null, kind:null };
 const lumaHistory = new Float32Array(N).fill(0.5);
@@ -230,6 +242,7 @@ const Engine = {
     p[24]=pr.gain!=null?pr.gain:1;p[25]=pr.bias||0;p[26]=pr.quantize||0;p[27]=pr.gate||0;
     p[28]=pr.lag||0;p[29]=pr.invert?1:0;p[30]=pr.rectify?1:0;
     p[31]=c.mod?(MODNUM[c.mod.target]||0):0;p[32]=c.mod?c.mod.depth:0;
+    p[33]=pr.warp||0;p[34]=pr.fold||0;
     const d=this.device,b=this.bufs; d.queue.writeBuffer(b.param,0,p);
     if(c.lumaInput) d.queue.writeBuffer(b.luma,0,c.lumaInput);
     if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
@@ -274,7 +287,13 @@ $("tabs").onclick=e=>{ const m=e.target.dataset.mode; if(!m)return; MODE_CUR=m;
   $("appliedPanel").classList.toggle("show",m==="applied"); needGraticule=true; updateMath(); };
 $("target").onchange=()=>{ applied.target=$("target").value; const d=defaults[applied.target]; if(d){$("tmin").value=d[0];$("tmax").value=d[1];applied.min=d[0];applied.max=d[1];} updateExpr(); updateMath(); };
 $("tmin").oninput=()=>{applied.min=+$("tmin").value; updateExpr(); updateMath();}; $("tmax").oninput=()=>{applied.max=+$("tmax").value; updateExpr(); updateMath();};
-const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100], particles:[0,250], type:[0,1] };
+$("driveMode").onchange=()=>{ drive.mode=$("driveMode").value; updateMath(); };
+const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100], particles:[0,250], type:[0,1], trace:[0,1] };
+// combine two channel values (0..1) into the Applied driver
+function combine(a,b){ switch(drive.mode){
+  case "y": return b; case "mult": return a*b; case "mix": return (a+b)/2;
+  case "diff": return Math.abs(a-b); case "min": return Math.min(a,b); case "max": return Math.max(a,b);
+  default: return a; } }
 
 const SRC=["","sine","pulse","ramp","noise","randomWalk"];
 $("exportBtn").onclick=()=>{ const rec={ type:"wildconstruct.signalRecipe", name:"Experiment", id:"sg_experiment", version:"0.2", rackType:"generator",
@@ -318,6 +337,8 @@ function smoothMath(n0, cfg){
 function procMath(t){
   let e=t, p=proc;
   if(p.gain!==1||p.bias!==0) e=`clamp(0.5 + (${e} − 0.5)·${num(p.gain)}${p.bias?` + ${num(p.bias)}`:""}, 0, 1)`;
+  if(p.warp) e=`warp₍${num(p.warp)}₎(${e})`;
+  if(p.fold>0) e=`fold₍${num(p.fold)}₎(${e})`;
   if(p.invert) e=`1 − (${e})`;
   if(p.rectify) e=`|2·(${e}) − 1|`;
   if(p.quantize>1) e=`round((${e})·${p.quantize-1}) / ${p.quantize-1}`;
@@ -325,7 +346,7 @@ function procMath(t){
   if(p.lag>0) e=`lag₍${num(p.lag)}₎(${e})`;
   return e;
 }
-function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rectify||p.quantize>1||p.gate>0||p.lag>0; }
+function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rectify||p.quantize>1||p.gate>0||p.lag>0||p.warp!==0||p.fold>0; }
 
 // Build a self-contained, WORKING After Effects expression that reproduces the
 // current Channel X signal -> property. Paste onto a property in AE.
@@ -361,6 +382,8 @@ function buildAEExpression(){
     L.push("  for(var i=0;i<M;i++){ var f=(M==1)?0:i/(M-1); acc+=srcUni(tt-win*f); } return acc/M; }");
     L.push("function shapedN(tt){ var n=clamp(smoothed(tt),0,1);");
     if(p.gain!==1||p.bias!==0) L.push("  n=clamp(0.5+(n-0.5)*"+aeNum(p.gain)+"+"+aeNum(p.bias)+",0,1);");
+    if(p.warp) L.push("  { var bp=n*2-1; n=((bp<0?-1:1)*Math.pow(Math.abs(bp),Math.pow(3,"+aeNum(-p.warp)+"))+1)/2; }");
+    if(p.fold>0) L.push("  { var fx=(n*2-1)*"+aeNum(1+p.fold*6)+", fm=(fx-1)-4*Math.floor((fx-1)/4); n=Math.abs(fm-2)*0.5; }");
     if(p.invert) L.push("  n=1-n;");
     if(p.rectify) L.push("  n=Math.abs(n*2-1);");
     if(p.quantize>1) L.push("  n=Math.round(n*"+(p.quantize-1)+")/"+(p.quantize-1)+";");
@@ -471,9 +494,17 @@ function vGrat(W,H,cx,cy,R){ ctx.fillStyle="#05070a"; ctx.fillRect(0,0,W,H); ctx
 function persistFade(W,H){ ctx.fillStyle=`rgba(5,7,10,${1-PERSIST})`; ctx.fillRect(0,0,W,H); }
 
 function drawApplied(W,H){
-  const n=bufX[N-1]; const val=applied.min+(applied.max-applied.min)*n; const cx=W/2, cy=H/2;
+  const n=combine(bufX[N-1],bufY[N-1]); const val=applied.min+(applied.max-applied.min)*n; const cx=W/2, cy=H/2;
   ctx.save();
   switch(applied.target){
+    case "trace":{ // an object that rides the driver's distorted waveform path
+      ctx.strokeStyle="#1d2a34"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+      ctx.strokeStyle="#2a6"; ctx.lineWidth=2; ctx.beginPath();
+      for(let i=0;i<N;i++){ const dv=combine(bufX[i],bufY[i]); const x=i/(N-1)*W, y=(1-dv)*(H-24)+12; i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+      ctx.stroke();
+      const dv=combine(bufX[N-1],bufY[N-1]); const px=W-14, py=(1-dv)*(H-24)+12;
+      ctx.shadowColor="#36f09a"; ctx.shadowBlur=16; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(px,py,9,0,7); ctx.fill(); ctx.shadowBlur=0;
+      break; }
     case "scale":{ const s=val/100; const d=Math.min(W,H)*0.55*s; ctx.fillStyle="#36f09a"; ctx.translate(cx,cy); ctx.fillRect(-d/2,-d/2,d,d); break; }
     case "rotation":{ ctx.translate(cx,cy); ctx.rotate(val*Math.PI/180); ctx.fillStyle="#36f09a"; const L=Math.min(W,H)*0.4; ctx.fillRect(-8,-L,16,2*L); ctx.beginPath(); ctx.arc(0,0,12,0,7); ctx.fill(); break; }
     case "position":{ ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx+val*Math.min(1,W/520),cy,36,0,7); ctx.fill(); break; }
@@ -489,8 +520,25 @@ function drawApplied(W,H){
       for(let i=0;i<txt.length;i++){ ctx.fillStyle=i<vis?"#36f09a":"#16221c"; ctx.fillText(txt[i], cx-txt.length*fs*0.33+i*fs*0.66, cy+fs*0.34); } break; }
   }
   ctx.restore();
-  ctx.fillStyle="#6b7a87"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="left";
-  ctx.fillText(`n=${n.toFixed(3)}  →  ${applied.target} = ${val.toFixed(1)}`, 12, H-12);
+  // PIP scope (bottom-right) so you can see the wave without leaving Applied
+  if(applied.target!=="trace") drawPip(W,H);
+  ctx.fillStyle="#8ea3b0"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="left";
+  ctx.fillText(`drive ${drive.mode}  ·  n=${n.toFixed(3)}  →  ${applied.target} = ${val.toFixed(1)}`, 12, H-12);
+}
+function drawPip(W,H){
+  const pw=Math.max(120,Math.min(220,W*0.34)), ph=pw*0.42, px=W-pw-12, py=H-ph-30;
+  ctx.save();
+  ctx.fillStyle="rgba(5,7,10,0.82)"; ctx.strokeStyle="#1c242c"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.rect(px,py,pw,ph); ctx.fill(); ctx.stroke(); ctx.clip();
+  ctx.strokeStyle="#11202a"; ctx.beginPath(); ctx.moveTo(px,py+ph/2); ctx.lineTo(px+pw,py+ph/2); ctx.stroke();
+  const trace=(get,col,glow)=>{ ctx.strokeStyle=col; ctx.lineWidth=glow?2:1.3; ctx.beginPath();
+    for(let i=0;i<N;i+=4){ const v=get(i); const x=px+i/(N-1)*pw, y=py+(1-v)*(ph-6)+3; (i?ctx.lineTo(x,y):ctx.moveTo(x,y)); } ctx.stroke(); };
+  trace(i=>bufX[i],"#36f09a55",false);
+  trace(i=>bufY[i],"#f0b23a55",false);
+  trace(i=>combine(bufX[i],bufY[i]),"#eef",true);     // the driver (bright)
+  ctx.restore();
+  ctx.fillStyle="#52606b"; ctx.font="9px ui-monospace,monospace"; ctx.textAlign="right";
+  ctx.fillText("driver", W-14, py-4);
 }
 
 // ---------- luma probe + sidechain ----------

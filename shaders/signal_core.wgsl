@@ -29,7 +29,7 @@ struct SignalParams {
     // processor stage:
     pGain : f32, pBias : f32, pQuant : f32, pGate : f32,
     pLag  : f32, pInvert : f32, pRectify : f32, modTarget : f32,
-    modDepth : f32, _pad0 : f32, _pad1 : f32, _pad2 : f32,
+    modDepth : f32, pWarp : f32, pFold : f32, _pad2 : f32,
 };
 
 @group(0) @binding(0) var<uniform>             P      : SignalParams;
@@ -82,6 +82,16 @@ fn smoothed(tt : f32, idx : u32) -> f32 {
 fn pointwise(n0 : f32) -> f32 {
     var n = n0;
     if (P.pGain != 1.0 || P.pBias != 0.0) { n = clamp(0.5 + (n - 0.5) * P.pGain + P.pBias, 0.0, 1.0); }
+    if (P.pWarp != 0.0) {                                  // contrast S-curve (identity at 0)
+        let bp = n * 2.0 - 1.0;
+        let pw = pow(3.0, -P.pWarp);
+        n = (sign(bp) * pow(abs(bp), pw) + 1.0) * 0.5;
+    }
+    if (P.pFold > 0.0) {                                   // triangle wavefolder (identity at 0)
+        let x = (n * 2.0 - 1.0) * (1.0 + P.pFold * 6.0);
+        let xm = (x - 1.0) - 4.0 * floor((x - 1.0) / 4.0); // positive mod 4
+        n = (abs(xm - 2.0)) * 0.5;
+    }
     if (P.pInvert > 0.5) { n = 1.0 - n; }
     if (P.pRectify > 0.5) { n = abs(n * 2.0 - 1.0); }
     if (P.pQuant > 1.5) { n = round(n * (P.pQuant - 1.0)) / (P.pQuant - 1.0); }
