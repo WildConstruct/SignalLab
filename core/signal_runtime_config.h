@@ -24,13 +24,17 @@ namespace SignalRack {
 
 struct CompiledSignalConfig {
     // Layout indices into SignalParams. Keep identical to the WGSL struct.
-    static constexpr int kFloatCount = 24;
+    static constexpr int kFloatCount = 36;
     enum Field {
         SrcType = 0, Rate, Amount, Phase, Seed, Offset, Smooth, InputA,
         StartTime = 8, Dt, FrameDur, SampleN,
         ModeA = 12, MinA, MaxA, PadA,
         ModeB = 16, MinB, MaxB, PadB,
         ModeC = 20, MinC, MaxC, PadC,
+        // processor stage:
+        PGain = 24, PBias, PQuant, PGate,
+        PLag = 28, PInvert, PRectify, ModTarget,
+        ModDepth = 32, Pad0, Pad1, Pad2,
     };
 
     std::array<float, kFloatCount> params{};
@@ -69,6 +73,17 @@ inline CompiledSignalConfig Compile(const SignalRecipe& r,
     pack(CompiledSignalConfig::ModeA, r.outputA);
     pack(CompiledSignalConfig::ModeB, r.outputB);
     pack(CompiledSignalConfig::ModeC, r.outputC);
+
+    const ProcessParams& pr = r.process;
+    p[CompiledSignalConfig::PGain]    = pr.gain;
+    p[CompiledSignalConfig::PBias]    = pr.bias;
+    p[CompiledSignalConfig::PQuant]   = pr.quantize;
+    p[CompiledSignalConfig::PGate]    = pr.gate;
+    p[CompiledSignalConfig::PLag]     = pr.lag;
+    p[CompiledSignalConfig::PInvert]  = pr.invert ? 1.0f : 0.0f;
+    p[CompiledSignalConfig::PRectify] = pr.rectify ? 1.0f : 0.0f;
+    p[CompiledSignalConfig::ModTarget]= static_cast<float>(pr.modTarget);
+    p[CompiledSignalConfig::ModDepth] = pr.modDepth;
     return c;
 }
 

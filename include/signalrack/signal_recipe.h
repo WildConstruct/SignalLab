@@ -69,10 +69,20 @@ struct SourceParams {
 };
 
 struct ProcessParams {
-    float smooth    = 0.0f;            // 0..1 box-average
-    float threshold = 0.5f;           // gate threshold (reserved for stateful path)
-    float hysteresis= 0.0f;           // reserved (bake/native only)
+    float smooth    = 0.0f;            // 0..1 box-average (pre-process)
+    // pointwise shaping (engine-owned; see shaders/signal_core.wgsl):
+    float gain      = 1.0f;
+    float bias      = 0.0f;
+    float quantize  = 0.0f;           // 0 = off, else number of steps
+    float gate      = 0.0f;           // 0 = off, else threshold
+    float lag       = 0.0f;           // 0..1 finite EWMA
     bool  invert    = false;
+    bool  rectify   = false;
+    // sidechain modulation (signal-drives-signal); per-sample input via request:
+    std::uint32_t modTarget = 0;      // 0 off, 1 amplitude, 2 rate, 3 phase
+    float         modDepth  = 0.0f;
+    float threshold = 0.5f;           // reserved (stateful/native path)
+    float hysteresis= 0.0f;           // reserved (bake/native only)
 };
 
 // Sidechain bindings. Empty = unconnected. Format "<rackId>:<A|B|C>".

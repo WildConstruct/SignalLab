@@ -181,50 +181,48 @@ const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, invert:false, rectify:
 const side = { target:"off", depth:0.5 };                        // X modulates Y
 const probe = { mode:"scan", loaded:false, el:null, kind:null }; // luma probe source
 const lumaHistory = new Float32Array(N).fill(0.5);               // scrolling probe signal
-const yRack = new Rack({ outputs:{ A:{ mode:MODE.normalized, min:0, max:1 } } }); // per-sample modulation
 
-// ---------- processor stage (the "shape" verb): shapes Channel X ----------
-// Applied uniformly to the sampled signal so WebGPU and CPU paths stay identical
-// in the tool. These mirror the engine's ProcessParams / WGSL processor section
-// (their future canonical home); here they run per displayed window.
-function clamp01(v){ return v<0?0:(v>1?1:v); }
-function processSignal(buf){
-  const p=proc;
-  for(let i=0;i<buf.length;i++){ let v=buf[i];
-    if(p.gain!==1||p.bias!==0) v=clamp01(0.5+(v-0.5)*p.gain+p.bias);
-    if(p.invert) v=1-v;
-    if(p.rectify) v=Math.abs(v*2-1);
-    if(p.quantize>1) v=Math.round(v*(p.quantize-1))/(p.quantize-1);
-    if(p.gate>0) v=(v>=p.gate)?1:0;
-    buf[i]=v;
-  }
-  if(p.lag>0){ const a=1-p.lag; let prev=buf[0]; for(let i=0;i<buf.length;i++){ prev=prev+a*(buf[i]-prev); buf[i]=prev; } }
-  return buf;
-}
+// The processor stage is NOT computed here — it lives in the engine
+// (ProcessParams -> signal_core.wgsl). The `proc` object is just the config the
+// host hands to the engine each frame. Same for sidechain (`side`) and luma.
 
 // ---------- engine (WebGPU primary, CPU reference fallback) ----------
+// The host (this tool) only CONFIGURES and CALLS the engine. All signal math —
+// source, smoothing, processor, sidechain modulation, luma mapping — lives in
+// the engine (shaders/signal_core.wgsl ⇄ signal-core-reference.js). Same code
+// the AE plugin runs through the Dawn bridge: "we run the demo how it ships."
+const MODNUM = { off:0, amp:1, rate:2, phase:3 };
 const Engine = {
   mode:"cpu", device:null, pipeline:null, bufs:null, bind:null,
-  cpuRack(c){ return new Rack({ srcType:c.src, rate:c.rate, phase:c.phase, amount:c.amount, offset:c.offset, smooth:c.smooth, seed:c.seed, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
-  sampleCPU(c,start,dt,out){ const r=this.cpuRack(c); for(let i=0;i<N;i++) out[i]=r.output("A",start+i*dt); return out; },
+  cpuRack(c,dt){ return new Rack({ srcType:+c.src, rate:c.rate, phase:c.phase, amount:c.amount, offset:c.offset||0,
+    smooth:c.smooth, seed:c.seed, frameDur:dt, process:c.process||null, mod:c.mod||null,
+    modInput:c.modInput||null, lumaInput:c.lumaInput||null, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
+  sampleCPU(c,start,dt,out){ const r=this.cpuRack(c,dt); for(let i=0;i<N;i++) out[i]=r.output("A",start+i*dt,i); return out; },
   async tryWebGPU(){ if(!navigator.gpu) return false;
     try{ const a=await navigator.gpu.requestAdapter(); if(!a) return false; this.device=await a.requestDevice();
       const code=await (await fetch("../shaders/signal_core.wgsl")).text();
       const m=this.device.createShaderModule({code});
       this.pipeline=this.device.createComputePipeline({layout:"auto",compute:{module:m,entryPoint:"main"}});
       const d=this.device;
-      this.bufs={ param:d.createBuffer({size:24*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
+      this.bufs={ param:d.createBuffer({size:36*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
         out:d.createBuffer({size:N*16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),
         luma:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
+        mod:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         read:d.createBuffer({size:N*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}) };
       this.bind=d.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[
-        {binding:0,resource:{buffer:this.bufs.param}},{binding:1,resource:{buffer:this.bufs.out}},{binding:2,resource:{buffer:this.bufs.luma}}]});
+        {binding:0,resource:{buffer:this.bufs.param}},{binding:1,resource:{buffer:this.bufs.out}},
+        {binding:2,resource:{buffer:this.bufs.luma}},{binding:3,resource:{buffer:this.bufs.mod}}]});
       this.mode="webgpu"; return true;
     }catch(e){ console.warn("WebGPU init failed:",e); return false; } },
-  async sampleGPU(c,start,dt,out){ const p=new Float32Array(24);
-    p[0]=c.src;p[1]=c.rate;p[2]=c.amount;p[3]=c.phase;p[4]=c.seed;p[5]=c.offset||0;p[6]=c.smooth;
-    p[8]=start;p[9]=dt;p[10]=1/60;p[11]=N;p[12]=MODE.normalized;p[13]=0;p[14]=1;p[16]=MODE.normalized;p[20]=MODE.normalized;
+  async sampleGPU(c,start,dt,out){ const p=new Float32Array(36), pr=c.process||{};
+    p[0]=+c.src;p[1]=c.rate;p[2]=c.amount;p[3]=c.phase;p[4]=c.seed;p[5]=c.offset||0;p[6]=c.smooth;
+    p[8]=start;p[9]=dt;p[10]=dt;p[11]=N;p[12]=MODE.normalized;p[13]=0;p[14]=1;p[16]=MODE.normalized;p[20]=MODE.normalized;
+    p[24]=pr.gain!=null?pr.gain:1;p[25]=pr.bias||0;p[26]=pr.quantize||0;p[27]=pr.gate||0;
+    p[28]=pr.lag||0;p[29]=pr.invert?1:0;p[30]=pr.rectify?1:0;
+    p[31]=c.mod?(MODNUM[c.mod.target]||0):0;p[32]=c.mod?c.mod.depth:0;
     const d=this.device,b=this.bufs; d.queue.writeBuffer(b.param,0,p);
+    if(c.lumaInput) d.queue.writeBuffer(b.luma,0,c.lumaInput);
+    if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
     const e=d.createCommandEncoder(); const pass=e.beginComputePass(); pass.setPipeline(this.pipeline); pass.setBindGroup(0,this.bind);
     pass.dispatchWorkgroups(Math.ceil(N/64)); pass.end(); e.copyBufferToBuffer(b.out,0,b.read,0,N*16); d.queue.submit([e.finish()]);
     await b.read.mapAsync(GPUMapMode.READ); const arr=new Float32Array(b.read.getMappedRange()); for(let i=0;i<N;i++) out[i]=arr[i*4]; b.read.unmap(); return out; },
@@ -427,24 +425,20 @@ function sampleMediaLuma(t){ if(!probe.el) return 0.5;
   let s=0,c=0; for(let i=0;i<data.length;i+=4){ s+=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]; c++; } return s/c/255;
 }
 function pushLuma(t){ const v=sampleMediaLuma(t); lumaHistory.copyWithin(0,1); lumaHistory[N-1]=v; }
-function fillFromLuma(out){ for(let i=0;i<N;i++) out[i]=lumaHistory[i]; }
-function sampleChannel(cfg,start,dt,out){ if(+cfg.src===7){ fillFromLuma(out); return Promise.resolve(out); } return Engine.sample(cfg,start,dt,out); }
-function modulateY(start,dt){ for(let i=0;i<N;i++){ const t=start+i*dt, xm=bufX[i];
-  yRack.srcType=+state.y.src; yRack.seed=state.y.seed; yRack.smooth=0; yRack.offset=state.y.offset;
-  yRack.amount=state.y.amount*(side.target==="amp"?(1-side.depth+side.depth*xm):1);
-  yRack.rate  =state.y.rate  *(side.target==="rate"?(1+side.depth*(xm*2-1)):1);
-  yRack.phase =state.y.phase +(side.target==="phase"?side.depth*xm:0);
-  bufY[i]=yRack.output("A",t); } }
-function sampleY(start,dt){ if(+state.y.src===7){ fillFromLuma(bufY); return Promise.resolve(); }
-  if(side.target!=="off"){ modulateY(start,dt); return Promise.resolve(); }
-  return Engine.sample(state.y,start,dt,bufY); }
+
+// Build the per-channel engine config (the host configures; the engine computes).
+function cfgX(){ return Object.assign({}, state.x, { process: proc, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
+function cfgY(){ return Object.assign({}, state.y, {
+    mod: (side.target!=="off" ? { target:side.target, depth:side.depth } : null),
+    modInput: (side.target!=="off" ? bufX : null),
+    lumaInput: (+state.y.src===7 ? lumaHistory : null) }); }
 
 // ---------- loop ----------
 function frame(){
   const t=FREEZE?frozenT:now(); const dt=SPAN/N, start=t-SPAN;
   if(probe.loaded) pushLuma(t);
-  sampleChannel(state.x,start,dt,bufX)
-    .then(()=>{ processSignal(bufX); return sampleY(start,dt); })   // shape X, then resolve Y (probe/sidechain/normal)
+  Engine.sample(cfgX(),start,dt,bufX)            // engine: source+smooth+processor+luma
+    .then(()=> Engine.sample(cfgY(),start,dt,bufY))  // engine: Y, sidechain-modulated by bufX
     .then(()=>{
       sizeCanvas(); const W=cv.width,H=cv.height; (Render[MODE_CUR]||Render.waveform)(W,H);
       const xc=bip(N-1), yc=bufY[N-1]*2-1;

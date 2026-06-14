@@ -35,6 +35,7 @@ public:
                   const CompiledSignalConfig& cfg,
                   std::uint32_t sampleCount,
                   const float* lumaSamples,
+                  const float* modSamples,
                   float startTime, float dt,
                   SignalOutputs* out,
                   std::string* message);
@@ -48,7 +49,8 @@ private:
     wgpu::ComputePipeline pipeline_;
     wgpu::Buffer          paramBuf_;   // uniform, 96 bytes
     wgpu::Buffer          outBuf_;     // storage, vec4 * capacity
-    wgpu::Buffer          lumaBuf_;    // storage, f32 * capacity
+    wgpu::Buffer          lumaBuf_;    // storage, f32 * capacity (probe input)
+    wgpu::Buffer          modBuf_;     // storage, f32 * capacity (sidechain input)
     wgpu::Buffer          readBuf_;    // map-read, vec4 * capacity
     std::uint32_t         capacity_ = 0;
 };

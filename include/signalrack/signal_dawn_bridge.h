@@ -36,6 +36,7 @@ struct SignalRenderRequest {
 
     float        resolvedInputA = 0.0f;  // sidechain scalar for SourceType::Linked
     const float* lumaSamples    = nullptr;  // length == sampleCount, for LumaProbe
+    const float* modSamples     = nullptr;  // length == sampleCount, per-sample modulator
 };
 
 // Evaluate the recipe on the GPU and fill `out` with interpreted scalar

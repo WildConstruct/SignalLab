@@ -42,7 +42,8 @@ bool RenderSignalWithDawn(const SignalRenderRequest& request,
                 request.frameDuration, request.sampleCount, request.resolvedInputA);
 
     return runtime.Evaluate(device, cfg, request.sampleCount,
-                            request.lumaSamples, request.startTime, request.dt,
+                            request.lumaSamples, request.modSamples,
+                            request.startTime, request.dt,
                             out, message);
 }
 

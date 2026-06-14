@@ -51,7 +51,7 @@ backend — no CPU fallback.
 
 ```bash
 # 1. Engine logic parity oracle (no GPU)
-cd prototypes/webgpu-lab && node validate.js          # 10/10 pass
+cd prototypes/webgpu-lab && node validate.js          # 15/15 pass (engine owns source/smooth/process/sidechain/lag/luma)
 
 # 2. C++ contract (Recipe→Compile→params parity, AE param mapping)
 g++ -std=c++17 -I include -I . examples/core_contract_test.cpp -o /tmp/t && /tmp/t

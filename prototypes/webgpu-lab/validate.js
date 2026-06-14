@@ -58,5 +58,36 @@ var luma = new Rack({ srcType: SOURCE.lumaProbe, luma: function (t) { return 0.5
 var lv = luma.output("A", 0.25);
 ok("Luma probe drives output in [0,1]", lv >= 0 && lv <= 1 && lv > 0.9);
 
+// --- engine-owned processor / sidechain / lag (moved out of the tool) ---
+
+// 9b. Processor gate (in-engine): threshold makes output strictly 0/1
+var pg = new Rack({ srcType: SOURCE.sine, rate: 1, process: { gate: 0.5 }, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+var pgBinary = true; for (var tg = 0; tg < 2; tg += 1 / 30) { var g = pg.output("A", tg); if (g !== 0 && g !== 1) pgBinary = false; }
+ok("Processor gate yields strictly 0/1", pgBinary);
+
+// 9c. Processor quantize: 4 steps -> at most 4 distinct values
+var pq = new Rack({ srcType: SOURCE.ramp, rate: 1, process: { quantize: 4 }, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+var qset = {}; for (var tq = 0; tq < 1; tq += 1 / 120) qset[pq.output("A", tq).toFixed(4)] = 1;
+ok("Processor quantize(4) -> <=4 levels", Object.keys(qset).length <= 4);
+
+// 9d. Processor invert: inverted sine = 1 - original
+var pa = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 3 });
+var pb = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 3, process: { invert: true } });
+ok("Processor invert == 1 - original", approx(pb.output("A", 0.37), 1 - pa.output("A", 0.37), 1e-9));
+
+// 9e. Sidechain (engine-owned): Y amplitude modulated by a per-sample X array
+var N = 64, mod = new Float32Array(N);
+for (var i = 0; i < N; i++) mod[i] = 0.5 + 0.5 * Math.sin(i / N * 6.283);
+var ymod = new Rack({ srcType: SOURCE.sine, rate: 3, mod: { target: "amp", depth: 0.9 }, modInput: mod, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+var ylo = 2, yhi = -2, ydistinct = {};
+for (var s = 0; s < N; s++) { var yv = ymod.output("A", s / 30, s); ylo = Math.min(ylo, yv); yhi = Math.max(yhi, yv); ydistinct[yv.toFixed(3)] = 1; }
+ok("Sidechain AM bounded [0,1] and varies", ylo >= 0 && yhi <= 1 && Object.keys(ydistinct).length > 10);
+
+// 9f. Lag (engine-owned, finite EWMA): lowers variance of a pulse
+function variance(rack) { var m = 0, n = 0, s = 0; for (var t = 0; t < 2; t += 1 / 60) { var v = rack.output("A", t, Math.round(t * 60)); n++; var d = v - m; m += d / n; s += d * (v - m); } return s / n; }
+var rawL = new Rack({ srcType: SOURCE.pulse, rate: 2, frameDur: 1 / 60, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+var lagL = new Rack({ srcType: SOURCE.pulse, rate: 2, frameDur: 1 / 60, process: { lag: 0.85 }, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+ok("Processor lag lowers variance", variance(lagL) < variance(rawL));
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

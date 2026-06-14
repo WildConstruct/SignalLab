@@ -28,7 +28,7 @@ open items still flagged **[verify]** against Notion.
 | `prototypes/ae-script/SignalRack.jsx` | **Shrunk** to `tooling/ae/SignalRack-binding-helper.jsx` (bind/chain/bake over the plugin; no engine). |
 
 ## Verified runnable here
-- `node prototypes/webgpu-lab/validate.js` → 10/10.
+- `node prototypes/webgpu-lab/validate.js` → 15/15 (incl. engine-owned processor, sidechain, lag).
 - `examples/core_contract_test.cpp` compiles + passes (Compile() WGSL parity).
 - WGSL embed codegen (`tools/embed_wgsl.cmake`) works.
 

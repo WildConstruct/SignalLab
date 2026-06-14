@@ -15,13 +15,21 @@ int main(){
   assert(name == "SR \xc2\xb7 Pulse Driver");
 
   // Recipe -> CompiledSignalConfig parity with WGSL layout
+  r.process.gain=1.5f; r.process.gate=0.6f; r.process.lag=0.4f; r.process.invert=true;
+  r.process.modTarget=1; r.process.modDepth=0.8f;
   auto c = Compile(r, 0.0f, 1.0f/30, 1.0f/30, 30, 0.0f);
-  assert(c.byteSize()==96);
+  assert(c.byteSize()==144);
   assert(c.params[CompiledSignalConfig::SrcType]==2.0f);     // Pulse
   assert(c.params[CompiledSignalConfig::Rate]==2.0f);
   assert(c.params[CompiledSignalConfig::SampleN]==30.0f);
   assert(c.params[CompiledSignalConfig::ModeA]==3.0f);       // Percentage
   assert(c.params[CompiledSignalConfig::MaxA]==110.0f);
+  assert(c.params[CompiledSignalConfig::PGain]==1.5f);       // processor moved into engine
+  assert(c.params[CompiledSignalConfig::PGate]==0.6f);
+  assert(c.params[CompiledSignalConfig::PLag]==0.4f);
+  assert(c.params[CompiledSignalConfig::PInvert]==1.0f);
+  assert(c.params[CompiledSignalConfig::ModTarget]==1.0f);
+  assert(c.params[CompiledSignalConfig::ModDepth]==0.8f);
 
   // AE param snapshot -> recipe
   ae::ParamSnapshot s; s.sourceType=2; s.rate=2.0f; s.outAMode=3; s.outAMax=110;
