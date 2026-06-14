@@ -187,6 +187,15 @@
   </div>
 
   <div class="panel">
+    <h2>Window <span class="lite">— feathered region (Channel X)</span></h2>
+    <div class="ctl"><label>Left</label><input type="range" id="winL" min="0" max="1" step="0.01" value="0"><output></output></div>
+    <div class="ctl"><label>Right</label><input type="range" id="winR" min="0" max="1" step="0.01" value="1"><output></output></div>
+    <div class="ctl"><label>Feather L</label><input type="range" id="winFL" min="0" max="0.5" step="0.01" value="0"><output></output></div>
+    <div class="ctl"><label>Feather R</label><input type="range" id="winFR" min="0" max="0.5" step="0.01" value="0"><output></output></div>
+    <div style="color:#52606b;font-size:11px;margin-top:4px">Pull each edge in/out; feather ramps that side. Leave one hard, ramp the other.</div>
+  </div>
+
+  <div class="panel">
     <h2>Sidechain <span class="lite">— X modulates Y</span></h2>
     <div class="ctl"><label>Mode</label><select id="sideMode"><option value="off">off</option><option value="amp">amplitude</option><option value="rate">rate (FM)</option><option value="phase">phase</option></select><output></output></div>
     <div class="ctl"><label>Depth</label><input type="range" id="sideDepth" min="0" max="1" step="0.02" value="0.5"><output></output></div>
@@ -237,7 +246,8 @@ const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied 
 const side = { target:"off", depth:0.5 };
 const probe = { mode:"scan", loaded:false, el:null, kind:null };
 const lumaHistory = new Float32Array(N).fill(0.5);
-const crt = { on:true, pass:null, failed:false };   // Cathode CRT/NTSC WebGPU overlay (default on)
+const crt = { on:true, pass:null, failed:false };
+const win = { left:0, right:1, featherL:0, featherR:0 };   // feathered region window (drives Channel X)   // Cathode CRT/NTSC WebGPU overlay (default on)
 
 // The processor/sidechain/luma are NOT computed here — they live in the engine
 // (signal_core.wgsl ⇄ signal-core-reference.js). This host only configures and
@@ -247,7 +257,7 @@ const Engine = {
   mode:"cpu", gpuRejected:false, device:null, pipeline:null, bufs:null, bind:null,
   cpuRack(c,dt){ return new Rack({ srcType:+c.src, rate:c.rate, phase:c.phase, amount:c.amount, offset:c.offset||0,
     smooth:c.smooth, seed:c.seed, frameDur:dt, process:c.process||null, mod:c.mod||null,
-    modInput:c.modInput||null, lumaInput:c.lumaInput||null, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
+    modInput:c.modInput||null, lumaInput:c.lumaInput||null, win:c.win||null, sampleN:N, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
   sampleCPU(c,start,dt,out){ const r=this.cpuRack(c,dt); for(let i=0;i<N;i++) out[i]=r.output("A",start+i*dt,i); return out; },
   async tryWebGPU(){ if(!navigator.gpu) return false;
     try{ const a=await navigator.gpu.requestAdapter(); if(!a) return false; this.device=await a.requestDevice();
@@ -255,7 +265,7 @@ const Engine = {
       const m=this.device.createShaderModule({code});
       this.pipeline=this.device.createComputePipeline({layout:"auto",compute:{module:m,entryPoint:"main"}});
       const d=this.device;
-      this.bufs={ param:d.createBuffer({size:36*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
+      this.bufs={ param:d.createBuffer({size:40*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
         out:d.createBuffer({size:N*16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),
         luma:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         mod:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
@@ -265,13 +275,14 @@ const Engine = {
         {binding:2,resource:{buffer:this.bufs.luma}},{binding:3,resource:{buffer:this.bufs.mod}}]});
       this.mode="webgpu"; return true;
     }catch(e){ console.warn("WebGPU init failed:",e); return false; } },
-  async sampleGPU(c,start,dt,out){ const p=new Float32Array(36), pr=c.process||{};
+  async sampleGPU(c,start,dt,out){ const p=new Float32Array(40), pr=c.process||{}, w=c.win||{};
     p[0]=+c.src;p[1]=c.rate;p[2]=c.amount;p[3]=c.phase;p[4]=c.seed;p[5]=c.offset||0;p[6]=c.smooth;
     p[8]=start;p[9]=dt;p[10]=dt;p[11]=N;p[12]=MODE.normalized;p[13]=0;p[14]=1;p[16]=MODE.normalized;p[20]=MODE.normalized;
     p[24]=pr.gain!=null?pr.gain:1;p[25]=pr.bias||0;p[26]=pr.quantize||0;p[27]=pr.gate||0;
     p[28]=pr.lag||0;p[29]=pr.invert?1:0;p[30]=pr.rectify?1:0;
     p[31]=c.mod?(MODNUM[c.mod.target]||0):0;p[32]=c.mod?c.mod.depth:0;
     p[33]=pr.warp||0;p[34]=pr.fold||0;p[35]=pr.sat||0;
+    p[36]=w.left!=null?w.left:0;p[37]=w.right!=null?w.right:1;p[38]=w.featherL||0;p[39]=w.featherR||0;
     const d=this.device,b=this.bufs; d.queue.writeBuffer(b.param,0,p);
     if(c.lumaInput) d.queue.writeBuffer(b.luma,0,c.lumaInput);
     if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
@@ -335,9 +346,10 @@ function reflectInputs(){
   document.querySelectorAll("#proc [data-q]").forEach(el=>{ const q=el.dataset.q; el.value=proc[q]; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(q==="quantize"?proc[q].toFixed(0):proc[q].toFixed(2)); });
   document.querySelectorAll("#proc [data-qb]").forEach(el=>{ el.checked=!!proc[el.dataset.qb]; });
   if(document.getElementById("driveMode")) document.getElementById("driveMode").value=drive.mode;
+  [["winL",win.left],["winR",win.right],["winFL",win.featherL],["winFR",win.featherR]].forEach(([id,v])=>{ const el=document.getElementById(id); if(el){ el.value=v; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(+v).toFixed(2); } });
 }
 function applyPreset(p){
-  Object.assign(proc,PROC0); drive.mode=p.drive||"x";
+  Object.assign(proc,PROC0); drive.mode=p.drive||"x"; Object.assign(win,{left:0,right:1,featherL:0,featherR:0});
   Object.assign(state.x,X0,p.x); Object.assign(state.y,Y0,p.y);
   if(p.proc) Object.assign(proc,p.proc);
   reflectInputs(); updateMath();
@@ -475,6 +487,15 @@ function buildAEExpression(){
       L.push("var n = shapedN(time);");
     }
   }
+  if(win.left>0||win.right<1||win.featherL>0||win.featherR>0){
+    L.push("");
+    L.push("// feathered region window, mapped to this layer's in/out");
+    L.push("var tIn=thisLayer.inPoint, tOut=thisLayer.outPoint, dur=Math.max(tOut-tIn,0.001);");
+    L.push("var wL=tIn+dur*"+aeNum(win.left)+", wR=tIn+dur*"+aeNum(win.right)+", fL=dur*"+aeNum(win.featherL)+", fR=dur*"+aeNum(win.featherR)+";");
+    L.push("var eL = (fL>0) ? linear(time,wL,wL+fL,0,1) : (time>=wL?1:0);");
+    L.push("var eR = (fR>0) ? linear(time,wR-fR,wR,1,0) : (time<=wR?1:0);");
+    L.push("n = n * eL * eR;");
+  }
   L.push("");
   L.push("linear(n, 0, 1, "+aeNum(mn)+", "+aeNum(mx)+");");
   return L.join("\n");
@@ -488,6 +509,8 @@ function updateMath(){
   html += `<div class="lbl">Channel Y</div><div class="math">y(t) = ${gy.b}</div>`;
   if(side.target!=="off"){ const w={amp:"amplitude",rate:"rate",phase:"phase"}[side.target];
     html += `<div class="lbl">Sidechain — X modulates Y ${w}</div><div class="math">y(t) = Y( ${w} ⊕ ${num(side.depth)}·x′(t) )</div>`; }
+  const anyWin = win.left>0||win.right<1||win.featherL>0||win.featherR>0;
+  if(anyWin) html += `<div class="lbl">Window — feathered region</div><div class="math">× window[${num(win.left)}, ${num(win.right)}] feather ${num(win.featherL)}/${num(win.featherR)}</div>`;
   const driver = anyProc() ? procMath("n(t)").replace(/n\(t\)/g, `(${nx})`) : nx;
   let punch, cap;
   if(MODE_CUR==="applied"){
@@ -512,6 +535,10 @@ function bindProc(){
     el.addEventListener("change",()=>{ proc[q]=el.checked; updateMath(); }); });
 }
 bindProc();
+function bindWin(){ const map={winL:"left",winR:"right",winFL:"featherL",winFR:"featherR"};
+  Object.keys(map).forEach(id=>{ const el=document.getElementById(id), o=el.parentElement.querySelector("output");
+    const set=()=>{ win[map[id]]=+el.value; if(o)o.textContent=(+el.value).toFixed(2); updateMath(); }; el.addEventListener("input",set); set(); }); }
+bindWin();
 document.getElementById("dhead").onclick=()=>document.getElementById("drawer").classList.toggle("open");
 // "Copy AE expression" lives inside the (re-rendered) drawer body — delegate the click.
 document.getElementById("dinner").addEventListener("click", e=>{
@@ -650,7 +677,7 @@ function sampleMediaLuma(t){ if(!probe.el) return 0.5;
 }
 function pushLuma(t){ const v=sampleMediaLuma(t); lumaHistory.copyWithin(0,1); lumaHistory[N-1]=v; }
 
-function cfgX(){ return Object.assign({}, state.x, { process: proc, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
+function cfgX(){ return Object.assign({}, state.x, { process: proc, win: win, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
 function cfgY(){ return Object.assign({}, state.y, {
     mod: (side.target!=="off" ? { target:side.target, depth:side.depth } : null),
     modInput: (side.target!=="off" ? bufX : null),
