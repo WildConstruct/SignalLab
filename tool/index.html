@@ -50,6 +50,11 @@
   .row{ display:flex; flex-wrap:wrap; gap:8px; }
   .row button{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer; }
   .row button:active{ border-color:#3a6; color:#bfe; }
+  .pgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px; }
+  .pcard{ background:#0b0e12; border:1px solid var(--edge); border-radius:9px; padding:5px; cursor:pointer; display:flex; flex-direction:column; gap:4px; align-items:center; }
+  .pcard:active{ border-color:#3a6; }
+  .pcard canvas{ width:100%; height:auto; border-radius:4px; display:block; background:#05070a; }
+  .pname{ font-size:10px; color:var(--dim); text-align:center; line-height:1.15; }
   textarea{ display:none; width:100%; height:140px; margin-top:8px; background:#0b0e12; color:#bfe; border:1px solid var(--edge); border-radius:8px; font:11px/1.4 ui-monospace,Menlo,monospace; padding:8px; }
 
   /* math expression — now a normal collapsible panel at the end of the scroll */
@@ -171,12 +176,8 @@
   </div>
 
   <div class="panel">
-    <h2>Presets</h2>
-    <div class="row" id="presets">
-      <button data-preset="circle">Circle</button><button data-preset="lissa23">Lissa 2:3</button>
-      <button data-preset="lissa34">Lissa 3:4</button><button data-preset="pulsegate">Pulse×Sine</button>
-      <button data-preset="noise">Noise</button>
-    </div>
+    <h2>Preset browser</h2>
+    <div class="pgrid" id="presetGallery"></div>
     <h2 style="margin-top:14px">Display</h2>
     <div class="ctl"><label>Window</label><input type="range" id="span" min="0.5" max="8" step="0.5" value="3"><output id="spanv"></output></div>
     <div class="ctl"><label>Persist</label><input type="range" id="persist" min="0" max="0.95" step="0.05" value="0.8"><output id="persistv"></output></div>
@@ -275,12 +276,48 @@ function fmt(p,v){ if(p==="src")return["","Sine","Pulse","Ramp","Noise","Walk","
 function bindCh(ch){ document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const p=el.dataset.p,o=el.parentElement.querySelector("output");
   const set=()=>{ state[ch][p]=+el.value; if(o)o.textContent=fmt(p,el.value); if(window._mathReady) updateMath(); }; el.addEventListener("input",set); set(); }); }
 bindCh("x"); bindCh("y");
-const presets={ circle:{x:{src:1,rate:1,phase:0},y:{src:1,rate:1,phase:0.25}}, lissa23:{x:{src:1,rate:2,phase:0},y:{src:1,rate:3,phase:0}},
-  lissa34:{x:{src:1,rate:3,phase:0},y:{src:1,rate:4,phase:0.12}}, pulsegate:{x:{src:2,rate:2,phase:0},y:{src:1,rate:2,phase:0.25}},
-  noise:{x:{src:5,rate:1.2,smooth:0.3},y:{src:5,rate:1.4,smooth:0.3,seed:412}} };
-document.getElementById("presets").onclick=e=>{ const k=e.target.dataset.preset; if(!k)return;
-  for(const ch of ["x","y"]) Object.assign(state[ch],presets[k][ch]||{});
-  for(const ch of ["x","y"]) document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const p=el.dataset.p; if(state[ch][p]!=null){ el.value=state[ch][p]; el.dispatchEvent(new Event("input")); }}); updateMath(); };
+// Preset browser — each entry has a name + thumbnail (mini vectorscope of X vs Y).
+const presetList=[
+  { name:"Circle 1:1",     x:{src:1,rate:1,phase:0},          y:{src:1,rate:1,phase:0.25} },
+  { name:"Lissajous 2:3",  x:{src:1,rate:2,phase:0},          y:{src:1,rate:3,phase:0} },
+  { name:"Lissajous 3:4",  x:{src:1,rate:3,phase:0},          y:{src:1,rate:4,phase:0.12} },
+  { name:"Pulse × Sine",   x:{src:2,rate:2,phase:0},          y:{src:1,rate:2,phase:0.25} },
+  { name:"Ring Mod",       x:{src:1,rate:3},                  y:{src:1,rate:2,phase:0.1}, drive:"mult" },
+  { name:"Folded Sine",    x:{src:1,rate:1.5},                y:{src:1,rate:1.5,phase:0.25}, proc:{fold:0.6} },
+  { name:"Warp Drive",     x:{src:1,rate:2},                  y:{src:1,rate:3,phase:0.2}, proc:{warp:0.8} },
+  { name:"Noise Cloud",    x:{src:5,rate:1.2,smooth:0.3},     y:{src:5,rate:1.4,smooth:0.3,seed:412} },
+  { name:"Sync Drift",     x:{src:5,rate:0.3,smooth:0.4},     y:{src:5,rate:0.4,smooth:0.4,seed:1972} },
+  { name:"Random Walk",    x:{src:5,rate:0.8,smooth:0.2},     y:{src:5,rate:1.0,smooth:0.2,seed:77} },
+  { name:"Needle Bounce",  x:{src:2,rate:1.5},                y:{src:1,rate:1.5,phase:0.25}, proc:{lag:0.7} },
+  { name:"Clock Gate",     x:{src:2,rate:4},                  y:{src:3,rate:2}, proc:{gate:0.5} },
+];
+const X0={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1941}, Y0={src:1,rate:3,phase:0,amount:1,offset:0,smooth:0,seed:77};
+const PROC0={gain:1,bias:0,quantize:0,gate:0,lag:0,warp:0,fold:0,invert:false,rectify:false};
+function presetRack(base,cfg,pr){ const c=Object.assign({},base,cfg); return new Rack({srcType:+c.src,rate:c.rate,phase:c.phase,amount:c.amount,offset:c.offset,smooth:c.smooth,seed:c.seed,frameDur:1/60,process:pr||null,outputs:{A:{mode:MODE.normalized,min:0,max:1}}}); }
+function renderThumb(cvn,p){ const c=cvn.getContext("2d"), W=cvn.width, H=cvn.height; c.fillStyle="#05070a"; c.fillRect(0,0,W,H);
+  const rx=presetRack(X0,p.x,Object.assign({},PROC0,p.proc||{})), ry=presetRack(Y0,p.y,null);
+  const M=320, cx=W/2, cy=H/2, R=Math.min(W,H)/2-3; c.strokeStyle="#36f09a"; c.lineWidth=1; c.beginPath();
+  for(let i=0;i<M;i++){ const t=i/M*2; const xv=rx.output("A",t,i)*2-1, yv=ry.output("A",t,i)*2-1; const px=cx+xv*R, py=cy-yv*R; i?c.lineTo(px,py):c.moveTo(px,py); }
+  c.stroke(); }
+function reflectInputs(){
+  for(const ch of ["x","y"]) document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const k=el.dataset.p; if(state[ch][k]!=null){ el.value=state[ch][k]; const o=el.parentElement.querySelector("output"); if(o)o.textContent=fmt(k,el.value); } });
+  document.querySelectorAll("#proc [data-q]").forEach(el=>{ const q=el.dataset.q; el.value=proc[q]; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(q==="quantize"?proc[q].toFixed(0):proc[q].toFixed(2)); });
+  document.querySelectorAll("#proc [data-qb]").forEach(el=>{ el.checked=!!proc[el.dataset.qb]; });
+  if(document.getElementById("driveMode")) document.getElementById("driveMode").value=drive.mode;
+}
+function applyPreset(p){
+  Object.assign(proc,PROC0); drive.mode=p.drive||"x";
+  Object.assign(state.x,X0,p.x); Object.assign(state.y,Y0,p.y);
+  if(p.proc) Object.assign(proc,p.proc);
+  reflectInputs(); updateMath();
+}
+function buildGallery(){ const g=document.getElementById("presetGallery"); g.innerHTML="";
+  presetList.forEach(p=>{ const card=document.createElement("div"); card.className="pcard"; card.title=p.name;
+    const cvn=document.createElement("canvas"); cvn.width=90; cvn.height=54;
+    const nm=document.createElement("div"); nm.className="pname"; nm.textContent=p.name;
+    card.appendChild(cvn); card.appendChild(nm); card.onclick=()=>applyPreset(p); g.appendChild(card); renderThumb(cvn,p); });
+}
+buildGallery();
 const $=id=>document.getElementById(id);
 $("span").oninput=()=>{SPAN=+$("span").value;$("spanv").textContent=SPAN.toFixed(1)+"s";}; $("span").oninput();
 $("persist").oninput=()=>{PERSIST=+$("persist").value;$("persistv").textContent=PERSIST.toFixed(2);}; $("persist").oninput();
