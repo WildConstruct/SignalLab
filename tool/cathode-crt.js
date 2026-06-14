@@ -41,24 +41,28 @@ struct V { @builtin(position) pos : vec4<f32>, @location(0) uv : vec2<f32>, };
 }
 fn bright(uv : vec2<f32>) -> vec3<f32> {
   let c = textureSampleLevel(tex, s, uv, 0.0).rgb;
-  return max(c - vec3<f32>(0.40), vec3<f32>(0.0));
+  return max(c - vec3<f32>(0.18), vec3<f32>(0.0));     // low threshold so the glow spreads
 }
 @fragment fn fs(in : V) -> @location(0) vec4<f32> {
   let texel = 1.0 / vec2<f32>(textureDimensions(tex));
   let base = textureSampleLevel(tex, s, in.uv, 0.0).rgb;
   let TAU = 6.28318530718;
-  var bloom = bright(in.uv) * 0.6;
-  for (var k : i32 = 0; k < 8; k = k + 1) {                 // inner ring (tight halo)
+  // multi-scale feathered bloom: 4 octaves of rings at growing radius → soft halo
+  var bloom = bright(in.uv) * 0.5;
+  for (var k : i32 = 0; k < 8; k = k + 1) {
     let a = TAU * f32(k) / 8.0;
-    bloom = bloom + bright(in.uv + vec2<f32>(cos(a), sin(a)) * texel * 3.0) * 0.46;
+    let d = vec2<f32>(cos(a), sin(a));
+    bloom = bloom
+      + bright(in.uv + d * texel * 5.0)  * 0.42
+      + bright(in.uv + d * texel * 12.0) * 0.30
+      + bright(in.uv + d * texel * 24.0) * 0.20
+      + bright(in.uv + d * texel * 44.0) * 0.12;
   }
-  for (var k2 : i32 = 0; k2 < 8; k2 = k2 + 1) {             // outer ring (feathered)
-    let a = TAU * (f32(k2) + 0.5) / 8.0;
-    bloom = bloom + bright(in.uv + vec2<f32>(cos(a), sin(a)) * texel * 8.0) * 0.26;
-  }
-  bloom = bloom / 6.0;
-  let tint = vec3<f32>(1.0, 0.97, 0.92);
-  let lit = 1.0 - (1.0 - base) * (1.0 - clamp(bloom * tint * 1.6, vec3<f32>(0.0), vec3<f32>(1.0)));
+  bloom = bloom / 8.5;
+  let tint = vec3<f32>(1.0, 0.99, 0.95);
+  let exposure = 1.34;                                  // overall gain up
+  let lit = 1.0 - (1.0 - clamp(base * exposure, vec3<f32>(0.0), vec3<f32>(1.0)))
+                * (1.0 - clamp(bloom * tint * 2.6, vec3<f32>(0.0), vec3<f32>(1.0)));
   return vec4<f32>(lit, 1.0);
 }`;
 
