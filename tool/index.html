@@ -73,6 +73,27 @@
   .dinner .punch{ color:#fff; background:#0f1620; border:1px solid #24343f; border-radius:8px; padding:10px 12px; margin-top:8px; word-break:break-word; }
   .dinner .punch .cap{ color:#6b7a87; display:block; margin-top:6px; font-size:11px; }
   .dinner .legend{ color:#52606b; font-size:11px; margin-top:12px; }
+
+  /* ---- app polish ---- */
+  body{ background:radial-gradient(1100px 560px at 50% -12%, #0f151c 0%, #07090b 62%); }
+  header{ position:sticky; top:0; z-index:20; background:rgba(9,12,16,0.82); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-bottom:1px solid #131a21; }
+  header h1{ display:flex; align-items:center; gap:9px; font-weight:700; }
+  header h1::before{ content:""; width:11px; height:11px; border-radius:50%; background:var(--x); box-shadow:0 0 12px var(--x); }
+  .tabs{ background:#0b0f14; border:1px solid var(--edge); border-radius:13px; padding:4px; gap:4px; }
+  .tabs button{ border:1px solid transparent; background:transparent; border-radius:10px; transition:background .15s,color .15s; }
+  .tabs button.on{ box-shadow:0 2px 10px -2px #0009; }
+  .panel{ box-shadow:0 1px 0 rgba(255,255,255,0.03) inset, 0 16px 30px -26px #000; }
+  .panel h2{ display:flex; align-items:center; gap:8px; }
+  .panel h2::before{ content:""; width:6px; height:6px; border-radius:2px; background:var(--x); opacity:.65; flex:0 0 auto; }
+  .stagewrap{ box-shadow:0 18px 40px -28px #000; }
+  input[type=range]{ -webkit-appearance:none; appearance:none; height:24px; background:transparent; }
+  input[type=range]::-webkit-slider-runnable-track{ height:4px; border-radius:3px; background:#1b232b; }
+  input[type=range]::-moz-range-track{ height:4px; border-radius:3px; background:#1b232b; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; margin-top:-7px; width:18px; height:18px; border-radius:50%; background:#dff; border:2px solid #2bb46e; box-shadow:0 2px 6px #0009; cursor:pointer; }
+  input[type=range]::-moz-range-thumb{ width:16px; height:16px; border-radius:50%; background:#dff; border:2px solid #2bb46e; }
+  select,input[type=number]{ transition:border-color .15s; } select:focus,input:focus{ outline:none; border-color:#2bb46e; }
+  #exportBtn{ background:#12231b; border-color:#27613f; color:#a8f0c8; font-weight:600; }
+  .pcard{ transition:transform .1s, border-color .15s; } .pcard:active{ transform:scale(.96); }
 </style>
 </head>
 <body>
@@ -153,6 +174,7 @@
       <div class="ctl"><label>Gain</label><input type="range" data-q="gain" min="0" max="3" step="0.05" value="1"><output></output></div>
       <div class="ctl"><label>Bias</label><input type="range" data-q="bias" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Quantize</label><input type="range" data-q="quantize" min="0" max="16" step="1" value="0"><output></output></div>
+      <div class="ctl"><label>Saturate</label><input type="range" data-q="sat" min="0" max="1" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Warp</label><input type="range" data-q="warp" min="-1" max="1" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Fold</label><input type="range" data-q="fold" min="0" max="1" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Gate ≥</label><input type="range" data-q="gate" min="0" max="1" step="0.02" value="0"><output></output></div>
@@ -210,7 +232,7 @@ const state = {
   y:{ src:1, rate:3, phase:0, amount:1, offset:0, smooth:0, seed:77 },
 };
 const applied = { target:"scale", min:80, max:120 };
-const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, invert:false, rectify:false };
+const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, sat:0, invert:false, rectify:false };
 const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied property
 const side = { target:"off", depth:0.5 };
 const probe = { mode:"scan", loaded:false, el:null, kind:null };
@@ -249,7 +271,7 @@ const Engine = {
     p[24]=pr.gain!=null?pr.gain:1;p[25]=pr.bias||0;p[26]=pr.quantize||0;p[27]=pr.gate||0;
     p[28]=pr.lag||0;p[29]=pr.invert?1:0;p[30]=pr.rectify?1:0;
     p[31]=c.mod?(MODNUM[c.mod.target]||0):0;p[32]=c.mod?c.mod.depth:0;
-    p[33]=pr.warp||0;p[34]=pr.fold||0;
+    p[33]=pr.warp||0;p[34]=pr.fold||0;p[35]=pr.sat||0;
     const d=this.device,b=this.bufs; d.queue.writeBuffer(b.param,0,p);
     if(c.lumaInput) d.queue.writeBuffer(b.luma,0,c.lumaInput);
     if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
@@ -297,7 +319,7 @@ const presetList=[
   { name:"Clock Gate",     x:{src:2,rate:4},                  y:{src:3,rate:2}, proc:{gate:0.5} },
 ];
 const X0={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1941}, Y0={src:1,rate:3,phase:0,amount:1,offset:0,smooth:0,seed:77};
-const PROC0={gain:1,bias:0,quantize:0,gate:0,lag:0,warp:0,fold:0,invert:false,rectify:false};
+const PROC0={gain:1,bias:0,quantize:0,gate:0,lag:0,warp:0,fold:0,sat:0,invert:false,rectify:false};
 function presetRack(base,cfg,pr){ const c=Object.assign({},base,cfg); return new Rack({srcType:+c.src,rate:c.rate,phase:c.phase,amount:c.amount,offset:c.offset,smooth:c.smooth,seed:c.seed,frameDur:1/60,process:pr||null,outputs:{A:{mode:MODE.normalized,min:0,max:1}}}); }
 function renderThumb(cvn,p){ const c=cvn.getContext("2d"), W=cvn.width, H=cvn.height; c.fillStyle="#05070a"; c.fillRect(0,0,W,H);
   const rx=presetRack(X0,p.x,Object.assign({},PROC0,p.proc||{})), ry=presetRack(Y0,p.y,null);
@@ -383,6 +405,7 @@ function smoothMath(n0, cfg){
 function procMath(t){
   let e=t, p=proc;
   if(p.gain!==1||p.bias!==0) e=`clamp(0.5 + (${e} − 0.5)·${num(p.gain)}${p.bias?` + ${num(p.bias)}`:""}, 0, 1)`;
+  if(p.sat>0) e=`saturate₍${num(p.sat)}₎(${e})`;
   if(p.warp) e=`warp₍${num(p.warp)}₎(${e})`;
   if(p.fold>0) e=`fold₍${num(p.fold)}₎(${e})`;
   if(p.invert) e=`1 − (${e})`;
@@ -392,7 +415,7 @@ function procMath(t){
   if(p.lag>0) e=`lag₍${num(p.lag)}₎(${e})`;
   return e;
 }
-function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rectify||p.quantize>1||p.gate>0||p.lag>0||p.warp!==0||p.fold>0; }
+function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rectify||p.quantize>1||p.gate>0||p.lag>0||p.warp!==0||p.fold>0||p.sat>0; }
 
 // Build a self-contained, WORKING After Effects expression that reproduces the
 // current Channel X signal -> property. Paste onto a property in AE.
@@ -428,6 +451,7 @@ function buildAEExpression(){
     L.push("  for(var i=0;i<M;i++){ var f=(M==1)?0:i/(M-1); acc+=srcUni(tt-win*f); } return acc/M; }");
     L.push("function shapedN(tt){ var n=clamp(smoothed(tt),0,1);");
     if(p.gain!==1||p.bias!==0) L.push("  n=clamp(0.5+(n-0.5)*"+aeNum(p.gain)+"+"+aeNum(p.bias)+",0,1);");
+    if(p.sat>0) L.push("  { function th(x){var c=Math.max(-4,Math.min(4,x)),a=c*c;return c*(27+a)/(27+9*a);} var bp=n*2-1,g=1+"+aeNum(p.sat)+"*4,bb="+aeNum(p.sat)+"*0.2,sh=(th(bp*g+bb)-th(bb))/Math.max(th(g),0.001); n=((bp*(1-"+aeNum(p.sat)+")+sh*"+aeNum(p.sat)+")+1)/2; }");
     if(p.warp) L.push("  { var bp=n*2-1; n=((bp<0?-1:1)*Math.pow(Math.abs(bp),Math.pow(3,"+aeNum(-p.warp)+"))+1)/2; }");
     if(p.fold>0) L.push("  { var fx=(n*2-1)*"+aeNum(1+p.fold*6)+", fm=(fx-1)-4*Math.floor((fx-1)/4); n=Math.abs(fm-2)*0.5; }");
     if(p.invert) L.push("  n=1-n;");
@@ -562,8 +586,18 @@ function drawApplied(W,H){
       ctx.fillStyle=(n>=0.5)?"#f0683a":"#16221c"; ctx.beginPath(); ctx.arc(cx,y-bh-26,11,0,7); ctx.fill(); break; }
     case "particles":{ const birth=Math.round(n*(applied.max/60)); for(let i=0;i<birth;i++) parts.push({x:cx,y:cy,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,l:1});
       parts=parts.filter(p=>p.l>0); for(const p of parts){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.l-=0.02; ctx.globalAlpha=Math.max(0,p.l); ctx.fillStyle="#36f09a"; ctx.fillRect(p.x,p.y,3,3);} ctx.globalAlpha=1; break; }
-    case "type":{ const txt="SIGNAL RACK"; const vis=Math.round(n*txt.length); const fs=Math.max(20,Math.min(48,W/12)); ctx.font=`bold ${fs}px ui-monospace,Menlo,monospace`; ctx.textAlign="center";
-      for(let i=0;i<txt.length;i++){ ctx.fillStyle=i<vis?"#36f09a":"#16221c"; ctx.fillText(txt[i], cx-txt.length*fs*0.33+i*fs*0.66, cy+fs*0.34); } break; }
+    case "type":{ const txt="SIGNAL RACK"; const fs=Math.max(20,Math.min(54,W/10));
+      ctx.font=`bold ${fs}px ui-monospace,Menlo,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      const cw=fs*0.64, x0=cx-(txt.length-1)*cw/2, stride=Math.max(1,Math.floor(N/(txt.length*1.4)));
+      for(let i=0;i<txt.length;i++){ if(txt[i]===" ") continue;
+        const idx=Math.max(0,Math.min(N-1, N-1-i*stride));      // each later glyph reads an older sample → wave travels
+        const v=combine(bufX[idx],bufY[idx]);
+        const yoff=(v*2-1)*H*0.17, s=0.82+v*0.5;
+        ctx.save(); ctx.translate(x0+i*cw, cy+yoff); ctx.scale(s,s);
+        ctx.shadowColor="#36f09a"; ctx.shadowBlur=10*v;
+        ctx.fillStyle=`hsl(${150+v*45},85%,${42+v*34}%)`;
+        ctx.fillText(txt[i],0,0); ctx.restore(); }
+      ctx.textBaseline="alphabetic"; break; }
   }
   ctx.restore();
   // PIP scope (bottom-right) so you can see the wave without leaving Applied

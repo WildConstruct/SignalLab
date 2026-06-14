@@ -60,6 +60,10 @@ fn pModTgt()  -> f32 { return P.v7.w; }
 fn pModDepth()-> f32 { return P.v8.x; }
 fn pWarp()    -> f32 { return P.v8.y; }
 fn pFold()    -> f32 { return P.v8.z; }
+fn pSat()     -> f32 { return P.v8.w; }
+
+// musical soft saturation (EchoBoy-flavoured): drive + asymmetric tanh warmth
+fn tanhApprox(x : f32) -> f32 { let c = clamp(x, -4.0, 4.0); let a = c * c; return c * (27.0 + a) / (27.0 + 9.0 * a); }
 
 fn hash1(n : f32) -> f32 { let s = sin(n) * 43758.5453123; return s - floor(s); }
 fn smoothstep01(t : f32) -> f32 { return t * t * (3.0 - 2.0 * t); }
@@ -105,6 +109,14 @@ fn smoothed(tt : f32, idx : u32) -> f32 {
 fn pointwise(n0 : f32) -> f32 {
     var n = n0;
     if (pGain() != 1.0 || pBias() != 0.0) { n = clamp(0.5 + (n - 0.5) * pGain() + pBias(), 0.0, 1.0); }
+    if (pSat() > 0.0) {                                    // soft saturation (drive + asymmetric warmth)
+        let bp = n * 2.0 - 1.0;
+        let g = 1.0 + pSat() * 4.0;
+        let bias = pSat() * 0.2;
+        var sh = tanhApprox(bp * g + bias) - tanhApprox(bias);
+        sh = sh / max(tanhApprox(g), 0.001);
+        n = ((bp * (1.0 - pSat()) + sh * pSat()) + 1.0) * 0.5;
+    }
     if (pWarp() != 0.0) {
         let bp = n * 2.0 - 1.0;
         let pw = pow(3.0, -pWarp());

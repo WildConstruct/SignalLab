@@ -59,7 +59,7 @@ struct V { @builtin(position) pos : vec4<f32>, @location(0) uv : vec2<f32>, };
     sF[12] = 0.0; sF[13] = 0.35; sF[14] = 0.0; sF[15] = 0.0;
 
     var dispBuf = new ArrayBuffer(256), dU = new Uint32Array(dispBuf), dF = new Float32Array(dispBuf);
-    dF[4] = 0.92; dF[5] = 0.9; dF[6] = 0.9; dF[7] = 0.2;            // display0: amount, beamSharpness, maskStrength, bloom
+    dF[4] = 0.92; dF[5] = 0.95; dF[6] = 0.9; dF[7] = 0.42;          // display0: amount, beamSharpness, maskStrength, bloom (glowier)
     dF[8] = 0.84; dF[9] = 0.58; dF[10] = 0.42; dF[11] = 0.18;       // display1: scanStrength, scanDensity, scanSoftness, persistence
     dF[12] = 0.1; dF[13] = 1.0; dF[14] = 1.0; dF[15] = 1.0;         // display2: curvature, maskPitch/pixelSize, enable, pixelSize
     // personality0..3 (16..31) = 0 -> neutral grading

@@ -78,6 +78,7 @@ struct ProcessParams {
     float lag       = 0.0f;           // 0..1 finite EWMA
     float warp      = 0.0f;           // -1..1 contrast S-curve (0 = identity)
     float fold      = 0.0f;           // 0..1 triangle wavefolder (0 = identity)
+    float sat       = 0.0f;           // 0..1 soft saturation (drive + asymmetric warmth)
     bool  invert    = false;
     bool  rectify   = false;
     // sidechain modulation (signal-drives-signal); per-sample input via request:

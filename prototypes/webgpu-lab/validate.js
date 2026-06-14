@@ -105,5 +105,13 @@ ok("Fold 0 == identity", approx(fId.output("A", 0.4), plain.output("A", 0.4), 1e
 var changed = false; for (var tf = 0; tf < 1; tf += 1 / 60) { if (Math.abs(fOn.output("A", tf) - plain.output("A", tf)) > 0.05) { changed = true; break; } }
 ok("Fold > 0 distorts the signal", changed);
 
+// 9i. Saturate = 0 identity; sat > 0 soft-distorts but stays in [0,1]
+var satId = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 9 });
+var satOn = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 9, process: { sat: 0.8 } });
+ok("Saturate 0 == identity", approx(new Rack({ srcType: SOURCE.sine, rate: 1, seed: 9, process: { sat: 0 } }).output("A", 0.3), satId.output("A", 0.3), 1e-9));
+var satChanged = false, satInRange = true;
+for (var ts = 0; ts < 2; ts += 1 / 60) { var sv = satOn.output("A", ts); if (sv < 0 || sv > 1) satInRange = false; if (Math.abs(sv - satId.output("A", ts)) > 0.02) satChanged = true; }
+ok("Saturate soft-distorts within [0,1]", satChanged && satInRange);
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

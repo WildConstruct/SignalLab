@@ -34,7 +34,7 @@ struct CompiledSignalConfig {
         // processor stage:
         PGain = 24, PBias, PQuant, PGate,
         PLag = 28, PInvert, PRectify, ModTarget,
-        ModDepth = 32, PWarp, PFold, Pad2,
+        ModDepth = 32, PWarp, PFold, PSat,
     };
 
     std::array<float, kFloatCount> params{};
@@ -86,6 +86,7 @@ inline CompiledSignalConfig Compile(const SignalRecipe& r,
     p[CompiledSignalConfig::ModDepth] = pr.modDepth;
     p[CompiledSignalConfig::PWarp]    = pr.warp;
     p[CompiledSignalConfig::PFold]    = pr.fold;
+    p[CompiledSignalConfig::PSat]     = pr.sat;
     return c;
 }
 
