@@ -24,6 +24,19 @@ Quantize, Gate (threshold), Lag, plus Invert / Rectify. This is the other half
 of the rack — turning a raw oscillation into a usable control (a gate, a stepped
 value, a lagged follower). It runs identically on the WebGPU and CPU paths.
 
+## Sidechain (signal drives signal)
+**Sidechain** lets Channel X modulate Channel Y — amplitude (AM), rate (FM), or
+phase — with a depth control. This is the chaining model without a node graph:
+one signal shaping another. Watch it on the vectorscope/waveform as rich
+cross-modulated figures.
+
+## Luma probe (drive signals from media)
+Drop an **image or video** into the Luma probe, set a channel's Source to
+**Luma Probe**, and that channel is driven by the media's brightness over time —
+*line scan* (sweeps a column, so even a still image yields a signal) or *average*
+(whole-frame, great for video). The probe runs through the same processor and
+output mapping, so a flashing clip can drive scale, particles, etc.
+
 ## Represent (the same signal, many ways)
 A mode switcher changes how the screen draws the signal:
 - **Waveform** — classic oscilloscope traces (X green, Y amber).
