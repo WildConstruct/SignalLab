@@ -18,6 +18,12 @@ random-walk), rate, phase, amount, offset, smooth, seed. Presets for quick
 interesting states. Window / persistence / freeze. **Export recipe JSON** to
 capture an experiment as a Signal Rack recipe.
 
+## Process (the "shape" verb)
+A **Processor** stage shapes Channel X between generate and apply: Gain, Bias,
+Quantize, Gate (threshold), Lag, plus Invert / Rectify. This is the other half
+of the rack — turning a raw oscillation into a usable control (a gate, a stepped
+value, a lagged follower). It runs identically on the WebGPU and CPU paths.
+
 ## Represent (the same signal, many ways)
 A mode switcher changes how the screen draws the signal:
 - **Waveform** — classic oscilloscope traces (X green, Y amber).
@@ -36,6 +42,14 @@ AE expression it would generate*. This is the controller workflow, visible:
 So you can watch a pulse become a logo pulse, a random walk become camera drift,
 a gate spawn particles — the point being *what the signal is for*, not just its
 shape.
+
+## The math drawer  ƒ(t)
+A drawer at the bottom expands to show the **live mathematical expression** for
+the current signal — the source term, normalization, smoothing, the processor
+chain, and (in Applied mode) the full hand-written equivalent, e.g.
+`scale(t) = 80 + 40·clamp(0.5·(1 + sin(2π·2t)), 0, 1)`. The point: you could dial
+it in above — or figure out and write *that* by hand. It also prints the AE
+expression form.
 
 ## Engine
 Runs the validated engine. Badge (top-right) shows the active path:
