@@ -90,6 +90,7 @@
     <span class="read" id="stageRead">—</span>
     <canvas id="stage"></canvas>
   </div>
+  <div id="gpudbg" style="display:none;font:10px/1.3 ui-monospace,Menlo,monospace;color:#fb9;padding:4px 6px;word-break:break-all"></div>
   <div class="applied" id="appliedPanel">
     <div class="row" style="margin-top:8px">
       <select id="target" style="flex:1; min-width:130px">
@@ -258,12 +259,13 @@ const Engine = {
     const cfg={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1234,
       process:{gain:1,bias:0,quantize:0,gate:0,lag:0,invert:false,rectify:false}};
     const g=new Float32Array(N), cc=new Float32Array(N);
-    try{ await this.sampleGPU(cfg,0,1/60,g); }catch(e){ this.mode="cpu"; this.gpuRejected=true; return; }
+    try{ await this.sampleGPU(cfg,0,1/60,g); }catch(e){ this.diag="gpu threw: "+(e&&e.message||e); this.mode="cpu"; this.gpuRejected=true; return; }
     this.sampleCPU(cfg,0,1/60,cc);
     let maxd=0, lo=2, hi=-2;
     for(let i=0;i<N;i+=17){ maxd=Math.max(maxd,Math.abs(g[i]-cc[i])); lo=Math.min(lo,g[i]); hi=Math.max(hi,g[i]); }
     const degenerate=(hi-lo)<1e-3;        // GPU produced a flat/dead signal
-    if(maxd>0.03 || degenerate){ console.warn("GPU self-check failed (maxDiff="+maxd.toFixed(4)+", flat="+degenerate+") — using CPU reference engine"); this.mode="cpu"; this.gpuRejected=true; }
+    this.diag="gpu["+g[128].toFixed(2)+" "+g[512].toFixed(2)+" "+g[896].toFixed(2)+"] cpu["+cc[128].toFixed(2)+" "+cc[512].toFixed(2)+" "+cc[896].toFixed(2)+"] d="+maxd.toFixed(2);
+    if(maxd>0.03 || degenerate){ console.warn("GPU self-check failed — "+this.diag); this.mode="cpu"; this.gpuRejected=true; }
   }
 };
 
@@ -581,7 +583,9 @@ function frame(){
       requestAnimationFrame(frame);
     }).catch(err=>{ console.warn("frame error, falling back to CPU:",err); Engine.mode="cpu"; Engine.gpuRejected=true; setBadge(); requestAnimationFrame(frame); });
 }
-(async()=>{ if(await Engine.tryWebGPU()){ await Engine.selfCheck(); } setBadge(); requestAnimationFrame(frame); })();
+(async()=>{ if(await Engine.tryWebGPU()){ await Engine.selfCheck(); } setBadge();
+  if(Engine.gpuRejected){ const d=$("gpudbg"); d.style.display="block"; d.textContent="WebGPU ran but output was wrong → using CPU. "+(Engine.diag||""); }
+  requestAnimationFrame(frame); })();
 </script>
 </body>
 </html>
