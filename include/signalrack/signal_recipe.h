@@ -76,6 +76,8 @@ struct ProcessParams {
     float quantize  = 0.0f;           // 0 = off, else number of steps
     float gate      = 0.0f;           // 0 = off, else threshold
     float lag       = 0.0f;           // 0..1 finite EWMA
+    float warp      = 0.0f;           // -1..1 contrast S-curve (0 = identity)
+    float fold      = 0.0f;           // 0..1 triangle wavefolder (0 = identity)
     bool  invert    = false;
     bool  rectify   = false;
     // sidechain modulation (signal-drives-signal); per-sample input via request:

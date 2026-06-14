@@ -39,7 +39,8 @@
   function normProcess(p) {
     p = p || {};
     return { gain: p.gain != null ? p.gain : 1, bias: p.bias || 0, quantize: p.quantize || 0,
-             gate: p.gate || 0, lag: p.lag || 0, invert: !!p.invert, rectify: !!p.rectify };
+             gate: p.gate || 0, lag: p.lag || 0, invert: !!p.invert, rectify: !!p.rectify,
+             warp: p.warp || 0, fold: p.fold || 0 };
   }
   function modCode(m) { if (!m || !m.target || m.target === "off") return 0; return MOD[m.target] || (typeof m.target === "number" ? m.target : 0); }
 
@@ -107,6 +108,8 @@
   Rack.prototype.pointwise = function (n) {
     var p = this.process;
     if (p.gain !== 1 || p.bias) n = clamp01(0.5 + (n - 0.5) * p.gain + p.bias);
+    if (p.warp) { var bp = n * 2 - 1, pw = Math.pow(3, -p.warp); n = ((bp < 0 ? -1 : 1) * Math.pow(Math.abs(bp), pw) + 1) * 0.5; }
+    if (p.fold > 0) { var x = (n * 2 - 1) * (1 + p.fold * 6); var xm = (x - 1) - 4 * Math.floor((x - 1) / 4); n = Math.abs(xm - 2) * 0.5; }
     if (p.invert) n = 1 - n;
     if (p.rectify) n = Math.abs(n * 2 - 1);
     if (p.quantize > 1) n = Math.round(n * (p.quantize - 1)) / (p.quantize - 1);

@@ -89,5 +89,21 @@ var rawL = new Rack({ srcType: SOURCE.pulse, rate: 2, frameDur: 1 / 60, outputs:
 var lagL = new Rack({ srcType: SOURCE.pulse, rate: 2, frameDur: 1 / 60, process: { lag: 0.85 }, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
 ok("Processor lag lowers variance", variance(lagL) < variance(rawL));
 
+// 9g. Warp = 0 is identity; warp > 0 increases contrast (pushes a mid value toward extremes)
+var wId = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 5 });
+var wOn = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 5, process: { warp: 0.8 } });
+ok("Warp 0 == identity", approx(new Rack({srcType:SOURCE.sine,rate:1,seed:5,process:{warp:0}}).output("A",0.3), wId.output("A",0.3), 1e-9));
+var tw = 0.07; // a time where sine normalized is between 0.5 and 1
+var nId = wId.output("A", tw), nWarp = wOn.output("A", tw);
+ok("Warp increases contrast away from 0.5", Math.abs(nWarp - 0.5) >= Math.abs(nId - 0.5) - 1e-9);
+
+// 9h. Fold = 0 is identity; fold > 0 changes the signal (adds folds)
+var fId = new Rack({ srcType: SOURCE.ramp, rate: 1, process: { fold: 0 } });
+var fOn = new Rack({ srcType: SOURCE.ramp, rate: 1, process: { fold: 0.7 } });
+var plain = new Rack({ srcType: SOURCE.ramp, rate: 1 });
+ok("Fold 0 == identity", approx(fId.output("A", 0.4), plain.output("A", 0.4), 1e-9));
+var changed = false; for (var tf = 0; tf < 1; tf += 1 / 60) { if (Math.abs(fOn.output("A", tf) - plain.output("A", tf)) > 0.05) { changed = true; break; } }
+ok("Fold > 0 distorts the signal", changed);
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
