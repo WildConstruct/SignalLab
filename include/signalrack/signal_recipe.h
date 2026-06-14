@@ -84,6 +84,7 @@ struct ProcessParams {
     float winRight    = 1.0f;
     float winFeatherL = 0.0f;
     float winFeatherR = 0.0f;
+    float zDepth      = 0.0f;          // third-signal distort depth (per-sample input via request)
     bool  invert    = false;
     bool  rectify   = false;
     // sidechain modulation (signal-drives-signal); per-sample input via request:

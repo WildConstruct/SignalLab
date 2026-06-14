@@ -65,6 +65,8 @@
     var w = cfg.win || {};                     // feathered region window
     this.win = { left: w.left != null ? w.left : 0, right: w.right != null ? w.right : 1, featherL: w.featherL || 0, featherR: w.featherR || 0 };
     this.sampleN = cfg.sampleN || 0;           // total samples (for window position)
+    this.zInput = (cfg.z && cfg.z.input) || null;   // third signal per-sample (distort)
+    this.zDepth = (cfg.z && cfg.z.depth) || 0;
     var d = cfg.outputs || {};
     this.outputs = { A: d.A || { mode: MODE.normalized, min: 0, max: 1 },
                      B: d.B || { mode: MODE.degrees, min: -15, max: 15 },
@@ -88,7 +90,8 @@
       if (this.modTarget === MOD.phase) phase  += this.modDepth * m;
     }
     var seedPhase = (this.seed * 0.07) - Math.floor(this.seed * 0.07);   // Seed shifts the waveform
-    var x = tt * rate + phase + seedPhase, fx = x - Math.floor(x), bp;
+    var zBend = this.zDepth && this.zInput ? this.zDepth * (this.zInput[idx] * 2 - 1) : 0;  // third signal phase-bend
+    var x = tt * rate + phase + seedPhase + zBend, fx = x - Math.floor(x), bp;
     switch (this.srcType) {
       case SOURCE.sine:       bp = Math.sin(x * Math.PI * 2); break;                                  // 1
       case SOURCE.pulse:      bp = fx < 0.5 ? 1 : -1; break;                                          // 2 Square

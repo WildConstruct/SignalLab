@@ -127,5 +127,13 @@ var nearRight = Math.round(0.78 * (WN - 1));
 ok("Window: right feather attenuates", win.windowEnv(nearRight) < 1 && win.windowEnv(nearRight) > 0);
 ok("Window default (0..1) is a no-op", new Rack({ srcType: SOURCE.sine, sampleN: WN }).windowEnv(insideIdx) === 1);
 
+// 9k. Third signal (distort): zDepth phase-bends; 0 = identity, >0 changes the wave
+var zbuf = new Float32Array(WN); for (var zi=0; zi<WN; zi++) zbuf[zi] = 0.5 + 0.5*Math.sin(zi/WN*6.283);
+var zOff = new Rack({ srcType: SOURCE.sine, rate: 2, z: { input: zbuf, depth: 0 } });
+var zOn  = new Rack({ srcType: SOURCE.sine, rate: 2, z: { input: zbuf, depth: 0.5 } });
+ok("Distort depth 0 == identity", approx(zOff.output("A",0.3,10), new Rack({srcType:SOURCE.sine,rate:2}).output("A",0.3,10), 1e-9));
+var zChanged=false; for (var zt=0; zt<2; zt+=1/60){ var k=Math.round(zt*30)%WN; if (Math.abs(zOn.output("A",zt,k)-zOff.output("A",zt,k))>0.02){ zChanged=true; break; } }
+ok("Distort depth > 0 bends the signal", zChanged);
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

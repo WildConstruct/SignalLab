@@ -36,6 +36,7 @@ public:
                   std::uint32_t sampleCount,
                   const float* lumaSamples,
                   const float* modSamples,
+                  const float* zSamples,
                   float startTime, float dt,
                   SignalOutputs* out,
                   std::string* message);
@@ -51,6 +52,7 @@ private:
     wgpu::Buffer          outBuf_;     // storage, vec4 * capacity
     wgpu::Buffer          lumaBuf_;    // storage, f32 * capacity (probe input)
     wgpu::Buffer          modBuf_;     // storage, f32 * capacity (sidechain input)
+    wgpu::Buffer          zBuf_;       // storage, f32 * capacity (third-signal distort input)
     wgpu::Buffer          readBuf_;    // map-read, vec4 * capacity
     std::uint32_t         capacity_ = 0;
 };

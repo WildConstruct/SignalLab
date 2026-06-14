@@ -75,6 +75,7 @@ void SignalRuntime::EnsureCapacity(wgpu::Device& device, std::uint32_t sampleCou
     lb.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
     lumaBuf_ = device.CreateBuffer(&lb);
     modBuf_ = device.CreateBuffer(&lb);  // same shape (f32 * capacity)
+    zBuf_ = device.CreateBuffer(&lb);
 
     wgpu::BufferDescriptor rb{};
     rb.size = static_cast<std::uint64_t>(capacity_) * kVec4Bytes;
@@ -87,6 +88,7 @@ bool SignalRuntime::Evaluate(wgpu::Device& device,
                              std::uint32_t sampleCount,
                              const float* lumaSamples,
                              const float* modSamples,
+                             const float* zSamples,
                              float startTime, float dt,
                              SignalOutputs* out,
                              std::string* message) {
@@ -101,15 +103,19 @@ bool SignalRuntime::Evaluate(wgpu::Device& device,
     if (modSamples) {
         device.GetQueue().WriteBuffer(modBuf_, 0, modSamples, sampleCount * sizeof(float));
     }
+    if (zSamples) {
+        device.GetQueue().WriteBuffer(zBuf_, 0, zSamples, sampleCount * sizeof(float));
+    }
 
-    wgpu::BindGroupEntry entries[4]{};
+    wgpu::BindGroupEntry entries[5]{};
     entries[0].binding = 0; entries[0].buffer = paramBuf_;
     entries[1].binding = 1; entries[1].buffer = outBuf_;
     entries[2].binding = 2; entries[2].buffer = lumaBuf_;
     entries[3].binding = 3; entries[3].buffer = modBuf_;
+    entries[4].binding = 4; entries[4].buffer = zBuf_;
     wgpu::BindGroupDescriptor bgDesc{};
     bgDesc.layout = pipeline_.GetBindGroupLayout(0);
-    bgDesc.entryCount = 4; bgDesc.entries = entries;
+    bgDesc.entryCount = 5; bgDesc.entries = entries;
     wgpu::BindGroup bind = device.CreateBindGroup(&bgDesc);
 
     wgpu::CommandEncoder enc = device.CreateCommandEncoder();

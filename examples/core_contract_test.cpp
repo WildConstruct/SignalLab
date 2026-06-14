@@ -18,8 +18,9 @@ int main(){
   r.process.gain=1.5f; r.process.gate=0.6f; r.process.lag=0.4f; r.process.invert=true;
   r.process.modTarget=1; r.process.modDepth=0.8f; r.process.warp=-0.5f; r.process.fold=0.7f; r.process.sat=0.55f;
   r.process.winLeft=0.2f; r.process.winRight=0.85f; r.process.winFeatherL=0.1f; r.process.winFeatherR=0.0f;
+  r.process.zDepth=0.3f;
   auto c = Compile(r, 0.0f, 1.0f/30, 1.0f/30, 30, 0.0f);
-  assert(c.byteSize()==160);
+  assert(c.byteSize()==176);
   assert(c.params[CompiledSignalConfig::SrcType]==2.0f);     // Pulse
   assert(c.params[CompiledSignalConfig::Rate]==2.0f);
   assert(c.params[CompiledSignalConfig::SampleN]==30.0f);
@@ -37,6 +38,7 @@ int main(){
   assert(c.params[CompiledSignalConfig::WinLeft]==0.2f);
   assert(c.params[CompiledSignalConfig::WinRight]==0.85f);
   assert(c.params[CompiledSignalConfig::WinFeatherL]==0.1f);
+  assert(c.params[CompiledSignalConfig::ZDepth]==0.3f);
 
   // AE param snapshot -> recipe
   ae::ParamSnapshot s; s.sourceType=2; s.rate=2.0f; s.outAMode=3; s.outAMax=110;
