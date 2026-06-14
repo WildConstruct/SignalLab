@@ -333,6 +333,10 @@ const presetList=[
   { name:"Triangle Lissa", x:{src:8,rate:2},                  y:{src:8,rate:3,phase:0.12} },
   { name:"Pulse Train",    x:{src:9,rate:3},                  y:{src:1,rate:3,phase:0.25}, proc:{sat:0.4} },
   { name:"Saturated Sine", x:{src:1,rate:1.5},                y:{src:1,rate:1.5,phase:0.25}, proc:{sat:0.85} },
+  { name:"Undulating Ray", view:"vector",
+    x:{src:1,rate:2.1,amount:1.36,offset:0.08,smooth:0.68,seed:962},
+    y:{src:1,rate:1.7,phase:0.915,offset:-0.22},
+    proc:{gain:0.85,bias:0.04,quantize:6,gate:0.74,lag:0.12} },
 ];
 const X0={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1941}, Y0={src:1,rate:3,phase:0,amount:1,offset:0,smooth:0,seed:1941};
 const PROC0={gain:1,bias:0,quantize:0,gate:0,lag:0,warp:0,fold:0,sat:0,invert:false,rectify:false};
@@ -353,6 +357,8 @@ function applyPreset(p){
   Object.assign(proc,PROC0); drive.mode=p.drive||"x"; Object.assign(win,{left:0,right:1,featherL:0,featherR:0});
   Object.assign(state.x,X0,p.x); Object.assign(state.y,Y0,p.y);
   if(p.proc) Object.assign(proc,p.proc);
+  if(p.view){ MODE_CUR=p.view; [...document.getElementById("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===p.view));
+    document.getElementById("appliedPanel").classList.toggle("show",p.view==="applied"); needGraticule=true; }
   reflectInputs(); updateMath();
 }
 function buildGallery(){ const g=document.getElementById("presetGallery"); g.innerHTML="";

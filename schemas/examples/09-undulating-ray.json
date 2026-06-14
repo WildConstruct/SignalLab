@@ -1,0 +1,19 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Undulating Ray",
+  "id": "sg_undulating_ray",
+  "version": "0.2",
+  "rackType": "generator",
+  "source": { "type": "sine", "rate": 2.1, "amount": 1.36, "phase": 0, "offset": 0.08 },
+  "process": { "smooth": 0.68, "gain": 0.85, "bias": 0.04, "quantize": 6, "gate": 0.74, "lag": 0.12, "invert": false, "rectify": false },
+  "outputs": {
+    "A": { "name": "X", "profile": "normalized_0_1", "range": [0, 1] },
+    "B": { "name": "Y", "profile": "normalized_0_1", "range": [0, 1] },
+    "C": { "name": "Gate", "profile": "gate", "range": [0, 1] }
+  },
+  "timebase": { "mode": "compTime", "seed": 962 },
+  "_channelY": { "type": "sine", "rate": 1.7, "phase": 0.915, "offset": -0.22 },
+  "visualization": { "mode": "vectorscope" },
+  "compatibilityTags": ["engine:wgsl", "tool:signal-lab"],
+  "notes": "Quantized+gated X against a smooth detuned Y -> a stepped, undulating ray figure on the vectorscope (with persistence). Opens on the vectorscope in the Signal Lab."
+}
