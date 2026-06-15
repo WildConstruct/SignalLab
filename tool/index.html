@@ -121,14 +121,164 @@
   @media (min-width: 1500px){
     body{ grid-template-columns:420px 1fr; }
   }
+
+  /* =====================================================================
+     DESIGN SYSTEM — Wild Construct creative tooling (Adobe-inspired)
+     Three-pane: tools (left) · viewport (center) · properties (right).
+     Dark slate surfaces, amber primary accent, teal secondary, small-caps
+     section headers. This block supersedes the prototype styling above.
+     ===================================================================== */
+  :root{
+    --app-bg:#0a0d11; --rail:#0f141a; --panel:#141a21; --panel-2:#10151b;
+    --edge:#212b35; --edge-2:#2b3845; --ink:#d7e1e9; --dim:#7e8c9a; --mute:#586675;
+    --amber:#e6a23c; --amber-soft:#f0bd6e; --amber-dim:#352a18; --teal:#3ad6a0;
+    --x:#36f09a; --y:#f0b23a;
+  }
+  body{ background:var(--app-bg); color:var(--ink);
+        display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+
+  /* ---- toolbar ---- */
+  header.bar{ position:relative; flex:0 0 auto; display:flex; align-items:center; gap:14px;
+    height:52px; padding:0 16px; background:linear-gradient(180deg,#121821,#0d1219);
+    border-bottom:1px solid var(--edge); z-index:30; backdrop-filter:none; }
+  header.bar::before{ content:none; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand .logo{ width:24px; height:24px; border-radius:7px;
+    background:linear-gradient(150deg,var(--amber),#b97a1d); flex:0 0 auto;
+    box-shadow:0 0 0 1px #00000040, 0 2px 8px -2px var(--amber); position:relative; }
+  .brand .logo::after{ content:""; position:absolute; inset:6px; border-radius:3px;
+    background:#0d1219; box-shadow:inset 0 0 0 1.5px var(--amber); }
+  .brand .bname{ font-size:13px; font-weight:700; letter-spacing:.2px; line-height:1.1; }
+  .brand .bsub{ font-size:10px; color:var(--dim); letter-spacing:.6px;
+    text-transform:uppercase; line-height:1.1; }
+  .bspace{ flex:1 1 auto; }
+  #engine{ margin:0; font-size:10.5px; letter-spacing:.4px; padding:4px 10px; border-radius:6px;
+    border:1px solid var(--edge-2); background:#0c1117; color:var(--dim);
+    text-transform:uppercase; cursor:pointer; user-select:none; white-space:nowrap; }
+  #engine.web{ color:#7df0c2; border-color:#1f6e4d; background:#0c1813; }
+  #engine.cpu{ color:var(--amber-soft); border-color:#6a4d1e; background:#181308; }
+  .btn{ font-size:12px; font-weight:600; padding:6px 14px; border-radius:7px; cursor:pointer;
+    background:linear-gradient(180deg,var(--amber),#cf8c26); color:#1a1206; border:1px solid #b97a1d;
+    box-shadow:0 1px 0 #ffffff22 inset, 0 4px 12px -6px var(--amber); transition:filter .12s, transform .08s; }
+  .btn:hover{ filter:brightness(1.06); } .btn:active{ transform:translateY(1px); }
+
+  /* ---- three-pane workspace ---- */
+  #work{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+  .rail{ background:var(--rail); display:flex; flex-direction:column; min-height:0; }
+  .railhd{ flex:0 0 auto; position:sticky; top:0; z-index:5; padding:11px 14px 9px;
+    font-size:10px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--mute);
+    background:linear-gradient(180deg,var(--rail),#0d1218); border-bottom:1px solid var(--edge); }
+
+  /* ---- center viewport ---- */
+  #top{ display:flex; flex-direction:column; min-height:0; background:radial-gradient(900px 480px at 50% -10%,#10161e,#0a0d11 64%); }
+
+  /* ---- panels / cards ---- */
+  .panel{ background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:13px;
+    box-shadow:0 1px 0 #ffffff05 inset, 0 14px 28px -26px #000; }
+  .panel h2{ display:flex; align-items:center; gap:7px; font-size:10.5px; font-weight:700;
+    letter-spacing:1.1px; text-transform:uppercase; color:var(--amber); margin:0 0 11px; }
+  .panel h2::before{ content:""; width:5px; height:5px; border-radius:1.5px; background:var(--amber); opacity:.85; }
+  .panel h2 .lite{ text-transform:none; letter-spacing:0; font-weight:500; color:var(--mute); font-size:11px; }
+
+  /* channel accents stay green/amber for scope legibility */
+  .chan.x{ border-color:var(--x); } .chan.y{ border-color:var(--y); }
+
+  /* ---- controls ---- */
+  .ctl label{ color:var(--dim); }
+  .ctl output{ color:var(--ink); }
+  input[type=range]{ accent-color:var(--amber); }
+  input[type=range]::-webkit-slider-runnable-track{ background:#1a222b; }
+  input[type=range]::-moz-range-track{ background:#1a222b; }
+  input[type=range]::-webkit-slider-thumb{ background:#f3e9d6; border:2px solid var(--amber); box-shadow:0 1px 4px #000a; }
+  input[type=range]::-moz-range-thumb{ background:#f3e9d6; border:2px solid var(--amber); }
+  input[type=checkbox]{ accent-color:var(--amber); }
+  select,input[type=number]{ background:#0b1016; border-color:var(--edge-2); }
+  select:focus,input:focus{ border-color:var(--amber); }
+
+  /* ---- tabs (viewport switcher) ---- */
+  .tabs{ background:#0c1117; border:1px solid var(--edge); border-radius:9px; padding:3px; gap:3px; }
+  .tabs button{ color:var(--dim); border-radius:7px; }
+  .tabs button.on{ background:var(--amber); color:#1a1206; border-color:var(--amber);
+    box-shadow:0 2px 8px -3px var(--amber); font-weight:700; }
+
+  /* ---- buttons in rows ---- */
+  .row button{ background:#0c1117; border-color:var(--edge-2); color:var(--ink); }
+  .row button:active{ border-color:var(--amber); color:var(--amber-soft); }
+  #exportBtn{ background:var(--amber-dim); border-color:#6a4d1e; color:var(--amber-soft); }
+
+  /* ---- Output inspector key/value rows ---- */
+  .kv{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:7px 0; border-bottom:1px solid var(--edge); font-size:11px; }
+  .kv:last-child{ border-bottom:none; }
+  .kv span{ color:var(--dim); text-transform:uppercase; letter-spacing:.5px; font-size:10px; }
+  .kv b{ color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; font-size:12.5px; }
+
+  /* ---- math drawer ---- */
+  .drawer{ background:var(--panel); border-color:var(--edge); }
+  .dhead .fx{ color:var(--amber); }
+
+  /* ---- viewport readout + present-mode controls ---- */
+  .stagewrap{ background:#06090d; border-color:var(--edge); box-shadow:0 18px 44px -30px #000; }
+  #exitPresent{ display:none; position:fixed; top:14px; right:16px; z-index:120;
+    background:#0c1117e6; border:1px solid var(--edge-2); color:var(--ink);
+    font-size:12px; padding:7px 13px; border-radius:8px; cursor:pointer; backdrop-filter:blur(6px); }
+  #exitPresent:hover{ border-color:var(--amber); color:var(--amber-soft); }
+
+  /* =================== MOBILE: stacked, viewport on top =================== */
+  @media (max-width:979px){
+    #work{ flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    #top{ position:sticky; top:0; z-index:10; flex:0 0 auto; padding:8px 12px 4px;
+      background:var(--app-bg); border-bottom:1px solid var(--edge); }
+    .stagewrap{ height:clamp(190px,38dvh,420px); }
+    .rail{ flex:0 0 auto; }
+    #paneL{ padding:0; } #paneR{ padding:0; }
+    #paneL .railhd, #paneR .railhd{ position:static; }
+    #paneL > .panel, #paneR > .panel, #paneR > .drawer{ margin:10px 12px; }
+    #paneL > .panel:first-of-type, #paneR > .panel:first-of-type{ margin-top:10px; }
+  }
+
+  /* =================== DESKTOP: true three-pane ========================== */
+  @media (min-width:980px){
+    body{ display:flex; flex-direction:column; }
+    #work{ display:grid; grid-template-columns:300px minmax(0,1fr) 290px;
+      grid-template-areas:"l c r"; gap:0; }
+    #paneL{ grid-area:l; border-right:1px solid var(--edge); overflow-y:auto; }
+    #top{ grid-area:c; overflow-y:auto; padding:16px 18px 18px; }
+    #paneR{ grid-area:r; border-left:1px solid var(--edge); overflow-y:auto; }
+    #paneL .panel, #paneR .panel, #paneR .drawer{ margin:12px; }
+    #paneL .panel:first-of-type, #paneR .panel:first-of-type{ margin-top:12px; }
+    .tabs{ flex:0 0 auto; }
+    .stagewrap{ flex:1 1 auto; min-height:320px; }
+    #stage{ height:100%; }
+    .ctl{ grid-template-columns:70px 1fr 48px; }
+  }
+  @media (min-width:1500px){
+    #work{ grid-template-columns:340px minmax(0,1fr) 320px; }
+  }
+
+  /* =================== PRESENT (fullscreen visualizer) =================== */
+  body.present header.bar{ display:none; }
+  body.present #exitPresent{ display:block; }
+  body.present #work{ display:block; grid-template-columns:none; }
+  body.present .rail{ display:none; }
+  body.present #top{ position:fixed; inset:0; z-index:100; padding:0; height:100dvh; }
+  body.present .tabs{ position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:110;
+    background:#0c1117cc; backdrop-filter:blur(6px); }
+  body.present .stagewrap{ position:absolute; inset:0; height:100%; border:none; border-radius:0; padding:0; }
+  body.present .applied{ position:absolute; left:14px; right:14px; bottom:14px; z-index:110;
+    background:#0c1117cc; backdrop-filter:blur(6px); border-radius:10px; padding:8px 10px; }
+  body.present #crt{ top:0; left:0; width:100%; height:100%; border-radius:0; }
 </style>
 </head>
 <body>
-<header>
-  <h1>Signal Rack</h1>
-  <span class="tag">generate · process · represent · apply</span>
+<header class="bar">
+  <div class="brand"><span class="logo"></span><div class="btxt"><div class="bname">Signal Rack</div><div class="bsub">Signal Lab · WebGPU</div></div></div>
+  <div class="bspace"></div>
   <span id="engine" class="cpu" title="engine">engine: …</span>
+  <button class="btn" id="presentBtn" title="Fullscreen the visualizer">Present ▸</button>
 </header>
+<button id="exitPresent" title="Exit present (Esc)">✕ Exit</button>
+<div id="work">
 
 <!-- GRAPH (sticky top) -->
 <div id="top">
@@ -172,7 +322,8 @@
 </div>
 
 <!-- CONTROLS (scrollable) -->
-<div id="scroll">
+<aside id="paneL" class="rail">
+  <div class="railhd">Parameters</div>
   <div class="panel">
     <h2>Generator</h2>
     <div class="chan x" data-ch="x"><div class="name">Channel X</div>
@@ -242,6 +393,17 @@
     <div style="color:#52606b;font-size:11px;margin-top:6px">Then set a channel Source → “Luma Probe”.</div>
   </div>
 
+  </aside>
+
+  <aside id="paneR" class="rail">
+  <div class="railhd">Output</div>
+  <div class="panel">
+    <h2>Live values</h2>
+    <div class="kv"><span>Channel X</span><b id="ovX">–</b></div>
+    <div class="kv"><span>Channel Y</span><b id="ovY">–</b></div>
+    <div class="kv"><span>Driver</span><b id="ovD">–</b></div>
+    <div class="kv"><span>View · Engine</span><b id="ovView">–</b></div>
+  </div>
   <div class="panel">
     <h2>Preset browser</h2>
     <div class="pgrid" id="presetGallery"></div>
@@ -263,6 +425,7 @@
     </div>
     <div class="dbody"><div class="dinner" id="dinner"></div></div>
   </div>
+  </aside>
 </div>
 
 <script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
@@ -657,6 +820,13 @@ function setBadge(){
 }
 badge.onclick=async()=>{ if(Engine.mode==="webgpu")return; badge.textContent="engine: starting WebGPU…"; if(await Engine.tryWebGPU()){ await Engine.selfCheck(); } setBadge(); };
 
+// ---------- present (fullscreen visualizer) ----------
+function setPresent(on){ document.body.classList.toggle("present", on); needGraticule=true; }
+{ const pb=$("presentBtn"), xb=$("exitPresent");
+  if(pb) pb.onclick=()=>setPresent(true);
+  if(xb) xb.onclick=()=>setPresent(false);
+  window.addEventListener("keydown", e=>{ if(e.key==="Escape"&&document.body.classList.contains("present")) setPresent(false); }); }
+
 // ---------- representations ----------
 const cv=$("stage"), ctx=cv.getContext("2d");
 const bufX=new Float32Array(N), bufY=new Float32Array(N);
@@ -800,6 +970,12 @@ function frame(){
       } else { crtCanvas.style.display="none"; }
       const xc=bip(N-1), yc=bufY[N-1]*2-1;
       $("stageRead").textContent = `${Engine.mode==="webgpu"?"GPU":"CPU"} · X ${xc>=0?"+":""}${xc.toFixed(3)} · Y ${yc>=0?"+":""}${yc.toFixed(3)}`;
+      // Output inspector (right pane) — live scalar readouts
+      const drv=combine(bufX[N-1],bufY[N-1])*2-1;
+      const sgn=v=>(v>=0?"+":"")+v.toFixed(3);
+      const ov=(id,t)=>{ const e=$(id); if(e)e.textContent=t; };
+      ov("ovX",sgn(xc)); ov("ovY",sgn(yc)); ov("ovD",sgn(drv));
+      ov("ovView",`${MODE_CUR} · ${Engine.mode==="webgpu"?"WebGPU":"CPU"}`);
       requestAnimationFrame(frame);
     }).catch(err=>{ console.warn("frame error, falling back to CPU:",err); Engine.mode="cpu"; Engine.gpuRejected=true; setBadge(); requestAnimationFrame(frame); });
 }
