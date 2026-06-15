@@ -359,7 +359,7 @@
   <div class="panel">
     <h2>Generator</h2>
     <div class="chan x" data-ch="x"><div class="name">Channel X</div>
-      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
+      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option></select><output></output></div>
       <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="2"><output></output></div>
       <div class="ctl osc-row"><label>Phase</label><button class="osc" data-osc="phase" title="Oscillate this value">o</button><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
       <div class="ctl osc-row"><label>Amount</label><button class="osc" data-osc="amount" title="Oscillate this value">o</button><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
@@ -372,7 +372,7 @@
         <label><input type="checkbox" id="ySync"> Sync to X</label>
         <label><input type="checkbox" id="yInvert"> Invert (mirror X)</label>
       </div>
-      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
+      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option></select><output></output></div>
       <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="3"><output></output></div>
       <div class="ctl osc-row"><label>Phase</label><button class="osc" data-osc="phase" title="Oscillate this value">o</button><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
       <div class="ctl osc-row"><label>Amount</label><button class="osc" data-osc="amount" title="Oscillate this value">o</button><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
@@ -420,13 +420,6 @@
     <div class="ctl"><label>Amount</label><input type="range" id="zAmt" min="0" max="0.6" step="0.01" value="0"><output></output></div>
     <div class="ctl"><label>Rate</label><input type="range" id="zRate" min="0.1" max="6" step="0.1" value="1"><output></output></div>
     <div class="ctl"><label>Shape</label><select id="zShape"><option value="1">Sine</option><option value="8">Triangle</option><option value="4">Noise</option></select><output></output></div>
-  </div>
-
-  <div class="panel">
-    <h2>Luma probe</h2>
-    <div class="row"><input type="file" id="probeFile" accept="image/*,video/*" style="font-size:11px;color:var(--dim)"></div>
-    <div class="ctl" style="margin-top:8px"><label>Mode</label><select id="probeMode"><option value="scan">line scan</option><option value="avg">average</option></select><output></output></div>
-    <div style="color:#52606b;font-size:11px;margin-top:6px">Then set a channel Source → “Luma Probe”.</div>
   </div>
 
   </aside>
@@ -481,8 +474,6 @@ const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied 
 const side = { target:"off", depth:0.5 };
 const link = { sync:false, invert:false };   // Channel Y relationship to X (sync = copy, invert = mirror)
 const z = { shape:1, rate:1, amount:0 };   // third signal — gently distorts X & Y (phase bend)
-const probe = { mode:"scan", loaded:false, el:null, kind:null };
-const lumaHistory = new Float32Array(N).fill(0.5);
 const zBuffer = new Float32Array(N).fill(0.5);   // third-signal (distort) per-sample
 const crt = { on:true, pass:null, failed:false };
 const win = { left:0, right:1, featherL:0, featherR:0 };   // feathered region window (drives Channel X)   // Cathode CRT/NTSC WebGPU overlay (default on)
@@ -762,7 +753,7 @@ updateExpr();
 // ---------- live mathematical expression ----------
 function num(v){ return (Math.round(v*1000)/1000).toString(); }
 function genMath(cfg){
-  if(+cfg.src===7){ const n0=`lumaProbe(media)` + (cfg.offset?` + ${num(cfg.offset)}`:""); return { b:`lumaProbe(media; ${probe.mode})`, n0:`clamp(${n0}, 0, 1)`, probe:true }; }
+  if(+cfg.src===7){ const n0=`lumaProbe(media)` + (cfg.offset?` + ${num(cfg.offset)}`:""); return { b:`lumaProbe(media)`, n0:`clamp(${n0}, 0, 1)`, probe:true }; }
   const sp=((cfg.seed*0.07)%1); const inner = `${num(cfg.rate)}·t` + (cfg.phase ? ` + ${num(cfg.phase)}` : "") + (sp ? ` + ${num(sp)}` : "");
   const sd = cfg.seed ? ` + ${num(0.123*cfg.seed)}` : "";
   let b;
@@ -1164,15 +1155,7 @@ function drawPip(W,H){
   ctx.fillText("driver", W-14, py-4);
 }
 
-// ---------- luma probe + sidechain ----------
-const mcvs=document.createElement("canvas"); mcvs.width=120; mcvs.height=68;
-const mctx=mcvs.getContext("2d",{willReadFrequently:true});
-const probeFile=$("probeFile");
-if(probeFile) probeFile.onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const url=URL.createObjectURL(f);
-  if(f.type.indexOf("video")===0){ const v=document.createElement("video"); v.src=url; v.loop=true; v.muted=true; v.playsInline=true; v.play().catch(()=>{}); probe.el=v; probe.kind="video"; }
-  else { const im=new Image(); im.src=url; probe.el=im; probe.kind="image"; }
-  probe.loaded=true; };
-$("probeMode").onchange=()=>{ probe.mode=$("probeMode").value; updateMath(); };
+// ---------- sidechain + Channel-Y link ----------
 $("sideMode").onchange=()=>{ side.target=$("sideMode").value; updateMath(); };
 $("sideDepth").oninput=()=>{ side.depth=+$("sideDepth").value; updateMath(); };
 function syncLinkUI(){ const y=document.querySelector('.chan[data-ch="y"]'); if(y) y.classList.toggle("linked", link.sync||link.invert);
@@ -1180,16 +1163,7 @@ function syncLinkUI(){ const y=document.querySelector('.chan[data-ch="y"]'); if(
 $("ySync").onchange=()=>{ link.sync=$("ySync").checked; syncLinkUI(); updateMath(); };
 $("yInvert").onchange=()=>{ link.invert=$("yInvert").checked; syncLinkUI(); updateMath(); };
 
-function sampleMediaLuma(t){ if(!probe.el) return 0.5;
-  try{ mctx.drawImage(probe.el,0,0,mcvs.width,mcvs.height); }catch(e){ return 0.5; }
-  let data; try{ data=mctx.getImageData(0,0,mcvs.width,mcvs.height).data; }catch(e){ return 0.5; }
-  const MW=mcvs.width, MH=mcvs.height;
-  if(probe.mode==="scan"){ const col=Math.floor(((t*0.25)%1)*MW); let s=0; for(let y=0;y<MH;y++){ const o=(y*MW+col)*4; s+=0.299*data[o]+0.587*data[o+1]+0.114*data[o+2]; } return s/MH/255; }
-  let s=0,c=0; for(let i=0;i<data.length;i+=4){ s+=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]; c++; } return s/c/255;
-}
-function pushLuma(t){ const v=sampleMediaLuma(t); lumaHistory.copyWithin(0,1); lumaHistory[N-1]=v; }
-
-function cfgX(){ return Object.assign({}, state.x, { amount:oscVal("x","amount",state.x.amount), phase:oscVal("x","phase",state.x.phase), process: proc, win: win, z:{input:zBuffer,depth:z.amount}, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
+function cfgX(){ return Object.assign({}, state.x, { amount:oscVal("x","amount",state.x.amount), phase:oscVal("x","phase",state.x.phase), process: proc, win: win, z:{input:zBuffer,depth:z.amount} }); }
 function cfgY(){
   // Sync/Invert link Channel Y to X. Synced → Y mirrors X's full pipeline
   // (generator + processor + window), so they track even with shaping on.
@@ -1198,7 +1172,7 @@ function cfgY(){
   return Object.assign({}, state.y, { amount:oscVal("y","amount",state.y.amount), phase:oscVal("y","phase",state.y.phase),
     mod: (side.target!=="off" ? { target:side.target, depth:side.depth } : null),
     modInput: (side.target!=="off" ? bufX : null),
-    lumaInput: (+state.y.src===7 ? lumaHistory : null), z:{input:zBuffer,depth:z.amount} }); }
+    z:{input:zBuffer,depth:z.amount} }); }
 
 // ---------- loop ----------
 function frame(){
@@ -1206,7 +1180,6 @@ function frame(){
   for(const ch of ["x","y"]) for(const p of ["amount","phase"]) if(lfo[ch][p]){
     const o=document.querySelector(`.chan[data-ch="${ch}"] [data-p="${p}"]`).parentElement.querySelector("output");
     if(o) o.textContent=fmt(p, oscVal(ch,p,state[ch][p])); }
-  if(probe.loaded) pushLuma(t);
   if(z.amount>0){ const zr=Engine.cpuRack({src:z.shape,rate:z.rate,phase:0,amount:1,offset:0,smooth:0,seed:7},dt); for(let i=0;i<N;i++) zBuffer[i]=zr.output("A",start+i*dt,i); }
   Engine.sample(cfgX(),start,dt,bufX)
     .then(()=> Engine.sample(cfgY(),start,dt,bufY))
