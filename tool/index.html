@@ -94,6 +94,33 @@
   select,input[type=number]{ transition:border-color .15s; } select:focus,input:focus{ outline:none; border-color:#2bb46e; }
   #exportBtn{ background:#12231b; border-color:#27613f; color:#a8f0c8; font-weight:600; }
   .pcard{ transition:transform .1s, border-color .15s; } .pcard:active{ transform:scale(.96); }
+
+  /* ---- desktop experience: controls sidebar + large stage ---- */
+  @media (min-width: 980px){
+    body{ display:grid; grid-template-columns:380px 1fr; grid-template-rows:auto 1fr;
+          grid-template-areas:"hd hd" "side main"; height:100dvh; overflow:hidden; }
+    header{ grid-area:hd; padding:14px 22px 12px; }
+    header h1{ font-size:17px; }
+    #top{ grid-area:main; display:flex; flex-direction:column; min-height:0; height:100%;
+          padding:14px 22px 18px; gap:0; }
+    .tabs{ flex:0 0 auto; gap:6px; }
+    .tabs button{ padding:9px 16px; font-size:13px; }
+    .stagewrap{ flex:1 1 auto; min-height:0; height:auto; border-radius:14px; }
+    #stage{ height:100%; }
+    #crt{ top:8px; left:8px; width:calc(100% - 16px); height:calc(100% - 16px); }
+    .applied{ flex:0 0 auto; }
+    .expr{ max-height:140px; }
+    #scroll{ grid-area:side; overflow-y:auto; border-right:1px solid var(--edge);
+             padding:16px; gap:13px; }
+    .panel{ padding:13px 14px; }
+    .ctl{ grid-template-columns:74px 1fr 50px; margin:8px 0; }
+    .pgrid{ grid-template-columns:repeat(auto-fill, minmax(98px, 1fr)); }
+    /* the math drawer reads better open by default on desktop */
+    .drawer .dbody{ }
+  }
+  @media (min-width: 1500px){
+    body{ grid-template-columns:420px 1fr; }
+  }
 </style>
 </head>
 <body>
