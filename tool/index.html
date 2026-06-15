@@ -320,15 +320,15 @@
   <div id="gpudbg" style="display:none;font:10px/1.3 ui-monospace,Menlo,monospace;color:#fb9;padding:4px 6px;word-break:break-all"></div>
   <div class="applied" id="appliedPanel">
     <div class="row" style="margin-top:8px">
-      <select id="target" style="flex:1; min-width:130px">
-        <option value="scale">Scale</option><option value="rotation">Rotation</option>
-        <option value="position">Position X</option><option value="opacity">Opacity / flicker</option>
-        <option value="glow">Glow</option><option value="color">Color (hue)</option>
-        <option value="meter">Bar meter + gate</option><option value="particles">Particles</option>
-        <option value="type">Kinetic type</option><option value="trace">Trace (wave-runner)</option>
-      </select>
+      <label style="color:var(--dim);font-size:11px;align-self:center">Apply to</label>
+      <select id="appCat" style="flex:1; min-width:120px"></select>
+      <select id="appVar" style="flex:1; min-width:140px"></select>
+    </div>
+    <div class="row" id="rangeRow" style="margin-top:8px; align-items:center">
+      <span style="color:var(--mute);font-size:11px;flex:0 0 auto">Output range</span>
       <div class="ctl" style="grid-template-columns:auto 64px; flex:0 0 auto"><label>Min</label><input type="number" id="tmin" value="80" step="1"></div>
       <div class="ctl" style="grid-template-columns:auto 64px; flex:0 0 auto"><label>Max</label><input type="number" id="tmax" value="120" step="1"></div>
+      <span style="color:#52606b;font-size:11px;flex:1 1 100%">The 0→1 driver is remapped into this range (e.g. Scale 80→120%). Hidden where a variant has no numeric range.</span>
     </div>
     <div class="row" style="margin-top:8px; align-items:center">
       <label style="color:var(--dim);font-size:11px">Drive</label>
@@ -596,9 +596,7 @@ function reflectInputs(){
   [["winL",win.left],["winR",win.right],["winFL",win.featherL],["winFR",win.featherR]].forEach(([id,v])=>{ const el=document.getElementById(id); if(el){ el.value=v; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(+v).toFixed(2); } });
   if(document.getElementById("sideMode")) document.getElementById("sideMode").value=side.target;
   if(document.getElementById("sideDepth")) document.getElementById("sideDepth").value=side.depth;
-  if(document.getElementById("target")){ document.getElementById("target").value=applied.target; }
-  if(document.getElementById("tmin")) document.getElementById("tmin").value=applied.min;
-  if(document.getElementById("tmax")) document.getElementById("tmax").value=applied.max;
+  if(typeof syncAppliedUI==="function") syncAppliedUI();
   if(typeof updateExpr==="function") updateExpr();
   { const yo=document.getElementById("yopac"); if(yo){ yo.value=YOPAC; const o=document.getElementById("yopacv"); if(o)o.textContent=(+YOPAC).toFixed(2); } }
   [["zShape",z.shape],["zRate",z.rate],["zAmt",z.amount]].forEach(([id,v])=>{ const el=document.getElementById(id); if(el){ el.value=v; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(id==="zShape"?["","Sine","","","Noise","","","","Triangle"][v]||v:(+v).toFixed(2)); } });
@@ -627,10 +625,37 @@ $("crtToggle").onchange=()=>{ crt.on=$("crtToggle").checked; if(!crt.on) $("crt"
 $("tabs").onclick=e=>{ const m=e.target.dataset.mode; if(!m)return; MODE_CUR=m;
   [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===m));
   $("appliedPanel").classList.toggle("show",m==="applied"); needGraticule=true; updateMath(); };
-$("target").onchange=()=>{ applied.target=$("target").value; const d=defaults[applied.target]; if(d){$("tmin").value=d[0];$("tmax").value=d[1];applied.min=d[0];applied.max=d[1];} updateExpr(); updateMath(); };
+const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100],
+  particles:[0,1], partRings:[0,1], partStream:[0,1], type:[0,1], textOpacity:[0,1], textPump:[0,1], trace:[0,1] };
+// Applied targets grouped into a two-level Category → Variant picker. The
+// variant value IS the drawApplied() switch key, so old presets/recipes that
+// stored a bare target string keep working.
+const APP_CATS=[
+  ["Transform", [["scale","Scale"],["rotation","Rotation"],["position","Position X"],["opacity","Opacity / flicker"]]],
+  ["Visual",    [["glow","Glow"],["color","Color (hue)"]]],
+  ["Meter",     [["meter","Bar meter + gate"]]],
+  ["Particles", [["particles","Fountain"],["partRings","Shock rings"],["partStream","Stream field"]]],
+  ["Text",      [["type","Kinetic wave"],["textOpacity","Word opacity"],["textPump","Title pump"]]],
+  ["Path",      [["trace","Wave-runner"]]],
+];
+const APP_RANGE=new Set(["scale","rotation","position","opacity","glow","color","meter"]); // variants that use Min/Max
+function appCatOf(t){ for(const [c,vs] of APP_CATS) if(vs.some(v=>v[0]===t)) return c; return APP_CATS[0][0]; }
+function fillAppVar(cat){ const sel=$("appVar"); if(!sel) return; sel.innerHTML="";
+  const vs=(APP_CATS.find(c=>c[0]===cat)||APP_CATS[0])[1];
+  for(const [val,lbl] of vs){ const o=document.createElement("option"); o.value=val; o.textContent=lbl; sel.appendChild(o); } }
+function syncRangeRow(){ const r=$("rangeRow"); if(r) r.style.display=APP_RANGE.has(applied.target)?"flex":"none"; }
+function syncAppliedUI(){ const cat=appCatOf(applied.target);
+  if($("appCat")){ if(!$("appCat").options.length){ for(const [c] of APP_CATS){ const o=document.createElement("option"); o.value=c; o.textContent=c; $("appCat").appendChild(o); } }
+    $("appCat").value=cat; fillAppVar(cat); $("appVar").value=applied.target; }
+  if($("tmin")) $("tmin").value=applied.min; if($("tmax")) $("tmax").value=applied.max; syncRangeRow(); }
+function setAppliedTarget(t){ applied.target=t; const d=defaults[t]; if(d){ applied.min=d[0]; applied.max=d[1]; if($("tmin"))$("tmin").value=d[0]; if($("tmax"))$("tmax").value=d[1]; }
+  parts=[]; rings.length=0; appliedPrevE=0;   // reset emitter state between variants
+  syncRangeRow(); updateExpr(); updateMath(); }
+$("appCat").onchange=()=>{ fillAppVar($("appCat").value); setAppliedTarget($("appVar").value); };
+$("appVar").onchange=()=>{ setAppliedTarget($("appVar").value); };
 $("tmin").oninput=()=>{applied.min=+$("tmin").value; updateExpr(); updateMath();}; $("tmax").oninput=()=>{applied.max=+$("tmax").value; updateExpr(); updateMath();};
 $("driveMode").onchange=()=>{ drive.mode=$("driveMode").value; updateMath(); };
-const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100], particles:[0,250], type:[0,1], trace:[0,1] };
+syncAppliedUI();
 // combine two channel values (0..1) into the Applied driver
 function combine(a,b){ switch(drive.mode){
   case "y": return b; case "mult": return a*b; case "mix": return (a+b)/2;
@@ -871,7 +896,7 @@ function setPresent(on){ document.body.classList.toggle("present", on); needGrat
 // ---------- representations ----------
 const cv=$("stage"), ctx=cv.getContext("2d");
 const bufX=new Float32Array(N), bufY=new Float32Array(N);
-let parts=[]; let needGraticule=true;
+let parts=[], rings=[], appliedPrevE=0; let needGraticule=true;
 function now(){ return performance.now()/1000; }
 function sizeCanvas(){ const r=cv.getBoundingClientRect(); const dpr=Math.min(devicePixelRatio||1,2);
   const w=Math.round(r.width*dpr), h=Math.round(r.height*dpr); if(w<2||h<2)return;
@@ -948,6 +973,23 @@ function drawApplied(W,H){
       for(const p of parts){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.07; p.l-=0.018;
         ctx.globalAlpha=Math.max(0,p.l*0.92); ctx.fillStyle=`hsl(${p.h},85%,58%)`; ctx.fillRect(p.x,p.y,p.sz,p.sz); }
       ctx.globalAlpha=1; break; }
+    case "partRings":{ const e=Math.max(0,Math.min(1,n));   // concentric shock rings fired on signal peaks
+      if(e>0.5 && e>appliedPrevE+0.03) rings.push({r:8, l:1, h:150+e*120, w:1.5+e*3.5});
+      appliedPrevE=e;
+      rings=rings.filter(R=>R.l>0);
+      for(const R of rings){ R.r+=3.2+(1-R.l)*7; R.l-=0.02;
+        ctx.globalAlpha=Math.max(0,R.l); ctx.strokeStyle=`hsl(${R.h},85%,60%)`; ctx.lineWidth=Math.max(0.5,R.w*R.l);
+        ctx.shadowColor=`hsl(${R.h},85%,60%)`; ctx.shadowBlur=8*R.l;
+        ctx.beginPath(); ctx.arc(cx,cy,R.r,0,7); ctx.stroke(); }
+      ctx.shadowBlur=0; ctx.globalAlpha=1;
+      ctx.fillStyle=`hsl(${150+e*120},85%,60%)`; ctx.beginPath(); ctx.arc(cx,cy,3+e*5,0,7); ctx.fill(); break; }
+    case "partStream":{ const e=Math.max(0,Math.min(1,n));   // left→right field; density/speed/spread follow the signal
+      const birth=Math.round(1+e*6);
+      for(let i=0;i<birth;i++) parts.push({x:0, y:cy+(Math.random()-0.5)*H*0.78*(0.25+e), vx:2.5+e*8+Math.random()*2, vy:(Math.random()-0.5)*1.4, l:1, sz:1.5+e*3, h:150+e*120});
+      parts=parts.filter(p=>p.l>0 && p.x<W+12);
+      for(const p of parts){ p.x+=p.vx; p.y+=p.vy; p.l-=0.006;
+        ctx.globalAlpha=Math.max(0,Math.min(1,p.l)); ctx.fillStyle=`hsl(${p.h},85%,60%)`; ctx.fillRect(p.x,p.y,p.sz*2.2,p.sz); }
+      ctx.globalAlpha=1; break; }
     case "type":{ const txt="SIGNAL RACK"; const fs=Math.max(20,Math.min(54,W/10));
       ctx.font=`bold ${fs}px ui-monospace,Menlo,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
       const cw=fs*0.64, x0=cx-(txt.length-1)*cw/2, stride=Math.max(1,Math.floor(N/(txt.length*1.4)));
@@ -960,6 +1002,22 @@ function drawApplied(W,H){
         ctx.fillStyle=`hsl(${150+v*45},85%,${42+v*34}%)`;
         ctx.fillText(txt[i],0,0); ctx.restore(); }
       ctx.textBaseline="alphabetic"; break; }
+    case "textOpacity":{ const words=["WILD","CONSTRUCT","SIGNAL","RACK"];   // each word fades on the signal (staggered)
+      const fs=Math.max(18,Math.min(40,W/12)); ctx.font=`bold ${fs}px ui-monospace,Menlo,monospace`;
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      const gap=fs*1.5, y0=cy-(words.length-1)*gap/2;
+      for(let i=0;i<words.length;i++){
+        const idx=Math.max(0,Math.min(N-1, Math.floor(N-1 - i*(N/words.length))));   // staggered read → words pulse in sequence
+        const v=combine(bufX[idx],bufY[idx]);
+        ctx.globalAlpha=Math.max(0.05, v); ctx.shadowColor="#36f09a"; ctx.shadowBlur=12*v;
+        ctx.fillStyle="#e6f2f4"; ctx.fillText(words[i], cx, y0+i*gap); }
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.textBaseline="alphabetic"; break; }
+    case "textPump":{ const e=Math.max(0,Math.min(1,n));   // single title word scales + glows on peaks
+      const fs=Math.max(26,Math.min(96,W/7))*(0.78+e*0.5);
+      ctx.font=`900 ${fs}px ui-monospace,Menlo,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.globalAlpha=0.32+e*0.68; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8+e*44;
+      ctx.fillStyle=`hsl(${150+e*60},85%,${50+e*22}%)`; ctx.fillText("SIGNAL", cx, cy);
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.textBaseline="alphabetic"; break; }
   }
   ctx.restore();
   // PIP scope (bottom-right) so you can see the wave without leaving Applied
