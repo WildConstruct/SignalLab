@@ -842,74 +842,111 @@ function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rec
 // Build a self-contained, WORKING After Effects expression that reproduces the
 // current Channel X signal -> property. Paste onto a property in AE.
 function aeNum(v){ return (Math.round(v*1e6)/1e6).toString(); }
+function driveLabel(m){ return ({x:"Channel X",y:"Channel Y",mult:"X × Y (ring)",mix:"(X + Y)/2",diff:"|X − Y|",min:"min(X, Y)",max:"max(X, Y)"})[m]||m; }
 function buildAEExpression(){
-  const s=state.x, p=proc, inApplied=(MODE_CUR==="applied");
+  const p=proc, inApplied=(MODE_CUR==="applied");
   const mn=inApplied?applied.min:0, mx=inApplied?applied.max:1, tgt=inApplied?applied.target:"value (0..1)";
+  const dm=drive.mode, needY=(dm!=="x");
   const L=[];
   L.push("// Signal Rack — generated After Effects expression");
-  L.push("// Channel X → "+tgt+". Paste onto the target property in AE.");
+  L.push("// "+(needY?("Driver: "+driveLabel(dm)):"Channel X")+" → "+tgt+". Paste onto the target property in AE.");
   L.push("");
-  if(+s.src===7){
+
+  // Luma Probe (legacy, single-channel) — short path
+  if(+state.x.src===7 && !needY){
     L.push("// Luma Probe: point srcLayer at your media layer.");
     L.push('var srcLayer = thisComp.layer("YOUR SOURCE LAYER");');
-    L.push("var P = ["+aeNum(s.probeX||50)+", "+aeNum(s.probeY||50)+"];   // probe point (px)");
+    L.push("var P = ["+aeNum(state.x.probeX||50)+", "+aeNum(state.x.probeY||50)+"];   // probe point (px)");
     L.push("var col = srcLayer.sampleImage(P, [2.5, 2.5], true, time); // 5x5 average");
-    L.push("var n = clamp(0.299*col[0] + 0.587*col[1] + 0.114*col[2] + "+aeNum(s.offset)+", 0, 1);");
+    L.push("var n = clamp(0.299*col[0] + 0.587*col[1] + 0.114*col[2] + "+aeNum(state.x.offset)+", 0, 1);");
+    L.push(""); L.push("linear(n, 0, 1, "+aeNum(mn)+", "+aeNum(mx)+");");
+    return L.join("\n");
+  }
+
+  // shared helpers
+  L.push("function frac(x){ return x-Math.floor(x); }");
+  L.push("function hsh(n){ var v=Math.sin(n)*43758.5453123; return v-Math.floor(v); }");
+  L.push("function vnoise(x){ var i=Math.floor(x), f=x-i, a=hsh(i), b=hsh(i+1); return (a+(b-a)*(f*f*(3-2*f)))*2-1; }");
+  let zTerm="";
+  if(z.amount>0){
+    L.push("function zBend(tt){ var zx=tt*"+aeNum(z.rate)+"+0.49, fz=zx-Math.floor(zx), zv;");
+    if(+z.shape===8) L.push("  zv=Math.abs(fz-0.5)*2;");
+    else if(+z.shape===4) L.push("  zv=(vnoise(zx+0.861)+1)/2;");
+    else L.push("  zv=(Math.sin(zx*2*Math.PI)+1)/2;");
+    L.push("  return "+aeNum(z.amount)+"*(zv*2-1); }   // third signal: phase-bends both channels");
+    zTerm="+zBend(tt)";
+  }
+
+  // emit a channel generator: srcUni<S>(tt) + smoothed<S>(tt). modSpec drives the
+  // sidechain (Channel X modulating Y); ampLFO/phLFO add the "o" oscillators.
+  function emitGen(S, c, ampLFO, phLFO, modSpec){
+    const sc=+c.src;
+    L.push("var rate"+S+"="+aeNum(c.rate)+", off"+S+"="+aeNum(c.offset)+", smooth"+S+"="+aeNum(c.smooth)+", seed"+S+"="+aeNum(c.seed)+";");
+    L.push("var amount"+S+"="+aeNum(c.amount)+(ampLFO?" + 0.45*Math.sin(time*0.8168141)":"")+";   "+(ampLFO?"// amount oscillator":""));
+    L.push("var phase"+S+"="+aeNum(c.phase)+(phLFO?" + 0.5*Math.sin(time*0.5026548)":"")+";   "+(phLFO?"// phase oscillator":""));
+    L.push("function srcUni"+S+"(tt){ var amt=amount"+S+", ph=phase"+S+";");
+    if(modSpec){
+      L.push("  var m = shapedX(tt);   // sidechain: Channel X modulates Y");
+      if(modSpec==="amp")   L.push("  amt *= (1 - "+aeNum(side.depth)+" + "+aeNum(side.depth)+"*m);");
+      else if(modSpec==="phase") L.push("  ph += "+aeNum(side.depth)+"*m;");
+      else if(modSpec==="rate")  L.push("  ph += "+aeNum(side.depth)+"*(m*2-1)*0.5;   // FM sidechain approximated as phase vibrato");
+    }
+    L.push("  var x=tt*rate"+S+"+ph+(seed"+S+"*0.07-Math.floor(seed"+S+"*0.07))"+zTerm+", fx=x-Math.floor(x), bp;");
+    if(sc===1) L.push("  bp=Math.sin(x*2*Math.PI);");
+    else if(sc===2) L.push("  bp=fx<0.5?1:-1;");
+    else if(sc===3) L.push("  bp=fx*2-1;");
+    else if(sc===4) L.push("  bp=vnoise(x+seed"+S+"*0.123);");
+    else if(sc===5) L.push("  var sum=0,a=1,fr=1,nm=0; for(var o=0;o<4;o++){ sum+=a*vnoise(x*fr+seed"+S+"+o*7.7); nm+=a; a*=0.5; fr*=2; } bp=sum/nm;");
+    else if(sc===8) L.push("  bp=4*Math.abs(fx-0.5)-1;");
+    else if(sc===9) L.push("  bp=fx<0.2?1:-1;");
+    else L.push("  bp=0;");
+    L.push("  bp*=amt; return (bp+1)/2 + off"+S+"; }");
+    L.push("function smoothed"+S+"(tt){ if(smooth"+S+"<=0) return srcUni"+S+"(tt);");
+    L.push("  var win=smooth"+S+"*0.5, M=Math.round(Math.max(1,Math.min(24,smooth"+S+"*24))), acc=0;");
+    L.push("  for(var i=0;i<M;i++){ var f=(M==1)?0:i/(M-1); acc+=srcUni"+S+"(tt-win*f); } return acc/M; }");
+  }
+
+  // ---- Channel X: generator + processor (+ window + lag below) ----
+  emitGen("X", state.x, lfo.x.amount, lfo.x.phase, null);
+  L.push("function shapedX(tt){ var n=clamp(smoothedX(tt),0,1);");
+  if(p.gain!==1||p.bias!==0) L.push("  n=clamp(0.5+(n-0.5)*"+aeNum(p.gain)+"+"+aeNum(p.bias)+",0,1);");
+  if(p.sat>0) L.push("  { function th(x){var c=Math.max(-4,Math.min(4,x)),a=c*c;return c*(27+a)/(27+9*a);} var bp=n*2-1,g=1+"+aeNum(p.sat)+"*4,bb="+aeNum(p.sat)+"*0.2,sh=(th(bp*g+bb)-th(bb))/Math.max(th(g),0.001); n=((bp*(1-"+aeNum(p.sat)+")+sh*"+aeNum(p.sat)+")+1)/2; }");
+  if(p.warp) L.push("  { var bp=n*2-1; n=((bp<0?-1:1)*Math.pow(Math.abs(bp),Math.pow(3,"+aeNum(-p.warp)+"))+1)/2; }");
+  if(p.fold>0) L.push("  { var fx=(n*2-1)*"+aeNum(1+p.fold*6)+", fm=(fx-1)-4*Math.floor((fx-1)/4); n=Math.abs(fm-2)*0.5; }");
+  if(p.invert) L.push("  n=1-n;");
+  if(p.rectify) L.push("  n=Math.abs(n*2-1);");
+  if(p.quantize>1) L.push("  n=Math.round(n*"+(p.quantize-1)+")/"+(p.quantize-1)+";");
+  if(p.gate>0) L.push("  n=(n>="+aeNum(p.gate)+")?1:0;");
+  L.push("  return n; }");
+  if(p.lag>0){
+    L.push("var lag="+aeNum(p.lag)+", fd=thisComp.frameDuration, K=Math.min(34,Math.round(lag*32)+2), accX=0, wX=1, wsX=0;");
+    L.push("for(var k=0;k<K;k++){ accX+=wX*shapedX(time-k*fd); wsX+=wX; wX*=lag; }");
+    L.push("var nx = accX/wsX;");
   } else {
-    L.push("var rate="+aeNum(s.rate)+", amount="+aeNum(s.amount)+", phase="+aeNum(s.phase)+", offset="+aeNum(s.offset)+", smooth="+aeNum(s.smooth)+", seed="+aeNum(s.seed)+";");
-    L.push("function frac(x){ return x - Math.floor(x); }");
-    L.push("function hsh(n){ var v=Math.sin(n)*43758.5453123; return v-Math.floor(v); }");
-    L.push("function vnoise(x){ var i=Math.floor(x), f=x-i, a=hsh(i), b=hsh(i+1); return (a+(b-a)*(f*f*(3-2*f)))*2-1; }");
-    var zTerm="";
-    if(z.amount>0){
-      L.push("function zBend(tt){ var zx=tt*"+aeNum(z.rate)+"+0.49, fz=zx-Math.floor(zx), zv;");
-      if(+z.shape===8) L.push("  zv=Math.abs(fz-0.5)*2;");
-      else if(+z.shape===4) L.push("  zv=(vnoise(zx+0.861)+1)/2;");
-      else L.push("  zv=(Math.sin(zx*2*Math.PI)+1)/2;");
-      L.push("  return "+aeNum(z.amount)+"*(zv*2-1); }   // third signal: phase-bends the wave");
-      zTerm="+zBend(tt)";
-    }
-    L.push("function srcUni(tt){ var x=tt*rate+phase+(seed*0.07-Math.floor(seed*0.07))"+zTerm+", fx=x-Math.floor(x), bp;");
-    if(+s.src===1) L.push("  bp = Math.sin(x*2*Math.PI);");
-    else if(+s.src===2) L.push("  bp = fx<0.5 ? 1 : -1;");
-    else if(+s.src===3) L.push("  bp = fx*2-1;");
-    else if(+s.src===4) L.push("  bp = vnoise(x + seed*0.123);");
-    else if(+s.src===5) L.push("  var sum=0,a=1,fr=1,nm=0; for(var o=0;o<4;o++){ sum+=a*vnoise(x*fr+seed+o*7.7); nm+=a; a*=0.5; fr*=2; } bp=sum/nm;");
-    else if(+s.src===8) L.push("  bp = 4*Math.abs(fx-0.5)-1;");
-    else if(+s.src===9) L.push("  bp = fx<0.2 ? 1 : -1;");
-    else L.push("  bp = 0;");
-    L.push("  bp*=amount; return (bp+1)/2 + offset; }");
-    L.push("function smoothed(tt){ if(smooth<=0) return srcUni(tt);");
-    L.push("  var win=smooth*0.5, M=Math.round(Math.max(1,Math.min(24,smooth*24))), acc=0;");
-    L.push("  for(var i=0;i<M;i++){ var f=(M==1)?0:i/(M-1); acc+=srcUni(tt-win*f); } return acc/M; }");
-    L.push("function shapedN(tt){ var n=clamp(smoothed(tt),0,1);");
-    if(p.gain!==1||p.bias!==0) L.push("  n=clamp(0.5+(n-0.5)*"+aeNum(p.gain)+"+"+aeNum(p.bias)+",0,1);");
-    if(p.sat>0) L.push("  { function th(x){var c=Math.max(-4,Math.min(4,x)),a=c*c;return c*(27+a)/(27+9*a);} var bp=n*2-1,g=1+"+aeNum(p.sat)+"*4,bb="+aeNum(p.sat)+"*0.2,sh=(th(bp*g+bb)-th(bb))/Math.max(th(g),0.001); n=((bp*(1-"+aeNum(p.sat)+")+sh*"+aeNum(p.sat)+")+1)/2; }");
-    if(p.warp) L.push("  { var bp=n*2-1; n=((bp<0?-1:1)*Math.pow(Math.abs(bp),Math.pow(3,"+aeNum(-p.warp)+"))+1)/2; }");
-    if(p.fold>0) L.push("  { var fx=(n*2-1)*"+aeNum(1+p.fold*6)+", fm=(fx-1)-4*Math.floor((fx-1)/4); n=Math.abs(fm-2)*0.5; }");
-    if(p.invert) L.push("  n=1-n;");
-    if(p.rectify) L.push("  n=Math.abs(n*2-1);");
-    if(p.quantize>1) L.push("  n=Math.round(n*"+(p.quantize-1)+")/"+(p.quantize-1)+";");
-    if(p.gate>0) L.push("  n=(n>="+aeNum(p.gate)+")?1:0;");
-    L.push("  return n; }");
-    if(p.lag>0){
-      L.push("var lag="+aeNum(p.lag)+", fd=thisComp.frameDuration, K=Math.min(34,Math.round(lag*32)+2), acc=0, w=1, ws=0;");
-      L.push("for(var k=0;k<K;k++){ acc+=w*shapedN(time-k*fd); ws+=w; w*=lag; }");
-      L.push("var n=acc/ws;");
-    } else {
-      L.push("var n = shapedN(time);");
-    }
+    L.push("var nx = shapedX(time);");
   }
   if(win.left>0||win.right<1||win.featherL>0||win.featherR>0){
-    L.push("");
-    L.push("// feathered region window, mapped to this layer's in/out");
+    L.push("// feathered region window (Channel X), mapped to this layer's in/out");
     L.push("var tIn=thisLayer.inPoint, tOut=thisLayer.outPoint, dur=Math.max(tOut-tIn,0.001);");
     L.push("var wL=tIn+dur*"+aeNum(win.left)+", wR=tIn+dur*"+aeNum(win.right)+", fL=dur*"+aeNum(win.featherL)+", fR=dur*"+aeNum(win.featherR)+";");
-    L.push("var eL = (fL>0) ? linear(time,wL,wL+fL,0,1) : (time>=wL?1:0);");
-    L.push("var eR = (fR>0) ? linear(time,wR-fR,wR,1,0) : (time<=wR?1:0);");
-    L.push("n = n * eL * eR;");
+    L.push("var eL=(fL>0)?linear(time,wL,wL+fL,0,1):(time>=wL?1:0), eR=(fR>0)?linear(time,wR-fR,wR,1,0):(time<=wR?1:0);");
+    L.push("nx = nx*eL*eR;");
   }
+
+  // ---- Channel Y (only when the driver needs it) ----
+  if(needY){
+    if(link.sync){ L.push("var ny = nx;   // Channel Y synced to X"); }
+    else if(link.invert){ L.push("var ny = 1 - nx;   // Channel Y mirrors X"); }
+    else {
+      emitGen("Y", state.y, lfo.y.amount, lfo.y.phase, side.target!=="off"?side.target:null);
+      L.push("var ny = clamp(smoothedY(time), 0, 1);");
+    }
+  }
+
+  // ---- driver combine (matches the on-screen Drive) ----
+  const drv={ y:"ny", mult:"nx*ny", mix:"(nx+ny)/2", diff:"Math.abs(nx-ny)", min:"Math.min(nx,ny)", max:"Math.max(nx,ny)" }[dm] || "nx";
   L.push("");
+  L.push("var n = "+drv+";");
   L.push("linear(n, 0, 1, "+aeNum(mn)+", "+aeNum(mx)+");");
   return L.join("\n");
 }
