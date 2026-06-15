@@ -632,20 +632,22 @@ $("tabs").onclick=e=>{ const m=e.target.dataset.mode; if(!m)return; MODE_CUR=m;
   [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===m));
   $("appliedPanel").classList.toggle("show",m==="applied"); needGraticule=true; updateMath(); };
 const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100],
+  positionY:[-200,200], skew:[-30,30], strobe:[0,1], ringPulse:[0,1], meterRadial:[0,1], meterLED:[0,1],
   particles:[0,1], partRings:[0,1], partStream:[0,1], partOrbit:[0,1], partFall:[0,1],
-  type:[0,1], textOpacity:[0,1], textPump:[0,1], textGlitch:[0,1], textType:[0,1], trace:[0,1] };
+  type:[0,1], textOpacity:[0,1], textPump:[0,1], textGlitch:[0,1], textType:[0,1],
+  trace:[0,1], orbitPath:[0,1], spiro:[0,1] };
 // Applied targets grouped into a two-level Category → Variant picker. The
 // variant value IS the drawApplied() switch key, so old presets/recipes that
 // stored a bare target string keep working.
 const APP_CATS=[
-  ["Transform", [["scale","Scale"],["rotation","Rotation"],["position","Position X"],["opacity","Opacity / flicker"]]],
-  ["Visual",    [["glow","Glow"],["color","Color (hue)"]]],
-  ["Meter",     [["meter","Bar meter + gate"]]],
+  ["Transform", [["scale","Scale"],["rotation","Rotation"],["position","Position X"],["positionY","Position Y"],["opacity","Opacity / flicker"],["skew","Skew"]]],
+  ["Visual",    [["glow","Glow"],["color","Color (hue)"],["strobe","Strobe"],["ringPulse","Ring pulse"]]],
+  ["Meter",     [["meter","Bar meter + gate"],["meterRadial","Radial gauge"],["meterLED","LED ladder"]]],
   ["Particles", [["particles","Fountain"],["partRings","Shock rings"],["partStream","Stream field"],["partOrbit","Orbit swarm"],["partFall","Confetti fall"]]],
   ["Text",      [["type","Kinetic wave"],["textOpacity","Word opacity"],["textPump","Title pump"],["textGlitch","RGB glitch"],["textType","Typewriter"]]],
-  ["Path",      [["trace","Wave-runner"]]],
+  ["Path",      [["trace","Wave-runner"],["orbitPath","Vectorscope dot"],["spiro","Spirograph"]]],
 ];
-const APP_RANGE=new Set(["scale","rotation","position","opacity","glow","color","meter"]); // variants that use Min/Max
+const APP_RANGE=new Set(["scale","rotation","position","positionY","opacity","skew","glow","color","meter"]); // variants that use Min/Max
 function appCatOf(t){ for(const [c,vs] of APP_CATS) if(vs.some(v=>v[0]===t)) return c; return APP_CATS[0][0]; }
 function fillAppVar(cat){ const sel=$("appVar"); if(!sel) return; sel.innerHTML="";
   const vs=(APP_CATS.find(c=>c[0]===cat)||APP_CATS[0])[1];
@@ -970,15 +972,41 @@ function drawApplied(W,H){
       const dv=combine(bufX[N-1],bufY[N-1]); const px=W-14, py=(1-dv)*(H-24)+12;
       ctx.shadowColor="#36f09a"; ctx.shadowBlur=16; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(px,py,9,0,7); ctx.fill(); ctx.shadowBlur=0;
       break; }
+    case "orbitPath":{ const R=Math.min(W,H)*0.4;   // dot rides the live X/Y point on the vectorscope path
+      ctx.strokeStyle="#16323f"; ctx.lineWidth=1; ctx.beginPath();
+      for(let i=0;i<N;i++){ const x=cx+bip(i)*R, y=cy-(bufY[i]*2-1)*R; i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
+      const hx=cx+bip(N-1)*R, hy=cy-(bufY[N-1]*2-1)*R;
+      ctx.shadowColor="#36f09a"; ctx.shadowBlur=16; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(hx,hy,9,0,7); ctx.fill(); ctx.shadowBlur=0; break; }
+    case "spiro":{ const R=Math.min(W,H)*0.42;   // rosette: angle sweeps, radius follows Channel X
+      ctx.strokeStyle="#36f09a"; ctx.lineWidth=1.4; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath();
+      for(let i=0;i<N;i++){ const a=i/(N-1)*Math.PI*8; const rr=R*(0.18+0.82*bufX[i]); const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr; i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke(); ctx.shadowBlur=0; break; }
     case "scale":{ const s=val/100; const d=Math.min(W,H)*0.55*s; ctx.fillStyle="#36f09a"; ctx.translate(cx,cy); ctx.fillRect(-d/2,-d/2,d,d); break; }
     case "rotation":{ ctx.translate(cx,cy); ctx.rotate(val*Math.PI/180); ctx.fillStyle="#36f09a"; const L=Math.min(W,H)*0.4; ctx.fillRect(-8,-L,16,2*L); ctx.beginPath(); ctx.arc(0,0,12,0,7); ctx.fill(); break; }
     case "position":{ ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx+val*Math.min(1,W/520),cy,36,0,7); ctx.fill(); break; }
+    case "positionY":{ ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx, cy - val*Math.min(1,H/360), 36, 0, 7); ctx.fill(); break; }
+    case "skew":{ ctx.translate(cx,cy); ctx.transform(1,0,Math.tan(val*Math.PI/180),1,0,0); ctx.fillStyle="#36f09a"; const d=Math.min(W,H)*0.42; ctx.fillRect(-d/2,-d/2,d,d); break; }
     case "opacity":{ ctx.globalAlpha=Math.max(0,Math.min(1,val/100)); ctx.fillStyle="#36f09a"; const d=Math.min(W,H)*0.5; ctx.fillRect(cx-d/2,cy-d/2,d,d); break; }
     case "glow":{ ctx.shadowColor="#36f09a"; ctx.shadowBlur=val; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx,cy,48,0,7); ctx.fill(); break; }
     case "color":{ ctx.fillStyle=`hsl(${n*320},80%,55%)`; ctx.beginPath(); ctx.arc(cx,cy,Math.min(W,H)*0.32,0,7); ctx.fill(); break; }
+    case "strobe":{ const e=Math.max(0,Math.min(1,n)); ctx.fillStyle=`hsl(${150+e*60},85%,${5+e*54}%)`; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle=`rgba(255,255,255,${e*e*0.3})`; ctx.fillRect(0,0,W,H); break; }   // full-frame light flicker
+    case "ringPulse":{ const e=Math.max(0,Math.min(1,n)); const R=Math.min(W,H)*(0.12+e*0.32);
+      ctx.strokeStyle=`hsl(${150+e*120},85%,60%)`; ctx.lineWidth=2+e*16; ctx.globalAlpha=0.5+0.5*e;
+      ctx.shadowColor=`hsl(${150+e*120},85%,60%)`; ctx.shadowBlur=10+e*30;
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1; break; }
     case "meter":{ const bw=90, bh=Math.min(H*0.7,260), x=cx-bw/2, y=cy+bh/2; const f=Math.max(0,Math.min(1,(val-applied.min)/(applied.max-applied.min)));
       ctx.strokeStyle="#1d2a34"; ctx.strokeRect(x,y-bh,bw,bh); ctx.fillStyle=f>0.85?"#f0683a":"#36f09a"; ctx.fillRect(x,y-bh*f,bw,bh*f);
       ctx.fillStyle=(n>=0.5)?"#f0683a":"#16221c"; ctx.beginPath(); ctx.arc(cx,y-bh-26,11,0,7); ctx.fill(); break; }
+    case "meterRadial":{ const e=Math.max(0,Math.min(1,n)); const R=Math.min(W,H)*0.34, a0=Math.PI*0.75, a1=Math.PI*2.25;
+      ctx.lineWidth=12; ctx.lineCap="round"; ctx.strokeStyle="#16222b"; ctx.beginPath(); ctx.arc(cx,cy,R,a0,a1); ctx.stroke();
+      const a=a0+(a1-a0)*e; ctx.strokeStyle=e>0.85?"#f0683a":"#36f09a"; ctx.beginPath(); ctx.arc(cx,cy,R,a0,a); ctx.stroke();
+      ctx.lineWidth=3; ctx.strokeStyle="#dff"; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*R*0.9, cy+Math.sin(a)*R*0.9); ctx.stroke();
+      ctx.fillStyle="#dff"; ctx.beginPath(); ctx.arc(cx,cy,5,0,7); ctx.fill(); ctx.lineCap="butt"; break; }
+    case "meterLED":{ const e=Math.max(0,Math.min(1,n)); const segs=16, gap=4, bw=54, areaH=Math.min(H*0.74,300);
+      const sh=(areaH-gap*(segs-1))/segs, x=cx-bw/2, y0=cy+areaH/2, lit=Math.round(e*segs);
+      for(let i=0;i<segs;i++){ const frac=i/segs, col=frac>0.85?"#f0683a":frac>0.6?"#f0c23a":"#36f09a";
+        ctx.fillStyle=i<lit?col:"#16242c"; ctx.globalAlpha=i<lit?1:0.5; ctx.fillRect(x, y0-(i+1)*sh-i*gap, bw, sh); }
+      ctx.globalAlpha=1; break; }
     case "particles":{ const e=Math.max(0,Math.min(1,n));   // driver energy 0..1 drives the whole emitter
       const birth=Math.round(e*e*16);                        // curved: quiet → sparse, peaks → eruption
       const spread=2.5+e*11;                                 // high energy throws particles faster & wider
