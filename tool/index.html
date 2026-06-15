@@ -479,7 +479,7 @@
 <script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
 <script src="cathode-crt.js"></script>
 <script>
-const BUILD = "2026-06-15d";   // bump on deploy → check console / brand tooltip to spot a stale cache
+const BUILD = "2026-06-15e";   // bump on deploy → check console / brand tooltip to spot a stale cache
 console.info("Signal Rack — build " + BUILD);
 try{ const b=document.querySelector(".brand"); if(b) b.title="build "+BUILD; }catch(e){}
 const { Rack, SOURCE, MODE } = SignalCore;
@@ -1033,6 +1033,22 @@ function setPresent(on){ document.body.classList.toggle("present", on); needGrat
   if(pb) pb.onclick=()=>setPresent(true);
   if(xb) xb.onclick=()=>setPresent(false);
   window.addEventListener("keydown", e=>{ if(e.key==="Escape"&&document.body.classList.contains("present")) setPresent(false); }); }
+
+// ---------- polish: double-click a slider to reset it; keyboard shortcuts ----------
+document.querySelectorAll('input[type=range]').forEach(el=>{ if(!el.title) el.title="Double-click to reset"; });
+document.addEventListener("dblclick", e=>{ const el=e.target;
+  if(el && el.tagName==="INPUT" && el.type==="range"){ el.value=el.defaultValue; el.dispatchEvent(new Event("input",{bubbles:true})); } });
+window.addEventListener("keydown", e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  if(e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;   // don't hijack typing
+  const k=e.key.toLowerCase();
+  if(k===" "||k==="f"){ e.preventDefault(); const cb=$("freeze"); if(cb){ cb.checked=!cb.checked; cb.onchange(); } }
+  else if(k==="r"){ surprise(); }
+  else if(k==="p"){ setPresent(!document.body.classList.contains("present")); }
+});
+{ const pb=$("presentBtn"); if(pb) pb.title="Fullscreen the visualizer (P)";
+  const sb=$("surpriseBtn"); if(sb) sb.title="Random signal + visual (R)";
+  const fz=$("freeze"); if(fz) fz.title="Freeze the signal (Space or F)"; }
 
 // ---------- collapsible panel sections (click the title) ----------
 document.querySelectorAll(".panel").forEach(p=>{ const h=p.querySelector("h2"); if(h) h.addEventListener("click",()=>p.classList.toggle("collapsed")); });
