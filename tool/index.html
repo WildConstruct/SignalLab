@@ -292,6 +292,11 @@
     font-size:13px; font-weight:600; background:var(--amber-dim); border:1px solid #6a4d1e; color:var(--amber-soft); }
   .wide:hover{ filter:brightness(1.12); }
   #shareBtn{ background:var(--amber-dim); border-color:#6a4d1e; color:var(--amber-soft); }
+
+  /* ---- Channel Y → X link (sync / mirror) ---- */
+  .linkrow{ margin:2px 0 8px; gap:14px; }
+  .linkrow label{ display:flex; align-items:center; gap:6px; color:var(--dim); font-size:11px; cursor:pointer; }
+  .chan.y.linked .ctl{ opacity:.38; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -363,6 +368,10 @@
       <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="1941"><output></output></div>
     </div>
     <div class="chan y" data-ch="y"><div class="name">Channel Y</div>
+      <div class="row linkrow">
+        <label><input type="checkbox" id="ySync"> Sync to X</label>
+        <label><input type="checkbox" id="yInvert"> Invert (mirror X)</label>
+      </div>
       <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
       <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="3"><output></output></div>
       <div class="ctl osc-row"><label>Phase</label><button class="osc" data-osc="phase" title="Oscillate this value">o</button><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
@@ -470,6 +479,7 @@ const applied = { target:"scale", min:80, max:120 };
 const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, sat:0, invert:false, rectify:false };
 const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied property
 const side = { target:"off", depth:0.5 };
+const link = { sync:false, invert:false };   // Channel Y relationship to X (sync = copy, invert = mirror)
 const z = { shape:1, rate:1, amount:0 };   // third signal — gently distorts X & Y (phase bend)
 const probe = { mode:"scan", loaded:false, el:null, kind:null };
 const lumaHistory = new Float32Array(N).fill(0.5);
@@ -600,6 +610,7 @@ function reflectInputs(){
   if(document.getElementById("sideMode")) document.getElementById("sideMode").value=side.target;
   if(document.getElementById("sideDepth")) document.getElementById("sideDepth").value=side.depth;
   if(typeof lfo==="object") for(const ch of ["x","y"]) document.querySelectorAll(`.chan[data-ch="${ch}"] .osc`).forEach(b=>b.classList.toggle("on", !!lfo[ch][b.dataset.osc]));
+  if(typeof syncLinkUI==="function") syncLinkUI();
   if(typeof syncAppliedUI==="function") syncAppliedUI();
   if(typeof updateExpr==="function") updateExpr();
   { const yo=document.getElementById("yopac"); if(yo){ yo.value=YOPAC; const o=document.getElementById("yopacv"); if(o)o.textContent=(+YOPAC).toFixed(2); } }
@@ -680,12 +691,13 @@ function buildFullRecipe(){ return {
   timebase:{ mode:"compTime", seed:state.x.seed },
   _channelY:{ type:srcName(state.y.src), rate:state.y.rate, amount:state.y.amount, phase:state.y.phase, offset:state.y.offset, smooth:state.y.smooth, seed:state.y.seed },
   visualization:{ mode:MODE_CUR },
-  _tool:{ x:Object.assign({},state.x), y:Object.assign({},state.y), proc:Object.assign({},proc), win:Object.assign({},win), drive:drive.mode, side:{target:side.target,depth:side.depth}, z:Object.assign({},z), lfo:{x:Object.assign({},lfo.x),y:Object.assign({},lfo.y)}, view:MODE_CUR, crt:crt.on, yOpacity:YOPAC, applied:{target:applied.target,min:applied.min,max:applied.max} },
+  _tool:{ x:Object.assign({},state.x), y:Object.assign({},state.y), proc:Object.assign({},proc), win:Object.assign({},win), drive:drive.mode, side:{target:side.target,depth:side.depth}, link:Object.assign({},link), z:Object.assign({},z), lfo:{x:Object.assign({},lfo.x),y:Object.assign({},lfo.y)}, view:MODE_CUR, crt:crt.on, yOpacity:YOPAC, applied:{target:applied.target,min:applied.min,max:applied.max} },
   compatibilityTags:["engine:wgsl","tool:signal-lab"] }; }
 function applyToolState(t){
   if(t.x) Object.assign(state.x,t.x); if(t.y) Object.assign(state.y,t.y);
   if(t.proc) Object.assign(proc,t.proc); if(t.win) Object.assign(win,t.win);
   if(t.drive) drive.mode=t.drive; if(t.side){ side.target=t.side.target; side.depth=t.side.depth; }
+  if(t.link) Object.assign(link,t.link);
   if(t.z) Object.assign(z,t.z);
   if(t.lfo){ if(t.lfo.x)Object.assign(lfo.x,t.lfo.x); if(t.lfo.y)Object.assign(lfo.y,t.lfo.y); }
   if(t.applied){ applied.target=t.applied.target; applied.min=t.applied.min; applied.max=t.applied.max; }
@@ -729,6 +741,7 @@ function surprise(){
   if(chance(0.6)) proc.sat=+rnd(0.2,0.8).toFixed(2);
   if(chance(0.4)) proc.warp=+rnd(-0.7,0.7).toFixed(2);
   if(chance(0.3)) proc.fold=+rnd(0.2,0.8).toFixed(2);
+  link.sync=chance(0.15); link.invert=!link.sync&&chance(0.15);   // occasional synced/mirrored Y
   side.target=pick(["off","off","amp","rate","phase"]); side.depth=+rnd(0.2,0.8).toFixed(2);
   z.amount=chance(0.4)?+rnd(0.1,0.4).toFixed(2):0; z.rate=+rnd(0.3,3).toFixed(1); z.shape=pick([1,8,4]);
   drive.mode=pick(["x","y","mult","mix","diff"]);
@@ -866,8 +879,12 @@ function updateMath(){
   let html = `<div class="lbl">Channel X — source</div><div class="math">x(t) = ${gx.b}</div>`;
   html += `<div class="lbl">Channel X — normalized${state.x.smooth>0?" + smoothing":""}</div><div class="math">n(t) = ${nx}</div>`;
   if(anyProc()) html += `<div class="lbl">Processor — shaped</div><div class="math">x′(t) = ${procMath("n(t)")}</div>`;
-  const gy=genMath(state.y);
-  html += `<div class="lbl">Channel Y</div><div class="math">y(t) = ${gy.b}</div>`;
+  if(link.sync||link.invert){
+    html += `<div class="lbl">Channel Y — ${link.invert?"mirror of X":"synced to X"}</div><div class="math">y(t) = ${link.invert?"1 − x(t)":"x(t)"}</div>`;
+  } else {
+    const gy=genMath(state.y);
+    html += `<div class="lbl">Channel Y</div><div class="math">y(t) = ${gy.b}</div>`;
+  }
   if(side.target!=="off"){ const w={amp:"amplitude",rate:"rate",phase:"phase"}[side.target];
     html += `<div class="lbl">Sidechain — X modulates Y ${w}</div><div class="math">y(t) = Y( ${w} ⊕ ${num(side.depth)}·x′(t) )</div>`; }
   const anyWin = win.left>0||win.right<1||win.featherL>0||win.featherR>0;
@@ -1158,6 +1175,10 @@ if(probeFile) probeFile.onchange=e=>{ const f=e.target.files&&e.target.files[0];
 $("probeMode").onchange=()=>{ probe.mode=$("probeMode").value; updateMath(); };
 $("sideMode").onchange=()=>{ side.target=$("sideMode").value; updateMath(); };
 $("sideDepth").oninput=()=>{ side.depth=+$("sideDepth").value; updateMath(); };
+function syncLinkUI(){ const y=document.querySelector('.chan[data-ch="y"]'); if(y) y.classList.toggle("linked", link.sync||link.invert);
+  const s=$("ySync"), iv=$("yInvert"); if(s)s.checked=link.sync; if(iv)iv.checked=link.invert; }
+$("ySync").onchange=()=>{ link.sync=$("ySync").checked; syncLinkUI(); updateMath(); };
+$("yInvert").onchange=()=>{ link.invert=$("yInvert").checked; syncLinkUI(); updateMath(); };
 
 function sampleMediaLuma(t){ if(!probe.el) return 0.5;
   try{ mctx.drawImage(probe.el,0,0,mcvs.width,mcvs.height); }catch(e){ return 0.5; }
@@ -1169,7 +1190,12 @@ function sampleMediaLuma(t){ if(!probe.el) return 0.5;
 function pushLuma(t){ const v=sampleMediaLuma(t); lumaHistory.copyWithin(0,1); lumaHistory[N-1]=v; }
 
 function cfgX(){ return Object.assign({}, state.x, { amount:oscVal("x","amount",state.x.amount), phase:oscVal("x","phase",state.x.phase), process: proc, win: win, z:{input:zBuffer,depth:z.amount}, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
-function cfgY(){ return Object.assign({}, state.y, { amount:oscVal("y","amount",state.y.amount), phase:oscVal("y","phase",state.y.phase),
+function cfgY(){
+  // Sync/Invert link Channel Y to X. Synced → Y mirrors X's full pipeline
+  // (generator + processor + window), so they track even with shaping on.
+  // Invert reuses that and flips to 1 − X after sampling (see frame()).
+  if(link.sync || link.invert) return cfgX();
+  return Object.assign({}, state.y, { amount:oscVal("y","amount",state.y.amount), phase:oscVal("y","phase",state.y.phase),
     mod: (side.target!=="off" ? { target:side.target, depth:side.depth } : null),
     modInput: (side.target!=="off" ? bufX : null),
     lumaInput: (+state.y.src===7 ? lumaHistory : null), z:{input:zBuffer,depth:z.amount} }); }
@@ -1185,6 +1211,7 @@ function frame(){
   Engine.sample(cfgX(),start,dt,bufX)
     .then(()=> Engine.sample(cfgY(),start,dt,bufY))
     .then(()=>{
+      if(link.invert) for(let i=0;i<N;i++) bufY[i]=1-bufY[i];   // mirror Channel X
       sizeCanvas(); const W=cv.width,H=cv.height; (Render[MODE_CUR]||Render.waveform)(W,H);
       if(MODE_CUR!=="applied") edgeVignette(W,H);   // soften/blur the smear at the borders
       // Cathode CRT/NTSC — real WebGPU overlay sampling the 2D scope as a texture
