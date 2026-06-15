@@ -479,7 +479,7 @@
 <script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
 <script src="cathode-crt.js"></script>
 <script>
-const BUILD = "2026-06-15c";   // bump on deploy → check console / brand tooltip to spot a stale cache
+const BUILD = "2026-06-15d";   // bump on deploy → check console / brand tooltip to spot a stale cache
 console.info("Signal Rack — build " + BUILD);
 try{ const b=document.querySelector(".brand"); if(b) b.title="build "+BUILD; }catch(e){}
 const { Rack, SOURCE, MODE } = SignalCore;
@@ -1288,10 +1288,12 @@ function drawApplied(W,H){
         for(let k=0;k<14;k++){ const y=headY-k*fs*1.2; if(y<-10||y>H+10) continue; const ch=hx.charAt((c*7+k+Math.floor(t*8))&15), a=Math.max(0,1-k/14)*(0.35+e*0.65);
           ctx.fillStyle=k===0?`rgba(220,255,240,${0.6+e*0.4})`:`rgba(54,240,154,${a})`; ctx.fillText(ch, 14+c*colW, y); } }
       ctx.textBaseline="alphabetic"; break; }
-    case "fuiSynapse":{ const t=lfoClock, NODES=15, sd=state.x.seed*0.137, hx=k=>{ const s=Math.sin(k*127.1+311.7+sd)*43758.5453; return s-Math.floor(s); };   // Channel X seed reshapes the map
+    case "fuiSynapse":{ const t=lfoClock, sd=state.x.seed*0.137, hx=k=>{ const s=Math.sin(k*127.1+311.7+sd)*43758.5453; return s-Math.floor(s); };   // Channel X seed reshapes the whole net
+      const NODES=11+Math.floor(hx(901)*9);   // seed varies node count (11..19)
       const pos=[]; for(let i=0;i<NODES;i++) pos.push([cx+(hx(i)-0.5)*Math.min(W*0.84,820), cy+(hx(i+50)-0.5)*Math.min(H*0.74,440)]);
       const act=i=>Math.max(0,Math.min(1, combine(bufX[Math.floor(hx(i+9)*(N-1))], bufY[Math.floor(hx(i+9)*(N-1))])));
-      const edges=[]; for(let i=0;i<NODES;i++){ edges.push([i,(i+1)%NODES]); edges.push([i,(i+5)%NODES]); }
+      const edges=[]; for(let i=0;i<NODES;i++){ const deg=1+Math.floor(hx(i*5+311)*3);   // seed-varied connectivity (1..3 per node)
+        for(let d=0;d<deg;d++){ let j=Math.floor(hx(i*5+d+617)*NODES); if(j===i) j=(j+1)%NODES; edges.push([i,j]); } }
       for(let ei=0;ei<edges.length;ei++){ const a=edges[ei][0], b=edges[ei][1], A=pos[a], B=pos[b];
         ctx.strokeStyle="#15303a"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
         const aa=act(a); if(aa>0.45){ const ph=(t*0.6+hx(ei*3))%1, x=A[0]+(B[0]-A[0])*ph, y=A[1]+(B[1]-A[1])*ph;
