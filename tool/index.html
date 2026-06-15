@@ -1244,7 +1244,7 @@ function drawApplied(W,H){
         for(let k=0;k<14;k++){ const y=headY-k*fs*1.2; if(y<-10||y>H+10) continue; const ch=hx.charAt((c*7+k+Math.floor(t*8))&15), a=Math.max(0,1-k/14)*(0.35+e*0.65);
           ctx.fillStyle=k===0?`rgba(220,255,240,${0.6+e*0.4})`:`rgba(54,240,154,${a})`; ctx.fillText(ch, 14+c*colW, y); } }
       ctx.textBaseline="alphabetic"; break; }
-    case "fuiSynapse":{ const t=lfoClock, NODES=15, hx=k=>{ const s=Math.sin(k*127.1+311.7)*43758.5453; return s-Math.floor(s); };
+    case "fuiSynapse":{ const t=lfoClock, NODES=15, sd=state.x.seed*0.137, hx=k=>{ const s=Math.sin(k*127.1+311.7+sd)*43758.5453; return s-Math.floor(s); };   // Channel X seed reshapes the map
       const pos=[]; for(let i=0;i<NODES;i++) pos.push([cx+(hx(i)-0.5)*Math.min(W*0.84,820), cy+(hx(i+50)-0.5)*Math.min(H*0.74,440)]);
       const act=i=>Math.max(0,Math.min(1, combine(bufX[Math.floor(hx(i+9)*(N-1))], bufY[Math.floor(hx(i+9)*(N-1))])));
       const edges=[]; for(let i=0;i<NODES;i++){ edges.push([i,(i+1)%NODES]); edges.push([i,(i+5)%NODES]); }
