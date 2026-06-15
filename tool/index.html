@@ -882,8 +882,8 @@ function buildAEExpression(){
   function emitGen(S, c, ampLFO, phLFO, modSpec){
     const sc=+c.src;
     L.push("var rate"+S+"="+aeNum(c.rate)+", off"+S+"="+aeNum(c.offset)+", smooth"+S+"="+aeNum(c.smooth)+", seed"+S+"="+aeNum(c.seed)+";");
-    L.push("var amount"+S+"="+aeNum(c.amount)+(ampLFO?" + 0.45*Math.sin(time*0.8168141)":"")+";   "+(ampLFO?"// amount oscillator":""));
-    L.push("var phase"+S+"="+aeNum(c.phase)+(phLFO?" + 0.5*Math.sin(time*0.5026548)":"")+";   "+(phLFO?"// phase oscillator":""));
+    L.push("var amount"+S+"="+aeNum(c.amount)+(ampLFO?" + 0.45*Math.sin(T*0.8168141)":"")+";   "+(ampLFO?"// amount oscillator":""));
+    L.push("var phase"+S+"="+aeNum(c.phase)+(phLFO?" + 0.5*Math.sin(T*0.5026548)":"")+";   "+(phLFO?"// phase oscillator":""));
     L.push("function srcUni"+S+"(tt){ var amt=amount"+S+", ph=phase"+S+";");
     if(modSpec){
       L.push("  var m = shapedX(tt);   // sidechain: Channel X modulates Y");
@@ -907,6 +907,7 @@ function buildAEExpression(){
   }
 
   // ---- Channel X: generator + processor (+ window + lag below) ----
+  L.push("var T = time*"+aeNum(SPEED)+";   // master Speed (time scale)");
   emitGen("X", state.x, lfo.x.amount, lfo.x.phase, null);
   L.push("function shapedX(tt){ var n=clamp(smoothedX(tt),0,1);");
   if(p.gain!==1||p.bias!==0) L.push("  n=clamp(0.5+(n-0.5)*"+aeNum(p.gain)+"+"+aeNum(p.bias)+",0,1);");
@@ -919,11 +920,11 @@ function buildAEExpression(){
   if(p.gate>0) L.push("  n=(n>="+aeNum(p.gate)+")?1:0;");
   L.push("  return n; }");
   if(p.lag>0){
-    L.push("var lag="+aeNum(p.lag)+", fd=thisComp.frameDuration, K=Math.min(34,Math.round(lag*32)+2), accX=0, wX=1, wsX=0;");
-    L.push("for(var k=0;k<K;k++){ accX+=wX*shapedX(time-k*fd); wsX+=wX; wX*=lag; }");
+    L.push("var lag="+aeNum(p.lag)+", fdT=thisComp.frameDuration*"+aeNum(SPEED)+", K=Math.min(34,Math.round(lag*32)+2), accX=0, wX=1, wsX=0;");
+    L.push("for(var k=0;k<K;k++){ accX+=wX*shapedX(T-k*fdT); wsX+=wX; wX*=lag; }");
     L.push("var nx = accX/wsX;");
   } else {
-    L.push("var nx = shapedX(time);");
+    L.push("var nx = shapedX(T);");
   }
   if(win.left>0||win.right<1||win.featherL>0||win.featherR>0){
     L.push("// feathered region window (Channel X), mapped to this layer's in/out");
@@ -939,7 +940,7 @@ function buildAEExpression(){
     else if(link.invert){ L.push("var ny = 1 - nx;   // Channel Y mirrors X"); }
     else {
       emitGen("Y", state.y, lfo.y.amount, lfo.y.phase, side.target!=="off"?side.target:null);
-      L.push("var ny = clamp(smoothedY(time), 0, 1);");
+      L.push("var ny = clamp(smoothedY(T), 0, 1);");
     }
   }
 
