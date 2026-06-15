@@ -1,9 +1,14 @@
 name: ci
 
+# Runs as a PR checkpoint + on manual dispatch. We intentionally do NOT run on
+# every branch push: the WildConstruct org's GitHub-hosted Actions runners are
+# currently unavailable (jobs never get a runner and fail in seconds), and the
+# demo deploys manually to the gh-pages branch. Re-add `push` here once the org
+# Actions/billing block is cleared.
 on:
-  push:
-    branches: ["**"]
   pull_request:
+    types: [opened, reopened]
+  workflow_dispatch:
 
 jobs:
   engine-logic:
