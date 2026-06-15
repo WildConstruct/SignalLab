@@ -479,6 +479,9 @@
 <script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
 <script src="cathode-crt.js"></script>
 <script>
+const BUILD = "2026-06-15c";   // bump on deploy → check console / brand tooltip to spot a stale cache
+console.info("Signal Rack — build " + BUILD);
+try{ const b=document.querySelector(".brand"); if(b) b.title="build "+BUILD; }catch(e){}
 const { Rack, SOURCE, MODE } = SignalCore;
 const N = 1024;
 let SPAN=3, PERSIST=0.8, FREEZE=false, frozenT=0, MODE_CUR="waveform", YOPAC=0.7, SPEED=1;
