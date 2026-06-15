@@ -138,7 +138,9 @@
 
   /* ---- toolbar ---- */
   header.bar{ position:relative; flex:0 0 auto; display:flex; align-items:center; gap:14px;
-    height:52px; padding:0 16px; background:linear-gradient(180deg,#121821,#0d1219);
+    height:auto; min-height:calc(52px + env(safe-area-inset-top, 0px));
+    padding:env(safe-area-inset-top, 0px) calc(16px + env(safe-area-inset-right, 0px)) 0 calc(16px + env(safe-area-inset-left, 0px));
+    background:linear-gradient(180deg,#121821,#0d1219);
     border-bottom:1px solid var(--edge); z-index:30; backdrop-filter:none; }
   header.bar::before{ content:none; }
   .brand{ display:flex; align-items:center; gap:10px; }
@@ -218,14 +220,14 @@
 
   /* ---- viewport readout + present-mode controls ---- */
   .stagewrap{ background:#06090d; border-color:var(--edge); box-shadow:0 18px 44px -30px #000; }
-  #exitPresent{ display:none; position:fixed; top:14px; right:16px; z-index:120;
+  #exitPresent{ display:none; position:fixed; top:calc(14px + env(safe-area-inset-top, 0px)); right:calc(16px + env(safe-area-inset-right, 0px)); z-index:120;
     background:#0c1117e6; border:1px solid var(--edge-2); color:var(--ink);
     font-size:12px; padding:7px 13px; border-radius:8px; cursor:pointer; backdrop-filter:blur(6px); }
   #exitPresent:hover{ border-color:var(--amber); color:var(--amber-soft); }
 
   /* =================== MOBILE: stacked, viewport on top =================== */
   @media (max-width:979px){
-    #work{ flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    #work{ flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:env(safe-area-inset-bottom, 0px); }
     #top{ position:sticky; top:0; z-index:10; flex:0 0 auto; padding:8px 12px 4px;
       background:var(--app-bg); border-bottom:1px solid var(--edge); }
     .stagewrap{ height:clamp(190px,38dvh,420px); }
@@ -261,7 +263,7 @@
   body.present #work{ display:block; grid-template-columns:none; }
   body.present .rail{ display:none; }
   body.present #top{ position:fixed; inset:0; z-index:100; padding:0; height:100dvh; }
-  body.present .tabs{ position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:110;
+  body.present .tabs{ position:absolute; top:calc(14px + env(safe-area-inset-top, 0px)); left:50%; transform:translateX(-50%); z-index:110;
     background:#0c1117cc; backdrop-filter:blur(6px); }
   body.present .stagewrap{ position:absolute; inset:0; height:100%; border:none; border-radius:0; padding:0; }
   body.present .applied{ position:absolute; left:14px; right:14px; bottom:14px; z-index:110;
