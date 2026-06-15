@@ -567,6 +567,7 @@ bindCh("x"); bindCh("y");
 // stays the center; the engine sees the live oscillated scalar each frame.
 const lfo = { x:{amount:false,phase:false}, y:{amount:false,phase:false} };
 let lfoClock = 0;   // frame-synced (respects Freeze) seconds
+let transP = 0;     // transition playhead 0..1 — advances even when the signal is frozen
 function oscVal(ch,p,base){
   if(!lfo[ch][p]) return base; const t=lfoClock;
   if(p==="amount") return Math.max(0, Math.min(1.5, base + 0.45*Math.sin(t*2*Math.PI*0.13)));
@@ -657,6 +658,7 @@ const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity
   fuiRadar:[0,1], fuiScope:[0,1], fuiArc:[0,1], fuiBars:[0,1], fuiReticle:[0,1], fuiWaveRing:[0,1], fuiGyro:[0,1], fuiStream:[0,1], fuiSynapse:[0,1], fuiPackets:[0,1], fuiCore:[0,1],
   particles:[0,1], partRings:[0,1], partStream:[0,1], partOrbit:[0,1], partFall:[0,1], partStars:[0,1],
   type:[0,1], textOpacity:[0,1], textPump:[0,1], textGlitch:[0,1], textType:[0,1], textCounter:[0,1], textShake:[0,1],
+  trLoad:[0,1], trWipe:[0,1], trText:[0,1], trRadial:[0,1], trMeter:[0,1],
   trace:[0,1], orbitPath:[0,1], spiro:[0,1], rose:[0,1] };
 // Applied targets grouped into a two-level Category → Variant picker. The
 // variant value IS the drawApplied() switch key, so old presets/recipes that
@@ -665,6 +667,7 @@ const APP_CATS=[
   ["Transform", [["scale","Scale"],["scaleX","Scale X"],["scaleY","Scale Y"],["rotation","Rotation"],["position","Position X"],["positionY","Position Y"],["opacity","Opacity / flicker"],["skew","Skew"]]],
   ["Visual",    [["glow","Glow"],["color","Color (hue)"],["strobe","Strobe"],["ringPulse","Ring pulse"],["blur","Defocus blur"],["gradientSweep","Gradient sweep"]]],
   ["Meter",     [["meter","Bar meter + gate"],["meterRadial","Radial gauge"],["meterLED","LED ladder"],["meterStereo","Stereo bars"],["meterHistogram","Histogram"],["meterDial","Rotary dial"]]],
+  ["Transitions",[["trLoad","Loading bar"],["trWipe","Wipe reveal"],["trText","Text reveal"],["trRadial","Radial fill"],["trMeter","Sweep meter"]]],
   ["FUI",       [["fuiRadar","Radar sweep"],["fuiScope","Oscilloscope"],["fuiArc","Progress arc"],["fuiBars","Equalizer"],["fuiReticle","Targeting reticle"],["fuiWaveRing","Waveform ring"],["fuiGyro","Gyro rings"],["fuiStream","Data stream"],["fuiSynapse","Synapse net"],["fuiPackets","Data packets"],["fuiCore","Processor die"]]],
   ["Particles", [["particles","Fountain"],["partRings","Shock rings"],["partStream","Stream field"],["partOrbit","Orbit swarm"],["partFall","Confetti fall"],["partStars","Starfield warp"]]],
   ["Text",      [["type","Kinetic wave"],["textOpacity","Word opacity"],["textPump","Title pump"],["textGlitch","RGB glitch"],["textType","Typewriter"],["textCounter","Counter readout"],["textShake","Shake / impact"]]],
@@ -1201,7 +1204,7 @@ function drawApplied(W,H){
       ctx.strokeStyle="#143b33"; ctx.lineWidth=1;
       for(let r=1;r<=4;r++){ ctx.beginPath(); ctx.arc(cx,cy,R*r/4,0,7); ctx.stroke(); }
       for(let i=0;i<12;i++){ const a=i/12*Math.PI*2; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R); ctx.stroke(); }
-      const sweep=t*(0.6+e*1.6);
+      const sweep=t*(0.22+e*0.6);
       for(let k=0;k<44;k++){ const a=sweep-k*0.028; ctx.strokeStyle=`rgba(54,240,154,${0.5*(1-k/44)})`; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R); ctx.stroke(); }
       for(let i=0;i<6;i++){ const v=combine(bufX[Math.floor(i/6*N)],bufY[Math.floor(i/6*N)]), ba=i*1.7+v*3, br=R*(0.3+0.6*v), bx=cx+Math.cos(ba)*br, by=cy+Math.sin(ba)*br;
         ctx.fillStyle="#7df0c2"; ctx.beginPath(); ctx.arc(bx,by,3+v*3,0,7); ctx.fill(); }
@@ -1259,7 +1262,7 @@ function drawApplied(W,H){
       for(let L=0;L<lanes;L++){ const ly=y0+laneH*(L+0.5), actS=Math.max(0,Math.min(1,bufX[Math.floor((L/lanes)*N)]));
         ctx.strokeStyle="#11242b"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(64,ly); ctx.lineTo(W-30,ly); ctx.stroke();
         ctx.fillStyle=actS>0.4?"#7df0c2":"#2a4a44"; ctx.textAlign="right"; ctx.fillText("0x"+(L*16).toString(16).toUpperCase().padStart(2,"0"), 56, ly);
-        const speed=0.14+(L%3)*0.05+e*0.3;
+        const speed=0.05+(L%3)*0.018+e*0.11;
         for(let k=0;k<3;k++){ if(actS<=0.4+k*0.16) continue; const ph=((t*speed+L*0.13+k*0.34)%1), x=64+ph*(W-94);
           ctx.fillStyle="#7df0c2"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.fillRect(x-7,ly-3,14,6); ctx.shadowBlur=0; } }
       ctx.textBaseline="alphabetic"; break; }
@@ -1284,17 +1287,55 @@ function drawApplied(W,H){
       ctx.fillStyle="#eaf6f5"; ctx.fillText("IMPACT", cx+dx, cy+dy); ctx.textBaseline="alphabetic"; break; }
     case "rose":{ const R=Math.min(W,H)*0.42, k=3+Math.round(Math.max(0,Math.min(1,n))*4); ctx.strokeStyle="#36f09a"; ctx.lineWidth=1.5; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath();
       for(let i=0;i<=N;i++){ const th=i/N*Math.PI*2, rr=R*Math.abs(Math.cos(k*th))*(0.3+0.7*bufX[i%N]), x=cx+Math.cos(th)*rr, y=cy+Math.sin(th)*rr; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke(); ctx.shadowBlur=0; break; }
+    case "trLoad":{ const prog=loadProgress(transP), bw=Math.min(W*0.7,560), bh=Math.min(H*0.12,52), x=cx-bw/2, y=cy-bh/2;   // monotonic fill, signal-shaped pace
+      ctx.strokeStyle="#1f5e4e"; ctx.lineWidth=2; ctx.strokeRect(x,y,bw,bh);
+      ctx.fillStyle="#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=14; ctx.fillRect(x+3,y+3,(bw-6)*prog,bh-6); ctx.shadowBlur=0;
+      ctx.fillStyle="#eaf6f5"; ctx.font=`700 ${Math.round(bh*0.62)}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(Math.round(prog*100)+"%", cx, y-bh*0.7); ctx.textBaseline="alphabetic"; break; }
+    case "trWipe":{ const prog=loadProgress(transP), txt="SIGNAL", fs=Math.round(Math.min(W,H)*0.2);   // wipe-reveal (animate in)
+      ctx.font=`900 ${fs}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillStyle="#16242c"; ctx.fillText(txt,cx,cy);
+      ctx.save(); ctx.beginPath(); ctx.rect(0,0,prog*W,H); ctx.clip(); ctx.fillStyle="#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=16; ctx.fillText(txt,cx,cy); ctx.restore();
+      ctx.strokeStyle="#7df0c2"; ctx.lineWidth=2; ctx.globalAlpha=0.8; ctx.beginPath(); ctx.moveTo(prog*W,cy-fs*0.6); ctx.lineTo(prog*W,cy+fs*0.6); ctx.stroke(); ctx.globalAlpha=1; ctx.textBaseline="alphabetic"; break; }
+    case "trText":{ const txt="ANIMATE IN", fs=Math.round(Math.min(W,H)*0.13);   // per-letter staggered reveal, signal shapes the rise
+      ctx.font=`800 ${fs}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      const cw=fs*0.62, x0=cx-(txt.length-1)*cw/2;
+      for(let i=0;i<txt.length;i++){ if(txt[i]===" ") continue; const lp=i/Math.max(1,txt.length-1);
+        const local=Math.max(0,Math.min(1,(transP-lp*0.7)/0.32)), ease=local*local*(3-2*local), sig=bufX[Math.floor(lp*(N-1))];
+        const yoff=(1-ease)*fs*0.7*(0.4+sig);
+        ctx.globalAlpha=ease; ctx.fillStyle="#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=10*ease; ctx.fillText(txt[i], x0+i*cw, cy+yoff); }
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.textBaseline="alphabetic"; break; }
+    case "trRadial":{ const prog=loadProgress(transP), R=Math.min(W,H)*0.3, a0=-Math.PI/2;
+      ctx.lineCap="round"; ctx.lineWidth=12; ctx.strokeStyle="#16222b"; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+      ctx.strokeStyle="#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=14; ctx.beginPath(); ctx.arc(cx,cy,R,a0,a0+prog*Math.PI*2); ctx.stroke(); ctx.shadowBlur=0; ctx.lineCap="butt";
+      ctx.fillStyle="#eaf6f5"; ctx.font=`700 ${Math.round(Math.min(W,H)*0.13)}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(Math.round(prog*100)+"%",cx,cy); ctx.textBaseline="alphabetic"; break; }
+    case "trMeter":{ const v=Math.max(0,Math.min(1,bufX[Math.floor(transP*(N-1))])), bw=90, bh=Math.min(H*0.6,260), x=cx-bw/2, y=cy+bh/2;   // fluctuates with the raw signal under the playhead
+      ctx.strokeStyle="#1d2a34"; ctx.strokeRect(x,y-bh,bw,bh); ctx.fillStyle=v>0.85?"#f0683a":"#36f09a"; ctx.fillRect(x,y-bh*v,bw,bh*v);
+      ctx.fillStyle="#eaf6f5"; ctx.font="13px ui-monospace,monospace"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(Math.round(v*100)+"%", cx, y-bh-20); ctx.textBaseline="alphabetic"; break; }
   }
   ctx.restore();
-  // PIP scope + readout — skipped for full-screen widgets (NOPIP) and while
-  // recording, so the captured video stays clean.
-  if(!rec && !NOPIP.has(applied.target)){
-    drawPip(W,H);
-    ctx.fillStyle="#8ea3b0"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="left";
-    ctx.fillText(`drive ${drive.mode}  ·  n=${n.toFixed(3)}  →  ${applied.target} = ${val.toFixed(1)}`, 12, H-12);
+  // Transitions show a playhead timeline instead of the PIP; everything else
+  // gets the PIP + readout (both skipped while recording for a clean capture).
+  if(!rec){
+    if(TRANS.has(applied.target)) drawTransStrip(W,H);
+    else if(!NOPIP.has(applied.target)){
+      drawPip(W,H);
+      ctx.fillStyle="#8ea3b0"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="left";
+      ctx.fillText(`drive ${drive.mode}  ·  n=${n.toFixed(3)}  →  ${applied.target} = ${val.toFixed(1)}`, 12, H-12);
+    }
   }
 }
 const NOPIP=new Set(["trace","fuiRadar","fuiScope","fuiArc","fuiBars","fuiReticle","fuiWaveRing","fuiGyro","fuiStream","fuiSynapse","fuiPackets","fuiCore","meterHistogram"]);
+const TRANS=new Set(["trLoad","trWipe","trText","trRadial","trMeter"]);
+// Monotonic "loading" progress at playhead tp: cumulative signal energy so the
+// fill always climbs 0→1 but at a signal-shaped (non-linear) pace.
+function loadProgress(tp){ const idx=Math.min(N-1,Math.floor(tp*N)); let tot=0,acc=0; for(let i=0;i<N;i++){ const w=0.04+Math.abs(bufX[i]-0.5); tot+=w; if(i<=idx) acc+=w; } return tot>0?acc/tot:tp; }
+// Timeline strip: the (frozen) signal curve with the playhead ramping across it.
+function drawTransStrip(W,H){ const sw=Math.min(W*0.8,640), sh=46, x=W/2-sw/2, y=H-sh-16;
+  ctx.fillStyle="rgba(5,7,10,0.72)"; ctx.fillRect(x,y,sw,sh); ctx.strokeStyle="#15303a"; ctx.lineWidth=1; ctx.strokeRect(x,y,sw,sh);
+  ctx.strokeStyle="#2a6"; ctx.lineWidth=1.3; ctx.beginPath(); for(let i=0;i<N;i+=4){ const px=x+i/(N-1)*sw, py=y+sh-bufX[i]*(sh-8)-4; (i?ctx.lineTo(px,py):ctx.moveTo(px,py)); } ctx.stroke();
+  const phx=x+transP*sw; ctx.fillStyle="rgba(54,240,154,0.10)"; ctx.fillRect(x,y,transP*sw,sh);
+  ctx.strokeStyle="#7df0c2"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(phx,y); ctx.lineTo(phx,y+sh); ctx.stroke();
+  ctx.fillStyle="#52606b"; ctx.font="9px ui-monospace,monospace"; ctx.textAlign="left"; ctx.fillText("playhead ramps across the signal — Freeze to hold the curve", x, y-5); ctx.textAlign="left"; }
 function drawPip(W,H){
   const pw=Math.max(120,Math.min(220,W*0.34)), ph=pw*0.42, px=W-pw-12, py=H-ph-30;
   ctx.save();
@@ -1332,7 +1373,7 @@ function cfgY(){
 
 // ---------- loop ----------
 function frame(){
-  const t=FREEZE?frozenT:now(); const dt=SPAN/N, start=t-SPAN; lfoClock=t;
+  const live=now(); const t=FREEZE?frozenT:live; const dt=SPAN/N, start=t-SPAN; lfoClock=t; transP=(live/3)%1;
   for(const ch of ["x","y"]) for(const p of ["amount","phase"]) if(lfo[ch][p]){
     const o=document.querySelector(`.chan[data-ch="${ch}"] [data-p="${p}"]`).parentElement.querySelector("output");
     if(o) o.textContent=fmt(p, oscVal(ch,p,state[ch][p])); }
