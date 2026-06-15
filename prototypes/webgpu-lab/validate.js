@@ -83,6 +83,21 @@ var ylo = 2, yhi = -2, ydistinct = {};
 for (var s = 0; s < N; s++) { var yv = ymod.output("A", s / 30, s); ylo = Math.min(ylo, yv); yhi = Math.max(yhi, yv); ydistinct[yv.toFixed(3)] = 1; }
 ok("Sidechain AM bounded [0,1] and varies", ylo >= 0 && yhi <= 1 && Object.keys(ydistinct).length > 10);
 
+// 9e-2. Sidechain FM/rate: applies frequency deviation over window-relative
+// time (idx*dt) so it stays usable even at a large absolute start time — the
+// old code scaled absolute-time rate and aliased to noise within a frame.
+var dtF = 3 / N, t0 = 512;                          // long-running page: tt ~ hundreds of seconds
+var fmMod = new Float32Array(N);
+for (var i = 0; i < N; i++) fmMod[i] = 0.5 + 0.5 * Math.sin(i / N * 6.283);
+var fm = new Rack({ srcType: SOURCE.sine, rate: 3, seed: 1, frameDur: dtF, mod: { target: "rate", depth: 0.4 }, modInput: fmMod, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+function fmRef(idx) { var m = fmMod[idx], tt = t0 + idx * dtF;
+  var fmDev = 3 * 0.4 * (m * 2 - 1) * (idx * dtF) * 0.5, sp = (1 * 0.07) - Math.floor(1 * 0.07);
+  return (Math.sin((tt * 3 + fmDev + sp) * Math.PI * 2) + 1) / 2; }
+var flo = 2, fhi = -2, fdistinct = {}, fmErr = 0;
+for (var s = 0; s < N; s++) { var v = fm.output("A", t0 + s * dtF, s); flo = Math.min(flo, v); fhi = Math.max(fhi, v); fdistinct[v.toFixed(3)] = 1; fmErr = Math.max(fmErr, Math.abs(v - fmRef(s))); }
+ok("Sidechain FM bounded [0,1] and varies at large t", flo >= 0 && fhi <= 1 && Object.keys(fdistinct).length > 10);
+ok("Sidechain FM uses window-relative time (no absolute-time blowup)", fmErr < 1e-9);
+
 // 9f. Lag (engine-owned, finite EWMA): lowers variance of a pulse
 function variance(rack) { var m = 0, n = 0, s = 0; for (var t = 0; t < 2; t += 1 / 60) { var v = rack.output("A", t, Math.round(t * 60)); n++; var d = v - m; m += d / n; s += d * (v - m); } return s / n; }
 var rawL = new Rack({ srcType: SOURCE.pulse, rate: 2, frameDur: 1 / 60, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });

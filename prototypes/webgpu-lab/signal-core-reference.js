@@ -82,16 +82,19 @@
       var l = this.lumaInput ? this.lumaInput[idx] : (this.luma ? this.luma(tt) : 0);
       return clamp(l + this.offset, 0, 1);
     }
-    var rate = this.rate, amount = this.amount, phase = this.phase;
+    var rate = this.rate, amount = this.amount, phase = this.phase, fmDev = 0;
     if (this.modTarget && this.modInput) {                 // sidechain modulation
       var m = this.modInput[idx];
       if (this.modTarget === MOD.amp)   amount *= (1 - this.modDepth + this.modDepth * m);
-      if (this.modTarget === MOD.rate)  rate   *= (1 + this.modDepth * (m * 2 - 1));
+      // FM/vibrato: apply the frequency deviation over window-relative time
+      // (idx*dt, bounded by the span) instead of scaling absolute-time rate —
+      // which exploded because tt is absolute seconds since load.
+      if (this.modTarget === MOD.rate)  fmDev = rate * this.modDepth * (m * 2 - 1) * (idx * this.frameDur) * 0.5;
       if (this.modTarget === MOD.phase) phase  += this.modDepth * m;
     }
     var seedPhase = (this.seed * 0.07) - Math.floor(this.seed * 0.07);   // Seed shifts the waveform
     var zBend = this.zDepth && this.zInput ? this.zDepth * (this.zInput[idx] * 2 - 1) : 0;  // third signal phase-bend
-    var x = tt * rate + phase + seedPhase + zBend, fx = x - Math.floor(x), bp;
+    var x = tt * rate + fmDev + phase + seedPhase + zBend, fx = x - Math.floor(x), bp;
     switch (this.srcType) {
       case SOURCE.sine:       bp = Math.sin(x * Math.PI * 2); break;                                  // 1
       case SOURCE.pulse:      bp = fx < 0.5 ? 1 : -1; break;                                          // 2 Square
