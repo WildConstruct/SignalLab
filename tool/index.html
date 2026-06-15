@@ -311,6 +311,26 @@
   .linkrow label{ display:flex; align-items:center; gap:6px; color:var(--dim); font-size:11px; cursor:pointer; }
   .chan.y.linked .ctl{ opacity:.38; pointer-events:none; }
   #recBtn{ color:#f0a8a8; border-color:#5e2b2b; }
+
+  /* ---- ghost toolbar button + Help overlay ---- */
+  .btn.ghost{ background:#0c1117; color:var(--dim); border:1px solid var(--edge-2); box-shadow:none; }
+  .btn.ghost:hover{ color:var(--amber-soft); border-color:#6a4d1e; filter:none; }
+  #helpModal{ position:fixed; inset:0; z-index:200; display:flex; align-items:flex-start; justify-content:center;
+    background:rgba(4,6,9,0.74); backdrop-filter:blur(4px); padding:max(24px,env(safe-area-inset-top)) 16px 24px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #helpModal[hidden]{ display:none; }
+  .help-card{ position:relative; width:min(720px,100%); background:var(--panel); border:1px solid var(--edge-2);
+    border-radius:14px; padding:22px 24px 26px; box-shadow:0 30px 80px -30px #000; color:var(--ink); }
+  .help-card h2{ color:var(--amber); font-size:16px; letter-spacing:.4px; margin:0 0 8px; text-transform:none; }
+  .help-card h2::before{ content:none; }
+  .help-card h3{ color:var(--amber-soft); font-size:12px; letter-spacing:1px; text-transform:uppercase; margin:18px 0 6px; }
+  .help-card .lead{ color:var(--dim); margin:0 0 6px; }
+  .help-card p{ margin:6px 0; font-size:13px; line-height:1.55; color:#c4cfd8; }
+  .help-card ul{ margin:6px 0; padding-left:18px; } .help-card li{ font-size:13px; line-height:1.5; margin:3px 0; color:#c4cfd8; }
+  .help-card b{ color:#e6eef4; font-weight:600; }
+  .help-card .keys b{ color:var(--amber-soft); }
+  #helpClose{ position:absolute; top:12px; right:12px; width:30px; height:30px; border-radius:8px; cursor:pointer;
+    background:#0c1117; border:1px solid var(--edge-2); color:var(--dim); font-size:13px; }
+  #helpClose:hover{ color:var(--amber-soft); border-color:#6a4d1e; }
 </style>
 </head>
 <body>
@@ -318,9 +338,55 @@
   <div class="brand"><span class="logo"></span><div class="btxt"><div class="bname">Signal Rack</div><div class="bsub">Signal Lab · WebGPU</div></div></div>
   <div class="bspace"></div>
   <span id="engine" class="cpu" title="engine">engine: …</span>
+  <button class="btn ghost" id="helpBtn" title="What is this? (?)">? Guide</button>
   <button class="btn" id="presentBtn" title="Fullscreen the visualizer">Present ▸</button>
 </header>
 <button id="exitPresent" title="Exit present (Esc)">✕ Exit</button>
+
+<div id="helpModal" hidden>
+  <div class="help-card">
+    <button id="helpClose" title="Close (Esc)">✕</button>
+    <h2>Signal Rack — Signal Lab</h2>
+    <p class="lead">Build a signal, then watch it drive things. Everything you see runs on the same WebGPU engine the After-Effects bridge uses — so a look you dial in here can be reproduced exactly, even copied out as a working AE expression.</p>
+
+    <h3>1 · Make a signal</h3>
+    <p><b>Generator</b> has two channels, <b>X</b> and <b>Y</b>. Each is a source (Sine, Square, Saw, Triangle, Pulse, Noise, Random Walk) shaped by <b>Rate, Phase, Amount, Offset, Smooth</b> and a <b>Seed</b> (re-rolls the random sources and shifts the wave). The little <b>“o”</b> next to Amount/Phase oscillates that value slowly.</p>
+    <p><b>Channel Y</b> can <b>Sync to X</b> (becomes X) or <b>Invert (mirror X)</b> (becomes 1−X) for clean symmetric figures.</p>
+
+    <h3>2 · Shape it</h3>
+    <ul>
+      <li><b>Processor</b> (shapes X): gain/bias, saturate, warp, fold, gate, quantize, lag, invert, rectify.</li>
+      <li><b>Window</b>: a feathered region that fades the signal in/out across the scope.</li>
+      <li><b>Sidechain</b>: let X modulate Y’s amplitude, rate (FM) or phase.</li>
+      <li><b>Distort</b>: a gentle third signal that phase-bends both channels.</li>
+    </ul>
+
+    <h3>3 · See it</h3>
+    <p>Tabs switch the scope: <b>Waveform, Bars, Vectorscope, Polar, Heat</b>, and <b>Applied</b> — where the signal drives something:</p>
+    <ul>
+      <li><b>Transform / Visual / Meter</b>: scale, rotate, opacity, glow, gauges, LED ladders…</li>
+      <li><b>FUI</b>: HUD widgets — radar, oscilloscope, gyro rings, waveform ring, data stream, and the firing ones (<b>Synapse net, Data packets, Processor die</b>) that light up where the signal is active. <b>Fire ≥</b> sets how active it must be; <b>Seed</b> reshapes the synapse map.</li>
+      <li><b>Transitions</b>: a playhead ramps 0→100% across the signal (turn on <b>Freeze</b> to hold the curve) — loading bars, wipes, text reveals.</li>
+      <li><b>Particles / Text / Path</b>: fountains, confetti, kinetic type, Lissajous, spirographs…</li>
+    </ul>
+    <p><b>Drive</b> picks how X and Y combine into the value (Channel X, Y, X×Y ring, mix, difference, min, max).</p>
+
+    <h3>4 · Use it</h3>
+    <ul>
+      <li><b>ƒ AE expression</b> (in Applied): the full, self-contained After-Effects expression — copy it onto any property; it reproduces the exact driver, no plugin needed.</li>
+      <li><b>Record video</b>: capture the visualization to an mp4/webm.</li>
+      <li><b>Copy link</b> / <b>Export JSON</b>: the whole setup travels in a URL or a recipe file.</li>
+      <li><b>🎲 Surprise me</b>: roll a tasteful random rig.</li>
+    </ul>
+
+    <h3>Display</h3>
+    <p><b>Speed</b> (÷2 / 1×) is a master time scale. <b>Window</b> = scope length, <b>Persist</b> = trail, <b>Freeze</b> = hold, <b>CRT</b> = Cathode tube look, <b>Y opacity</b> = dim channel Y.</p>
+
+    <h3>Shortcuts</h3>
+    <p class="keys"><b>Space</b>/<b>F</b> freeze · <b>R</b> surprise · <b>P</b> present · <b>Esc</b> exit · <b>double-click</b> a slider to reset it.</p>
+  </div>
+</div>
+
 <div id="work">
 
 <!-- GRAPH (sticky top) -->
@@ -351,6 +417,11 @@
       <div class="ctl" style="grid-template-columns:auto 64px; flex:0 0 auto"><label>Max</label><input type="number" id="tmax" value="120" step="1"></div>
       <span style="color:#52606b;font-size:11px;flex:1 1 100%">The 0→1 driver is remapped into this range (e.g. Scale 80→120%). Hidden where a variant has no numeric range.</span>
     </div>
+    <div class="row" id="fireRow" style="margin-top:8px; align-items:center; display:none">
+      <span style="color:var(--mute);font-size:11px;flex:0 0 auto">Fire ≥</span>
+      <input type="range" id="fireThresh" min="0.1" max="0.9" step="0.02" value="0.45" style="flex:1; min-width:120px"><output id="fireThreshv" style="font-size:11px;width:34px;text-align:right">0.45</output>
+      <span style="color:#52606b;font-size:11px;flex:1 1 100%">How active the signal must be for a node / cell / lane to light up. Lower = busier.</span>
+    </div>
     <div class="row" style="margin-top:8px; align-items:center">
       <label style="color:var(--dim);font-size:11px">Drive</label>
       <select id="driveMode" style="flex:1; min-width:130px">
@@ -358,7 +429,7 @@
         <option value="mult">X × Y (ring)</option><option value="mix">Mix (X+Y)/2</option>
         <option value="diff">Difference |X−Y|</option><option value="min">Min(X,Y)</option><option value="max">Max(X,Y)</option>
       </select>
-      <span style="color:#52606b;font-size:11px;flex:1 1 100%">The driver feeds the property. PIP (bottom-right) shows X (green), Y (amber), driver (white).</span>
+      <span style="color:#52606b;font-size:11px;flex:1 1 100%">The driver feeds the property. Scope-style variants show a PIP (bottom-right): X (green), Y (amber), driver (white).</span>
     </div>
     <div class="exprwrap" id="exprwrap">
       <button class="exprtoggle" id="exprToggle" aria-expanded="false">ƒ&nbsp;AE expression<span class="chev">▸</span></button>
@@ -479,7 +550,7 @@
 <script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
 <script src="cathode-crt.js"></script>
 <script>
-const BUILD = "2026-06-15e";   // bump on deploy → check console / brand tooltip to spot a stale cache
+const BUILD = "2026-06-15f";   // bump on deploy → check console / brand tooltip to spot a stale cache
 console.info("Signal Rack — build " + BUILD);
 try{ const b=document.querySelector(".brand"); if(b) b.title="build "+BUILD; }catch(e){}
 const { Rack, SOURCE, MODE } = SignalCore;
@@ -494,6 +565,8 @@ const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, sat:0,
 const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied property
 const side = { target:"off", depth:0.5 };
 const link = { sync:false, invert:false };   // Channel Y relationship to X (sync = copy, invert = mirror)
+const fire = { thresh:0.45 };   // firing threshold for the synapse / packets / die widgets
+const FIRE = new Set(["fuiSynapse","fuiPackets","fuiCore"]);
 const z = { shape:1, rate:1, amount:0 };   // third signal — gently distorts X & Y (phase bend)
 const zBuffer = new Float32Array(N).fill(0.5);   // third-signal (distort) per-sample
 const crt = { on:true, pass:null, failed:false };
@@ -605,6 +678,14 @@ const presetList=[
     x:{src:1,rate:2.1,amount:1.36,offset:0.08,smooth:0.68,seed:962},
     y:{src:1,rate:1.7,phase:0.915,offset:-0.22},
     proc:{gain:0.85,bias:0.04,quantize:6,gate:0.74,lag:0.12} },
+  // ---- Applied showcases (open straight into a category to discover them) ----
+  { name:"Neural Net",  applied:"fuiSynapse", drive:"mult", fire:0.4,
+    x:{src:5,rate:0.8,smooth:0.25,seed:418}, y:{src:5,rate:1.1,smooth:0.25,seed:77} },
+  { name:"Radar",       applied:"fuiRadar",   x:{src:1,rate:1.5}, y:{src:1,rate:2,phase:0.2} },
+  { name:"Equalizer",   applied:"fuiBars",    x:{src:5,rate:1.4,smooth:0.15,seed:1972}, y:{src:1,rate:2} },
+  { name:"Processor",   applied:"fuiCore",    fire:0.42, x:{src:4,rate:2,seed:333}, y:{src:1,rate:3} },
+  { name:"Load In",     applied:"trLoad",     x:{src:3,rate:1}, y:{src:1,rate:1} },
+  { name:"Title Pump",  applied:"textPump",   drive:"mult", x:{src:9,rate:2}, y:{src:1,rate:2,phase:0.25}, proc:{sat:0.4} },
 ];
 const X0={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1941}, Y0={src:1,rate:3,phase:0,amount:1,offset:0,smooth:0,seed:1941};
 const PROC0={gain:1,bias:0,quantize:0,gate:0,lag:0,warp:0,fold:0,sat:0,invert:false,rectify:false};
@@ -628,14 +709,21 @@ function reflectInputs(){
   if(typeof updateExpr==="function") updateExpr();
   { const yo=document.getElementById("yopac"); if(yo){ yo.value=YOPAC; const o=document.getElementById("yopacv"); if(o)o.textContent=(+YOPAC).toFixed(2); } }
   { const sp=document.getElementById("speed"); if(sp){ sp.value=SPEED; const o=document.getElementById("speedv"); if(o)o.textContent=(+SPEED).toFixed(2)+"×"; } }
+  { const ft=document.getElementById("fireThresh"); if(ft){ ft.value=fire.thresh; const o=document.getElementById("fireThreshv"); if(o)o.textContent=(+fire.thresh).toFixed(2); } }
   [["zShape",z.shape],["zRate",z.rate],["zAmt",z.amount]].forEach(([id,v])=>{ const el=document.getElementById(id); if(el){ el.value=v; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(id==="zShape"?["","Sine","","","Noise","","","","Triangle"][v]||v:(+v).toFixed(2)); } });
 }
 function applyPreset(p){
   Object.assign(proc,PROC0); drive.mode=p.drive||"x"; Object.assign(win,{left:0,right:1,featherL:0,featherR:0});
   Object.assign(state.x,X0,p.x); Object.assign(state.y,Y0,p.y);
   if(p.proc) Object.assign(proc,p.proc);
-  if(p.view){ MODE_CUR=p.view; [...document.getElementById("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===p.view));
-    document.getElementById("appliedPanel").classList.toggle("show",p.view==="applied"); needGraticule=true; }
+  side.target = p.side ? (p.side.target||"off") : "off"; side.depth = (p.side&&p.side.depth!=null) ? p.side.depth : 0.5;
+  z.amount = (p.z&&p.z.amount!=null) ? p.z.amount : 0; if(p.z){ if(p.z.rate!=null)z.rate=p.z.rate; if(p.z.shape!=null)z.shape=p.z.shape; }
+  link.sync = !!(p.link&&p.link.sync); link.invert = !!(p.link&&p.link.invert);
+  if(p.fire!=null) fire.thresh=p.fire;
+  let view=p.view;
+  if(p.applied){ if(typeof setAppliedTarget==="function") setAppliedTarget(p.applied); if(!view) view="applied"; }
+  if(view){ MODE_CUR=view; [...document.getElementById("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===view));
+    document.getElementById("appliedPanel").classList.toggle("show",view==="applied"); needGraticule=true; }
   reflectInputs(); updateMath();
 }
 function buildGallery(){ const g=document.getElementById("presetGallery"); g.innerHTML="";
@@ -684,7 +772,8 @@ function appCatOf(t){ for(const [c,vs] of APP_CATS) if(vs.some(v=>v[0]===t)) ret
 function fillAppVar(cat){ const sel=$("appVar"); if(!sel) return; sel.innerHTML="";
   const vs=(APP_CATS.find(c=>c[0]===cat)||APP_CATS[0])[1];
   for(const [val,lbl] of vs){ const o=document.createElement("option"); o.value=val; o.textContent=lbl; sel.appendChild(o); } }
-function syncRangeRow(){ const r=$("rangeRow"); if(r) r.style.display=APP_RANGE.has(applied.target)?"flex":"none"; }
+function syncRangeRow(){ const r=$("rangeRow"); if(r) r.style.display=APP_RANGE.has(applied.target)?"flex":"none";
+  const fr=$("fireRow"); if(fr) fr.style.display=FIRE.has(applied.target)?"flex":"none"; }
 function syncAppliedUI(){ const cat=appCatOf(applied.target);
   if($("appCat")){ if(!$("appCat").options.length){ for(const [c] of APP_CATS){ const o=document.createElement("option"); o.value=c; o.textContent=c; $("appCat").appendChild(o); } }
     $("appCat").value=cat; fillAppVar(cat); $("appVar").value=applied.target; }
@@ -695,6 +784,7 @@ function setAppliedTarget(t){ applied.target=t; const d=defaults[t]; if(d){ appl
 $("appCat").onchange=()=>{ fillAppVar($("appCat").value); setAppliedTarget($("appVar").value); };
 $("appVar").onchange=()=>{ setAppliedTarget($("appVar").value); };
 $("tmin").oninput=()=>{applied.min=+$("tmin").value; updateExpr(); updateMath();}; $("tmax").oninput=()=>{applied.max=+$("tmax").value; updateExpr(); updateMath();};
+$("fireThresh").oninput=()=>{ fire.thresh=+$("fireThresh").value; $("fireThreshv").textContent=fire.thresh.toFixed(2); };
 $("driveMode").onchange=()=>{ drive.mode=$("driveMode").value; updateMath(); };
 syncAppliedUI();
 // combine two channel values (0..1) into the Applied driver
@@ -714,13 +804,14 @@ function buildFullRecipe(){ return {
   timebase:{ mode:"compTime", seed:state.x.seed },
   _channelY:{ type:srcName(state.y.src), rate:state.y.rate, amount:state.y.amount, phase:state.y.phase, offset:state.y.offset, smooth:state.y.smooth, seed:state.y.seed },
   visualization:{ mode:MODE_CUR },
-  _tool:{ x:Object.assign({},state.x), y:Object.assign({},state.y), proc:Object.assign({},proc), win:Object.assign({},win), drive:drive.mode, side:{target:side.target,depth:side.depth}, link:Object.assign({},link), z:Object.assign({},z), lfo:{x:Object.assign({},lfo.x),y:Object.assign({},lfo.y)}, view:MODE_CUR, crt:crt.on, yOpacity:YOPAC, speed:SPEED, applied:{target:applied.target,min:applied.min,max:applied.max} },
+  _tool:{ x:Object.assign({},state.x), y:Object.assign({},state.y), proc:Object.assign({},proc), win:Object.assign({},win), drive:drive.mode, side:{target:side.target,depth:side.depth}, link:Object.assign({},link), fire:fire.thresh, z:Object.assign({},z), lfo:{x:Object.assign({},lfo.x),y:Object.assign({},lfo.y)}, view:MODE_CUR, crt:crt.on, yOpacity:YOPAC, speed:SPEED, applied:{target:applied.target,min:applied.min,max:applied.max} },
   compatibilityTags:["engine:wgsl","tool:signal-lab"] }; }
 function applyToolState(t){
   if(t.x) Object.assign(state.x,t.x); if(t.y) Object.assign(state.y,t.y);
   if(t.proc) Object.assign(proc,t.proc); if(t.win) Object.assign(win,t.win);
   if(t.drive) drive.mode=t.drive; if(t.side){ side.target=t.side.target; side.depth=t.side.depth; }
   if(t.link) Object.assign(link,t.link);
+  if(t.fire!=null) fire.thresh=t.fire;
   if(t.z) Object.assign(z,t.z);
   if(t.lfo){ if(t.lfo.x)Object.assign(lfo.x,t.lfo.x); if(t.lfo.y)Object.assign(lfo.y,t.lfo.y); }
   if(t.applied){ applied.target=t.applied.target; applied.min=t.applied.min; applied.max=t.applied.max; }
@@ -1050,6 +1141,14 @@ window.addEventListener("keydown", e=>{
   const sb=$("surpriseBtn"); if(sb) sb.title="Random signal + visual (R)";
   const fz=$("freeze"); if(fz) fz.title="Freeze the signal (Space or F)"; }
 
+// ---------- Help / Guide overlay ----------
+{ const hm=$("helpModal"), open=()=>hm.hidden=false, close=()=>hm.hidden=true;
+  const hb=$("helpBtn"); if(hb) hb.onclick=open;
+  const hc=$("helpClose"); if(hc) hc.onclick=close;
+  if(hm) hm.addEventListener("click", e=>{ if(e.target===hm) close(); });   // click backdrop to dismiss
+  window.addEventListener("keydown", e=>{ if(hm && !hm.hidden && e.key==="Escape"){ e.stopPropagation(); close(); }
+    else if(hm && hm.hidden && e.key==="?" && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target||{}).tagName||"")) open(); }); }
+
 // ---------- collapsible panel sections (click the title) ----------
 document.querySelectorAll(".panel").forEach(p=>{ const h=p.querySelector("h2"); if(h) h.addEventListener("click",()=>p.classList.toggle("collapsed")); });
 
@@ -1266,7 +1365,7 @@ function drawApplied(W,H){
       for(let i=0;i<12;i++){ const a=i/12*Math.PI*2; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R); ctx.stroke(); }
       const sweep=t*(0.22+e*0.6);
       for(let k=0;k<44;k++){ const a=sweep-k*0.028; ctx.strokeStyle=`rgba(54,240,154,${0.5*(1-k/44)})`; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R); ctx.stroke(); }
-      for(let i=0;i<6;i++){ const v=combine(bufX[Math.floor(i/6*N)],bufY[Math.floor(i/6*N)]), ba=i*1.7+v*3, br=R*(0.3+0.6*v), bx=cx+Math.cos(ba)*br, by=cy+Math.sin(ba)*br;
+      const blips=4+(state.x.seed%4); for(let i=0;i<blips;i++){ const v=combine(bufX[Math.floor(i/blips*N)],bufY[Math.floor(i/blips*N)]), ba=i*1.7+v*3+state.x.seed*0.017, br=R*(0.3+0.6*v), bx=cx+Math.cos(ba)*br, by=cy+Math.sin(ba)*br;
         ctx.fillStyle="#7df0c2"; ctx.beginPath(); ctx.arc(bx,by,3+v*3,0,7); ctx.fill(); }
       break; }
     case "fuiScope":{ const pw=Math.min(W*0.84,720), ph=Math.min(H*0.56,300), px=cx-pw/2, py=cy-ph/2;
@@ -1300,8 +1399,8 @@ function drawApplied(W,H){
       ctx.fillStyle="#eaf6f5"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText((e*100).toFixed(0), cx, cy); ctx.textBaseline="alphabetic"; break; }
     case "fuiStream":{ const e=Math.max(0,Math.min(1,n)), t=lfoClock, fs=15, colW=22, cols=Math.max(6,Math.floor((W-20)/colW)), hx="0123456789ABCDEF";
       ctx.font=`${fs}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
-      for(let c=0;c<cols;c++){ const sp=40+((c*53)%70)+e*120, headY=((t*sp+c*97)%(H+60))-30;
-        for(let k=0;k<14;k++){ const y=headY-k*fs*1.2; if(y<-10||y>H+10) continue; const ch=hx.charAt((c*7+k+Math.floor(t*8))&15), a=Math.max(0,1-k/14)*(0.35+e*0.65);
+      for(let c=0;c<cols;c++){ const sp=40+(((c*53)+state.x.seed*3)%70)+e*120, headY=((t*sp+c*97+state.x.seed)%(H+60))-30;
+        for(let k=0;k<14;k++){ const y=headY-k*fs*1.2; if(y<-10||y>H+10) continue; const ch=hx.charAt((c*7+k+Math.floor(t*8)+state.x.seed)&15), a=Math.max(0,1-k/14)*(0.35+e*0.65);
           ctx.fillStyle=k===0?`rgba(220,255,240,${0.6+e*0.4})`:`rgba(54,240,154,${a})`; ctx.fillText(ch, 14+c*colW, y); } }
       ctx.textBaseline="alphabetic"; break; }
     case "fuiSynapse":{ const t=lfoClock, sd=state.x.seed*0.137, hx=k=>{ const s=Math.sin(k*127.1+311.7+sd)*43758.5453; return s-Math.floor(s); };   // Channel X seed reshapes the whole net
@@ -1312,24 +1411,24 @@ function drawApplied(W,H){
         for(let d=0;d<deg;d++){ let j=Math.floor(hx(i*5+d+617)*NODES); if(j===i) j=(j+1)%NODES; edges.push([i,j]); } }
       for(let ei=0;ei<edges.length;ei++){ const a=edges[ei][0], b=edges[ei][1], A=pos[a], B=pos[b];
         ctx.strokeStyle="#15303a"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
-        const aa=act(a); if(aa>0.45){ const ph=(t*0.6+hx(ei*3))%1, x=A[0]+(B[0]-A[0])*ph, y=A[1]+(B[1]-A[1])*ph;
+        const aa=act(a); if(aa>Math.max(0.05,fire.thresh-0.1)){ const ph=(t*0.6+hx(ei*3))%1, x=A[0]+(B[0]-A[0])*ph, y=A[1]+(B[1]-A[1])*ph;
           ctx.globalAlpha=aa; ctx.fillStyle="#7df0c2"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(x,y,2+aa*2,0,7); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1; } }
-      for(let i=0;i<NODES;i++){ const a=act(i), P=pos[i], fired=a>0.55;
+      for(let i=0;i<NODES;i++){ const a=act(i), P=pos[i], fired=a>fire.thresh;
         ctx.fillStyle=fired?`hsl(${150+a*120},90%,${55+a*20}%)`:"#1b2a30"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=fired?14*a:0;
         ctx.beginPath(); ctx.arc(P[0],P[1],4+a*8,0,7); ctx.fill(); ctx.shadowBlur=0;
         if(fired){ ctx.strokeStyle=`rgba(54,240,154,${a*(1-((t*1.5+i)%1))})`; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(P[0],P[1],8+24*((t*1.5+i)%1),0,7); ctx.stroke(); } }
       break; }
     case "fuiPackets":{ const e=Math.max(0,Math.min(1,n)), t=lfoClock, lanes=8, span=Math.min(H*0.8,440), laneH=span/lanes, y0=cy-span/2;
       ctx.font="11px ui-monospace,monospace"; ctx.textBaseline="middle";
-      for(let L=0;L<lanes;L++){ const ly=y0+laneH*(L+0.5), actS=Math.max(0,Math.min(1,bufX[Math.floor((L/lanes)*N)]));
+      for(let L=0;L<lanes;L++){ const ly=y0+laneH*(L+0.5), actS=Math.max(0,Math.min(1,bufX[(Math.floor((L/lanes)*N)+state.x.seed*7)%N]));
         ctx.strokeStyle="#11242b"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(64,ly); ctx.lineTo(W-30,ly); ctx.stroke();
-        ctx.fillStyle=actS>0.4?"#7df0c2":"#2a4a44"; ctx.textAlign="right"; ctx.fillText("0x"+(L*16).toString(16).toUpperCase().padStart(2,"0"), 56, ly);
+        ctx.fillStyle=actS>fire.thresh?"#7df0c2":"#2a4a44"; ctx.textAlign="right"; ctx.fillText("0x"+(((L*16+state.x.seed*16)&255).toString(16).toUpperCase().padStart(2,"0")), 56, ly);
         const speed=0.05+(L%3)*0.018+e*0.11;
-        for(let k=0;k<3;k++){ if(actS<=0.4+k*0.16) continue; const ph=((t*speed+L*0.13+k*0.34)%1), x=64+ph*(W-94);
+        for(let k=0;k<3;k++){ if(actS<=fire.thresh+k*0.16) continue; const ph=((t*speed+L*0.13+k*0.34)%1), x=64+ph*(W-94);
           ctx.fillStyle="#7df0c2"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.fillRect(x-7,ly-3,14,6); ctx.shadowBlur=0; } }
       ctx.textBaseline="alphabetic"; break; }
     case "fuiCore":{ const cols=10, rows=7, gap=4, total=Math.min(W*0.8,560), cw=(total-gap*(cols-1))/cols, gh=Math.min(H*0.7,380), chh=(gh-gap*(rows-1))/rows, x0=cx-total/2, y0=cy-gh/2, t=lfoClock;
-      for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){ const i=r*cols+c, v=Math.max(0,Math.min(1, bufX[(i*37)%N]*(0.6+0.4*Math.sin(t*3+i)))), on=v>0.4;
+      for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){ const i=r*cols+c, v=Math.max(0,Math.min(1, bufX[(i*37+state.x.seed*13)%N]*(0.6+0.4*Math.sin(t*3+i+state.x.seed)))), on=v>fire.thresh;
         ctx.fillStyle=on?`hsl(${150+v*120},85%,${28+v*42}%)`:"#0e1a1f"; if(on){ ctx.shadowColor="#36f09a"; ctx.shadowBlur=10*v; }
         ctx.fillRect(x0+c*(cw+gap), y0+r*(chh+gap), cw, chh); ctx.shadowBlur=0; }
       ctx.strokeStyle="#1f5e4e"; ctx.lineWidth=1.5; ctx.strokeRect(x0-6,y0-6,total+12,gh+12); break; }
