@@ -60,9 +60,9 @@ fn bright(uv : vec2<f32>) -> vec3<f32> {
   }
   bloom = bloom / 8.0;
   let tint = vec3<f32>(0.93, 1.0, 0.96);
-  let exposure = 1.18;                                  // overall gain up
+  let exposure = 1.42;                                  // overall gain up (brighter tube)
   let lit = 1.0 - (1.0 - clamp(base * exposure, vec3<f32>(0.0), vec3<f32>(1.0)))
-                * (1.0 - clamp(bloom * tint * 1.85, vec3<f32>(0.0), vec3<f32>(1.0)));
+                * (1.0 - clamp(bloom * tint * 2.05, vec3<f32>(0.0), vec3<f32>(1.0)));
   return vec4<f32>(lit, 1.0);
 }`;
 
@@ -86,8 +86,8 @@ fn bright(uv : vec2<f32>) -> vec3<f32> {
     sF[12] = 0.0; sF[13] = 0.35; sF[14] = 0.0; sF[15] = 0.0;
 
     var dispBuf = new ArrayBuffer(256), dU = new Uint32Array(dispBuf), dF = new Float32Array(dispBuf);
-    dF[4] = 0.92; dF[5] = 0.9; dF[6] = 0.9; dF[7] = 0.16;           // display0: amount, beamSharpness, maskStrength, bloom (kept low; feathered glow added in blit)
-    dF[8] = 0.84; dF[9] = 0.58; dF[10] = 0.42; dF[11] = 0.18;       // display1: scanStrength, scanDensity, scanSoftness, persistence
+    dF[4] = 0.92; dF[5] = 0.9; dF[6] = 0.74; dF[7] = 0.16;          // display0: amount, beamSharpness, maskStrength (eased → brighter), bloom
+    dF[8] = 0.7; dF[9] = 0.58; dF[10] = 0.42; dF[11] = 0.18;        // display1: scanStrength (eased → brighter), scanDensity, scanSoftness, persistence
     dF[12] = 0.1; dF[13] = 1.0; dF[14] = 1.0; dF[15] = 1.0;         // display2: curvature, maskPitch/pixelSize, enable, pixelSize
     // personality0..3 (16..31) = 0 -> neutral grading
     dF[32] = 0.0; dF[33] = 0.35; dF[34] = 0.0; dF[35] = 0.35;       // glitch0
