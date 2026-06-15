@@ -94,16 +94,19 @@ fn srcUni(tt : f32, idx : u32) -> f32 {
     if (st >= 5.5 && st < 6.5) { return clamp(pInputA(), 0.0, 1.0); }       // 6 Linked
     if (st >= 6.5 && st < 7.5) { return clamp(lumaIn[idx] + pOffset(), 0.0, 1.0); } // 7 Luma probe
 
-    var rate = pRate(); var amount = pAmount(); var phase = pPhase();
+    var rate = pRate(); var amount = pAmount(); var phase = pPhase(); var fmDev = 0.0;
     if (pModTgt() > 0.5) {                                                  // sidechain modulation
         let m = modIn[idx]; let d = pModDepth();
         if (pModTgt() < 1.5)      { amount = amount * (1.0 - d + d * m); }
-        else if (pModTgt() < 2.5) { rate   = rate   * (1.0 + d * (m * 2.0 - 1.0)); }
+        // FM/vibrato over window-relative time (idx*dt, bounded by the span)
+        // instead of scaling absolute-time rate — which exploded since tt is
+        // absolute seconds since load.
+        else if (pModTgt() < 2.5) { fmDev = rate * d * (m * 2.0 - 1.0) * (f32(idx) * pDt()) * 0.5; }
         else                      { phase  = phase  + d * m; }
     }
     let seedPhase = fract(pSeed() * 0.07);                                  // Seed shifts the waveform (deterministic)
     let zBend = pZDepth() * (zIn[idx] * 2.0 - 1.0);                         // third signal phase-bends X & Y
-    let x = tt * rate + phase + seedPhase + zBend;
+    let x = tt * rate + fmDev + phase + seedPhase + zBend;
     let fx = x - floor(x);
     var bp : f32 = 0.0;
     if (st < 1.5) { bp = sin(x * 6.28318530718); }                         // 1 Sine
