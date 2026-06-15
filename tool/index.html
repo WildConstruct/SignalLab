@@ -291,6 +291,8 @@
   .exprwrap.open .exprtoggle .chev{ transform:rotate(90deg); }
   .exprwrap:not(.open) .expr{ display:none; }
   .exprwrap.open .expr{ display:block; }
+  #exprCopy{ margin-left:8px; }
+  .exprwrap:not(.open) #exprCopy{ display:none; }
 
   /* ---- collapsible panel sections (click the title) ---- */
   .panel > h2:first-child{ cursor:pointer; user-select:none; }
@@ -360,6 +362,7 @@
     </div>
     <div class="exprwrap" id="exprwrap">
       <button class="exprtoggle" id="exprToggle" aria-expanded="false">ƒ&nbsp;AE expression<span class="chev">▸</span></button>
+      <button class="exprtoggle" id="exprCopy">⧉ Copy</button>
       <div class="expr" id="expr"></div>
     </div>
   </div>
@@ -792,10 +795,7 @@ function surprise(){
 }
 $("surpriseBtn").onclick=surprise;
 
-function updateExpr(){ const tgt=applied.target, mn=applied.min, mx=applied.max;
-  $("expr").innerHTML = `<span class="k">// Channel X drives ${tgt} — generated AE expression</span>\n`+
-    `s = thisComp.layer("SR · Experiment").effect("Signal Rack")("Output A");\n`+
-    `linear(s, 0, 1, ${mn}, ${mx})`; }
+function updateExpr(){ const el=$("expr"); if(el) el.textContent = buildAEExpression(); }   // full self-contained expression
 updateExpr();
 
 // ---------- live mathematical expression ----------
@@ -943,6 +943,7 @@ function updateMath(){
   html += `<div class="legend">t = seconds · frac = fractional part · noise = value noise · clamp(v,0,1) bounds · [P] = 1 if P else 0 · lag = one-pole smoothing</div>`;
   document.getElementById("dinner").innerHTML = html;
   const tz=document.getElementById("dteaser"); tz.textContent = punch.length>70 ? punch.slice(0,70)+"…" : punch;
+  if(typeof updateExpr==="function") updateExpr();   // keep the Applied AE expression live with every change
 }
 function bindProc(){
   document.querySelectorAll("#proc [data-q]").forEach(el=>{ const q=el.dataset.q, o=el.parentElement.querySelector("output");
@@ -962,7 +963,9 @@ function bindZ(){ const map={zAmt:["amount",v=>(+v).toFixed(2)],zRate:["rate",v=
     el.addEventListener("input",set); el.addEventListener("change",set); set(); }); }
 bindZ();
 document.getElementById("dhead").onclick=()=>document.getElementById("drawer").classList.toggle("open");
-{ const et=document.getElementById("exprToggle"); if(et) et.onclick=()=>{ const w=document.getElementById("exprwrap"); const open=w.classList.toggle("open"); et.setAttribute("aria-expanded",open); }; }
+{ const et=document.getElementById("exprToggle"); if(et) et.onclick=()=>{ const w=document.getElementById("exprwrap"); const open=w.classList.toggle("open"); et.setAttribute("aria-expanded",open); if(open) updateExpr(); }; }
+{ const ec=document.getElementById("exprCopy"); if(ec) ec.onclick=()=>{ const expr=buildAEExpression(); let ok=false; try{ navigator.clipboard.writeText(expr); ok=true; }catch(_){}
+  ec.textContent= ok ? "Copied ✓" : "Select & copy"; setTimeout(()=>ec.textContent="⧉ Copy", 1600); }; }
 // "Copy AE expression" lives inside the (re-rendered) drawer body — delegate the click.
 document.getElementById("dinner").addEventListener("click", e=>{
   if(!e.target || e.target.id!=="copyAE") return;
