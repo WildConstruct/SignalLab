@@ -83,11 +83,72 @@ var ylo = 2, yhi = -2, ydistinct = {};
 for (var s = 0; s < N; s++) { var yv = ymod.output("A", s / 30, s); ylo = Math.min(ylo, yv); yhi = Math.max(yhi, yv); ydistinct[yv.toFixed(3)] = 1; }
 ok("Sidechain AM bounded [0,1] and varies", ylo >= 0 && yhi <= 1 && Object.keys(ydistinct).length > 10);
 
+// 9e-2. Sidechain FM/rate: applies frequency deviation over window-relative
+// time (idx*dt) so it stays usable even at a large absolute start time — the
+// old code scaled absolute-time rate and aliased to noise within a frame.
+var dtF = 3 / N, t0 = 512;                          // long-running page: tt ~ hundreds of seconds
+var fmMod = new Float32Array(N);
+for (var i = 0; i < N; i++) fmMod[i] = 0.5 + 0.5 * Math.sin(i / N * 6.283);
+var fm = new Rack({ srcType: SOURCE.sine, rate: 3, seed: 1, frameDur: dtF, mod: { target: "rate", depth: 0.4 }, modInput: fmMod, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+function fmRef(idx) { var m = fmMod[idx], tt = t0 + idx * dtF;
+  var fmDev = 3 * 0.4 * (m * 2 - 1) * (idx * dtF) * 0.5, sp = (1 * 0.07) - Math.floor(1 * 0.07);
+  return (Math.sin((tt * 3 + fmDev + sp) * Math.PI * 2) + 1) / 2; }
+var flo = 2, fhi = -2, fdistinct = {}, fmErr = 0;
+for (var s = 0; s < N; s++) { var v = fm.output("A", t0 + s * dtF, s); flo = Math.min(flo, v); fhi = Math.max(fhi, v); fdistinct[v.toFixed(3)] = 1; fmErr = Math.max(fmErr, Math.abs(v - fmRef(s))); }
+ok("Sidechain FM bounded [0,1] and varies at large t", flo >= 0 && fhi <= 1 && Object.keys(fdistinct).length > 10);
+ok("Sidechain FM uses window-relative time (no absolute-time blowup)", fmErr < 1e-9);
+
 // 9f. Lag (engine-owned, finite EWMA): lowers variance of a pulse
 function variance(rack) { var m = 0, n = 0, s = 0; for (var t = 0; t < 2; t += 1 / 60) { var v = rack.output("A", t, Math.round(t * 60)); n++; var d = v - m; m += d / n; s += d * (v - m); } return s / n; }
 var rawL = new Rack({ srcType: SOURCE.pulse, rate: 2, frameDur: 1 / 60, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
 var lagL = new Rack({ srcType: SOURCE.pulse, rate: 2, frameDur: 1 / 60, process: { lag: 0.85 }, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
 ok("Processor lag lowers variance", variance(lagL) < variance(rawL));
+
+// 9g. Warp = 0 is identity; warp > 0 increases contrast (pushes a mid value toward extremes)
+var wId = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 5 });
+var wOn = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 5, process: { warp: 0.8 } });
+ok("Warp 0 == identity", approx(new Rack({srcType:SOURCE.sine,rate:1,seed:5,process:{warp:0}}).output("A",0.3), wId.output("A",0.3), 1e-9));
+var tw = 0.07; // a time where sine normalized is between 0.5 and 1
+var nId = wId.output("A", tw), nWarp = wOn.output("A", tw);
+ok("Warp increases contrast away from 0.5", Math.abs(nWarp - 0.5) >= Math.abs(nId - 0.5) - 1e-9);
+
+// 9h. Fold = 0 is identity; fold > 0 changes the signal (adds folds)
+var fId = new Rack({ srcType: SOURCE.ramp, rate: 1, process: { fold: 0 } });
+var fOn = new Rack({ srcType: SOURCE.ramp, rate: 1, process: { fold: 0.7 } });
+var plain = new Rack({ srcType: SOURCE.ramp, rate: 1 });
+ok("Fold 0 == identity", approx(fId.output("A", 0.4), plain.output("A", 0.4), 1e-9));
+var changed = false; for (var tf = 0; tf < 1; tf += 1 / 60) { if (Math.abs(fOn.output("A", tf) - plain.output("A", tf)) > 0.05) { changed = true; break; } }
+ok("Fold > 0 distorts the signal", changed);
+
+// 9i. Saturate = 0 identity; sat > 0 soft-distorts but stays in [0,1]
+var satId = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 9 });
+var satOn = new Rack({ srcType: SOURCE.sine, rate: 1, seed: 9, process: { sat: 0.8 } });
+ok("Saturate 0 == identity", approx(new Rack({ srcType: SOURCE.sine, rate: 1, seed: 9, process: { sat: 0 } }).output("A", 0.3), satId.output("A", 0.3), 1e-9));
+var satChanged = false, satInRange = true;
+for (var ts = 0; ts < 2; ts += 1 / 60) { var sv = satOn.output("A", ts); if (sv < 0 || sv > 1) satInRange = false; if (Math.abs(sv - satId.output("A", ts)) > 0.02) satChanged = true; }
+ok("Saturate soft-distorts within [0,1]", satChanged && satInRange);
+
+// 9j. Feathered window: 0 outside [L,R], hard left edge, feathered right ramp
+var WN = 100;
+var win = new Rack({ srcType: SOURCE.sine, rate: 2, sampleN: WN, win: { left: 0.2, right: 0.8, featherL: 0, featherR: 0.2 }, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+ok("Window: zero before left edge", win.output("A", 0.05, Math.round(0.1 * (WN - 1))) === 0);
+ok("Window: zero after right edge", win.output("A", 0.95, Math.round(0.95 * (WN - 1))) === 0);
+// inside, full (away from feather)
+var insideIdx = Math.round(0.5 * (WN - 1));
+var base = new Rack({ srcType: SOURCE.sine, rate: 2, sampleN: WN, outputs: { A: { mode: MODE.normalized, min: 0, max: 1 } } });
+ok("Window: unscaled in the interior", approx(win.output("A", 0.5, insideIdx), base.output("A", 0.5, insideIdx), 1e-9));
+// right feather ramps down (value near right edge < interior envelope)
+var nearRight = Math.round(0.78 * (WN - 1));
+ok("Window: right feather attenuates", win.windowEnv(nearRight) < 1 && win.windowEnv(nearRight) > 0);
+ok("Window default (0..1) is a no-op", new Rack({ srcType: SOURCE.sine, sampleN: WN }).windowEnv(insideIdx) === 1);
+
+// 9k. Third signal (distort): zDepth phase-bends; 0 = identity, >0 changes the wave
+var zbuf = new Float32Array(WN); for (var zi=0; zi<WN; zi++) zbuf[zi] = 0.5 + 0.5*Math.sin(zi/WN*6.283);
+var zOff = new Rack({ srcType: SOURCE.sine, rate: 2, z: { input: zbuf, depth: 0 } });
+var zOn  = new Rack({ srcType: SOURCE.sine, rate: 2, z: { input: zbuf, depth: 0.5 } });
+ok("Distort depth 0 == identity", approx(zOff.output("A",0.3,10), new Rack({srcType:SOURCE.sine,rate:2}).output("A",0.3,10), 1e-9));
+var zChanged=false; for (var zt=0; zt<2; zt+=1/60){ var k=Math.round(zt*30)%WN; if (Math.abs(zOn.output("A",zt,k)-zOff.output("A",zt,k))>0.02){ zChanged=true; break; } }
+ok("Distort depth > 0 bends the signal", zChanged);
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

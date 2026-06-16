@@ -82,17 +82,19 @@ const module = device.createShaderModule({ code: wgsl });
 const pipeline = device.createComputePipeline({ layout: "auto", compute: { module, entryPoint: "main" } });
 
 // buffers (params now 36 floats; bindings 0..3 incl. luma + modulation inputs)
-const F32_PARAMS = 36;
+const F32_PARAMS = 44;
 const paramBuf = device.createBuffer({ size: F32_PARAMS*4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 const outBuf   = device.createBuffer({ size: SAMPLES*4*4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
 const lumaBuf  = device.createBuffer({ size: SAMPLES*4,   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
 const modBuf   = device.createBuffer({ size: SAMPLES*4,   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+const zBuf     = device.createBuffer({ size: SAMPLES*4,   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
 const readBuf  = device.createBuffer({ size: SAMPLES*4*4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
 const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [
   { binding:0, resource:{ buffer: paramBuf } },
   { binding:1, resource:{ buffer: outBuf } },
   { binding:2, resource:{ buffer: lumaBuf } },
   { binding:3, resource:{ buffer: modBuf } },
+  { binding:4, resource:{ buffer: zBuf } },
 ]});
 
 // one dispatch: pack params, run, read back SAMPLES vec4 (n,A,B,C)
@@ -104,7 +106,7 @@ async function dispatch(cfg){
   p[12]=cfg.modeA; p[13]=cfg.minA; p[14]=cfg.maxA;
   p[16]=cfg.modeB; p[17]=cfg.minB; p[18]=cfg.maxB;
   p[20]=cfg.modeC; p[21]=cfg.minC; p[22]=cfg.maxC;
-  p[24]=1;  // pGain default = 1 (processor pass-through); other processor fields 0
+  p[24]=1; p[37]=1;  // pGain=1, winRight=1 (window no-op); other fields 0
   device.queue.writeBuffer(paramBuf, 0, p);
 
   const enc = device.createCommandEncoder();

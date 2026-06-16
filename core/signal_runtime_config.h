@@ -24,7 +24,7 @@ namespace SignalRack {
 
 struct CompiledSignalConfig {
     // Layout indices into SignalParams. Keep identical to the WGSL struct.
-    static constexpr int kFloatCount = 36;
+    static constexpr int kFloatCount = 44;
     enum Field {
         SrcType = 0, Rate, Amount, Phase, Seed, Offset, Smooth, InputA,
         StartTime = 8, Dt, FrameDur, SampleN,
@@ -34,7 +34,9 @@ struct CompiledSignalConfig {
         // processor stage:
         PGain = 24, PBias, PQuant, PGate,
         PLag = 28, PInvert, PRectify, ModTarget,
-        ModDepth = 32, Pad0, Pad1, Pad2,
+        ModDepth = 32, PWarp, PFold, PSat,
+        WinLeft = 36, WinRight, WinFeatherL, WinFeatherR,
+        ZDepth = 40, ZPad0, ZPad1, ZPad2,
     };
 
     std::array<float, kFloatCount> params{};
@@ -84,6 +86,14 @@ inline CompiledSignalConfig Compile(const SignalRecipe& r,
     p[CompiledSignalConfig::PRectify] = pr.rectify ? 1.0f : 0.0f;
     p[CompiledSignalConfig::ModTarget]= static_cast<float>(pr.modTarget);
     p[CompiledSignalConfig::ModDepth] = pr.modDepth;
+    p[CompiledSignalConfig::PWarp]    = pr.warp;
+    p[CompiledSignalConfig::PFold]    = pr.fold;
+    p[CompiledSignalConfig::PSat]     = pr.sat;
+    p[CompiledSignalConfig::WinLeft]     = pr.winLeft;
+    p[CompiledSignalConfig::WinRight]    = pr.winRight;
+    p[CompiledSignalConfig::WinFeatherL] = pr.winFeatherL;
+    p[CompiledSignalConfig::WinFeatherR] = pr.winFeatherR;
+    p[CompiledSignalConfig::ZDepth]      = pr.zDepth;
     return c;
 }
 

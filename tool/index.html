@@ -2,201 +2,585 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Signal Rack — Signal Lab</title>
+<!-- Add-to-Home-Screen / PWA: home-screen icon + standalone app shell -->
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#0a0d11" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Signal Rack" />
 <style>
-  :root{ --bg:#07090b; --panel:#0f1318; --edge:#1c242c; --ink:#cdd9e1; --dim:#6b7a87; --x:#36f09a; --y:#f0b23a; }
-  *{ box-sizing:border-box; }
-  body{ margin:0; background:var(--bg); color:var(--ink); font:13px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,sans-serif; }
-  header{ display:flex; align-items:baseline; gap:12px; padding:14px 18px 8px; }
-  header h1{ font-size:15px; margin:0; letter-spacing:.3px; }
-  header .tag{ color:var(--dim); font-size:11px; }
-  #engine{ margin-left:auto; font-size:11px; padding:2px 8px; border-radius:10px; border:1px solid var(--edge); color:var(--dim); cursor:pointer; user-select:none; }
+  /* Structural base. Design tokens (:root) and the Adobe-inspired restyle live
+     in the design-system block further down, which supersedes this section. */
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{ margin:0; font:13px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,sans-serif;
+        display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+  header{ flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:10px 14px 6px; }
+  #engine{ margin-left:auto; font-size:11px; padding:3px 9px; border-radius:10px; border:1px solid var(--edge); color:var(--dim); cursor:pointer; user-select:none; white-space:nowrap; }
   #engine.web{ color:#8fe; border-color:#2b6; } #engine.cpu{ color:#fb9; border-color:#a63; }
-  .wrap{ display:grid; grid-template-columns:300px 1fr; gap:14px; padding:0 18px 18px; }
-  @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
-  .panel{ background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:12px; }
+
+  /* graph stays on top; controls scroll underneath */
+  #top{ flex:0 0 auto; padding:0 12px; }
+  .tabs{ display:flex; gap:6px; overflow-x:auto; padding:6px 0 8px; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tabs button{ flex:0 0 auto; background:#0b0e12; color:var(--dim); border:1px solid var(--edge); border-radius:8px; padding:8px 13px; font-size:12px; cursor:pointer; }
+  .tabs button.on{ color:#04120b; background:var(--x); border-color:var(--x); font-weight:600; }
+  .stagewrap{ position:relative; background:#05070a; border:1px solid var(--edge); border-radius:12px; padding:8px;
+              height:clamp(200px, 40dvh, 460px); }
+  #stage{ width:100%; height:100%; display:block; }
+  #crt{ position:absolute; top:8px; left:8px; width:calc(100% - 16px); height:calc(100% - 16px); display:none; border-radius:8px; pointer-events:none; }
+  .stagewrap .read{ position:absolute; top:12px; right:16px; z-index:3; font-size:11px; color:var(--dim); font-variant-numeric:tabular-nums; pointer-events:none; }
+  .applied{ display:none; margin-top:8px; }
+  .applied.show{ display:block; }
+  .expr{ margin-top:8px; background:#0b0e12; border:1px solid var(--edge); border-radius:8px; padding:8px 10px;
+         font:11px/1.5 ui-monospace,Menlo,monospace; color:#bfe; white-space:pre-wrap; max-height:96px; overflow:auto; }
+  .expr .k{ color:#6b7a87; }
+
+  .panel{ background:var(--panel); border:1px solid var(--edge); border-radius:12px; padding:12px; }
   .panel h2{ font-size:12px; margin:0 0 10px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px; }
+  .panel h2 .lite{ text-transform:none; color:#52606b; }
   .chan{ border-left:3px solid var(--x); padding-left:10px; margin-bottom:14px; }
   .chan.y{ border-color:var(--y); }
   .chan .name{ font-weight:600; margin-bottom:6px; } .chan.x .name{ color:var(--x);} .chan.y .name{ color:var(--y); }
-  .ctl{ display:grid; grid-template-columns:60px 1fr 44px; align-items:center; gap:8px; margin:5px 0; }
+  .ctl{ display:grid; grid-template-columns:64px 1fr 46px; align-items:center; gap:10px; margin:7px 0; }
   .ctl label{ color:var(--dim); font-size:11px; }
   .ctl output{ font-variant-numeric:tabular-nums; text-align:right; font-size:11px; }
-  input[type=range]{ width:100%; accent-color:#3a7; }
-  select{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:5px; padding:3px 5px; width:100%; }
-  .row{ display:flex; flex-wrap:wrap; gap:6px; }
-  .row button{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:6px; padding:4px 9px; font-size:11px; cursor:pointer; }
-  .row button:hover{ border-color:#3a6; color:#bfe; }
-  .tabs{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
-  .tabs button{ background:#0b0e12; color:var(--dim); border:1px solid var(--edge); border-radius:7px; padding:6px 12px; font-size:12px; cursor:pointer; }
-  .tabs button.on{ color:#04120b; background:var(--x); border-color:var(--x); font-weight:600; }
-  .stagewrap{ background:#05070a; border:1px solid var(--edge); border-radius:10px; padding:10px; position:relative; }
-  .stagewrap .read{ position:absolute; top:10px; right:14px; font-size:11px; color:var(--dim); font-variant-numeric:tabular-nums; }
-  canvas{ display:block; width:100%; }
-  #stage{ height:440px; }
-  .applied{ display:none; margin-top:12px; }
-  .applied.show{ display:block; }
-  .expr{ margin-top:10px; background:#0b0e12; border:1px solid var(--edge); border-radius:8px; padding:10px;
-         font:11px/1.5 ui-monospace,Menlo,monospace; color:#bfe; white-space:pre-wrap; }
-  .expr .k{ color:#6b7a87; }
-  textarea{ display:none; width:100%; height:140px; margin-top:8px; background:#0b0e12; color:#bfe; border:1px solid var(--edge); border-radius:6px; font:11px/1.4 ui-monospace,Menlo,monospace; padding:8px; }
-  body{ padding-bottom:46px; }
-  .drawer{ position:fixed; left:0; right:0; bottom:0; background:#0b0e12; border-top:1px solid var(--edge); z-index:50; box-shadow:0 -8px 24px #0008; }
-  .dhead{ padding:9px 18px; cursor:pointer; display:flex; gap:10px; align-items:center; font:12px/1 ui-monospace,Menlo,monospace; color:var(--dim); user-select:none; }
+  input[type=range]{ width:100%; accent-color:#3a7; height:26px; }
+  input[type=checkbox]{ width:18px; height:18px; accent-color:#3a7; }
+  select,input[type=number]{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:6px; padding:6px 8px; width:100%; font-size:13px; }
+  .row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .row button{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer; }
+  .row button:active{ border-color:#3a6; color:#bfe; }
+  .pgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px; }
+  .pcard{ background:#0b0e12; border:1px solid var(--edge); border-radius:9px; padding:5px; cursor:pointer; display:flex; flex-direction:column; gap:4px; align-items:center; }
+  .pcard:active{ border-color:#3a6; }
+  .pcard canvas{ width:100%; height:auto; border-radius:4px; display:block; background:#05070a; }
+  .pname{ font-size:10px; color:var(--dim); text-align:center; line-height:1.15; }
+  textarea{ display:none; width:100%; height:140px; margin-top:8px; background:#0b0e12; color:#bfe; border:1px solid var(--edge); border-radius:8px; font:11px/1.4 ui-monospace,Menlo,monospace; padding:8px; }
+
+  /* math expression — now a normal collapsible panel at the end of the scroll */
+  .drawer{ background:var(--panel); border:1px solid var(--edge); border-radius:12px; overflow:hidden; }
+  .dhead{ padding:12px; cursor:pointer; display:flex; gap:10px; align-items:center; font:12px/1 ui-monospace,Menlo,monospace; color:var(--dim); user-select:none; }
   .dhead .fx{ color:var(--x); font-weight:700; }
   .dhead .teaser{ color:#7d8b97; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
   .dhead .chev{ transition:transform .2s; }
   .drawer.open .dhead .chev{ transform:rotate(180deg); }
-  .dbody{ max-height:0; overflow:hidden; transition:max-height .25s ease; }
-  .drawer.open .dbody{ max-height:54vh; overflow:auto; }
-  .dinner{ padding:4px 18px 18px; font:12px/1.7 ui-monospace,Menlo,monospace; }
+  .dbody{ max-height:0; overflow:hidden; transition:max-height .28s ease; }
+  .drawer.open .dbody{ max-height:1400px; }
+  .dinner{ padding:0 12px 14px; font:12px/1.7 ui-monospace,Menlo,monospace; }
   .dinner .lbl{ color:#6b7a87; margin-top:10px; }
-  .dinner .math{ color:#bfe; }
-  .dinner .punch{ color:#fff; background:#0f1620; border:1px solid #24343f; border-radius:8px; padding:10px 12px; margin-top:8px; }
+  .dinner .math{ color:#bfe; word-break:break-word; }
+  .dinner .punch{ color:#fff; background:#0f1620; border:1px solid #24343f; border-radius:8px; padding:10px 12px; margin-top:8px; word-break:break-word; }
   .dinner .punch .cap{ color:#6b7a87; display:block; margin-top:6px; font-size:11px; }
   .dinner .legend{ color:#52606b; font-size:11px; margin-top:12px; }
+
+  /* ---- app polish ---- */
+  body{ background:radial-gradient(1100px 560px at 50% -12%, #0f151c 0%, #07090b 62%); }
+  header{ position:sticky; top:0; z-index:20; background:rgba(9,12,16,0.82); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-bottom:1px solid #131a21; }
+  .tabs{ background:#0b0f14; border:1px solid var(--edge); border-radius:13px; padding:4px; gap:4px; }
+  .tabs button{ border:1px solid transparent; background:transparent; border-radius:10px; transition:background .15s,color .15s; }
+  .tabs button.on{ box-shadow:0 2px 10px -2px #0009; }
+  .panel{ box-shadow:0 1px 0 rgba(255,255,255,0.03) inset, 0 16px 30px -26px #000; }
+  .panel h2{ display:flex; align-items:center; gap:8px; }
+  .panel h2::before{ content:""; width:6px; height:6px; border-radius:2px; background:var(--x); opacity:.65; flex:0 0 auto; }
+  .stagewrap{ box-shadow:0 18px 40px -28px #000; }
+  input[type=range]{ -webkit-appearance:none; appearance:none; height:24px; background:transparent; }
+  input[type=range]::-webkit-slider-runnable-track{ height:4px; border-radius:3px; background:#1b232b; }
+  input[type=range]::-moz-range-track{ height:4px; border-radius:3px; background:#1b232b; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; margin-top:-7px; width:18px; height:18px; border-radius:50%; background:#dff; border:2px solid #2bb46e; box-shadow:0 2px 6px #0009; cursor:pointer; }
+  input[type=range]::-moz-range-thumb{ width:16px; height:16px; border-radius:50%; background:#dff; border:2px solid #2bb46e; }
+  select,input[type=number]{ transition:border-color .15s; } select:focus,input:focus{ outline:none; border-color:#2bb46e; }
+  .pcard{ transition:transform .1s, border-color .15s; } .pcard:active{ transform:scale(.96); }
+
+  /* ---- desktop experience: controls sidebar + large stage ---- */
+  @media (min-width: 980px){
+    body{ display:grid; grid-template-columns:380px 1fr; grid-template-rows:auto 1fr;
+          grid-template-areas:"hd hd" "side main"; height:100dvh; overflow:hidden; }
+    header{ grid-area:hd; padding:14px 22px 12px; }
+    #top{ grid-area:main; display:flex; flex-direction:column; min-height:0; height:100%;
+          padding:14px 22px 18px; gap:0; }
+    .tabs{ flex:0 0 auto; gap:6px; }
+    .tabs button{ padding:9px 16px; font-size:13px; }
+    .stagewrap{ flex:1 1 auto; min-height:0; height:auto; border-radius:14px; }
+    #stage{ height:100%; }
+    #crt{ top:8px; left:8px; width:calc(100% - 16px); height:calc(100% - 16px); }
+    .applied{ flex:0 0 auto; }
+    .expr{ max-height:140px; }
+    .panel{ padding:13px 14px; }
+    .ctl{ grid-template-columns:74px 1fr 50px; margin:8px 0; }
+    .pgrid{ grid-template-columns:repeat(auto-fill, minmax(98px, 1fr)); }
+    /* the math drawer reads better open by default on desktop */
+    .drawer .dbody{ }
+  }
+  @media (min-width: 1500px){
+    body{ grid-template-columns:420px 1fr; }
+  }
+
+  /* =====================================================================
+     DESIGN SYSTEM — Wild Construct creative tooling (Adobe-inspired)
+     Three-pane: tools (left) · viewport (center) · properties (right).
+     Dark slate surfaces, amber primary accent, teal secondary, small-caps
+     section headers. This block supersedes the prototype styling above.
+     ===================================================================== */
+  :root{
+    --app-bg:#0a0d11; --rail:#0f141a; --panel:#141a21; --panel-2:#10151b;
+    --edge:#212b35; --edge-2:#2b3845; --ink:#d7e1e9; --dim:#7e8c9a; --mute:#586675;
+    --amber:#e6a23c; --amber-soft:#f0bd6e; --amber-dim:#352a18; --teal:#3ad6a0;
+    --x:#36f09a; --y:#f0b23a;
+  }
+  body{ background:var(--app-bg); color:var(--ink);
+        display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+
+  /* ---- toolbar ---- */
+  header.bar{ position:relative; flex:0 0 auto; display:flex; align-items:center; gap:14px;
+    height:auto; min-height:calc(52px + env(safe-area-inset-top, 0px));
+    padding:env(safe-area-inset-top, 0px) calc(16px + env(safe-area-inset-right, 0px)) 0 calc(16px + env(safe-area-inset-left, 0px));
+    background:linear-gradient(180deg,#121821,#0d1219);
+    border-bottom:1px solid var(--edge); z-index:30; backdrop-filter:none; }
+  header.bar::before{ content:none; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand .logo{ width:24px; height:24px; border-radius:7px;
+    background:linear-gradient(150deg,var(--amber),#b97a1d); flex:0 0 auto;
+    box-shadow:0 0 0 1px #00000040, 0 2px 8px -2px var(--amber); position:relative; }
+  .brand .logo::after{ content:""; position:absolute; inset:6px; border-radius:3px;
+    background:#0d1219; box-shadow:inset 0 0 0 1.5px var(--amber); }
+  .brand .bname{ font-size:13px; font-weight:700; letter-spacing:.2px; line-height:1.1; }
+  .brand .bsub{ font-size:10px; color:var(--dim); letter-spacing:.6px;
+    text-transform:uppercase; line-height:1.1; }
+  .bspace{ flex:1 1 auto; }
+  #engine{ margin:0; font-size:10.5px; letter-spacing:.4px; padding:4px 10px; border-radius:6px;
+    border:1px solid var(--edge-2); background:#0c1117; color:var(--dim);
+    text-transform:uppercase; cursor:pointer; user-select:none; white-space:nowrap; }
+  #engine.web{ color:#7df0c2; border-color:#1f6e4d; background:#0c1813; }
+  #engine.cpu{ color:var(--amber-soft); border-color:#6a4d1e; background:#181308; }
+  .btn{ font-size:12px; font-weight:600; padding:6px 14px; border-radius:7px; cursor:pointer;
+    background:linear-gradient(180deg,var(--amber),#cf8c26); color:#1a1206; border:1px solid #b97a1d;
+    box-shadow:0 1px 0 #ffffff22 inset, 0 4px 12px -6px var(--amber); transition:filter .12s, transform .08s; }
+  .btn:hover{ filter:brightness(1.06); } .btn:active{ transform:translateY(1px); }
+
+  /* ---- three-pane workspace ---- */
+  #work{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+  .rail{ background:var(--rail); display:flex; flex-direction:column; min-height:0; }
+  .railhd{ flex:0 0 auto; position:sticky; top:0; z-index:5; padding:11px 14px 9px;
+    font-size:10px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--mute);
+    background:linear-gradient(180deg,var(--rail),#0d1218); border-bottom:1px solid var(--edge); }
+
+  /* ---- center viewport ---- */
+  #top{ display:flex; flex-direction:column; min-height:0; background:radial-gradient(900px 480px at 50% -10%,#10161e,#0a0d11 64%); }
+
+  /* ---- panels / cards ---- */
+  .panel{ background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:13px;
+    box-shadow:0 1px 0 #ffffff05 inset, 0 14px 28px -26px #000; }
+  .panel h2{ display:flex; align-items:center; gap:7px; font-size:10.5px; font-weight:700;
+    letter-spacing:1.1px; text-transform:uppercase; color:var(--amber); margin:0 0 11px; }
+  .panel h2::before{ content:""; width:5px; height:5px; border-radius:1.5px; background:var(--amber); opacity:.85; }
+  .panel h2 .lite{ text-transform:none; letter-spacing:0; font-weight:500; color:var(--mute); font-size:11px; }
+
+  /* channel accents stay green/amber for scope legibility */
+  .chan.x{ border-color:var(--x); } .chan.y{ border-color:var(--y); }
+
+  /* ---- controls ---- */
+  .ctl label{ color:var(--dim); }
+  .ctl output{ color:var(--ink); }
+  input[type=range]{ accent-color:var(--amber); }
+  input[type=range]::-webkit-slider-runnable-track{ background:#1a222b; }
+  input[type=range]::-moz-range-track{ background:#1a222b; }
+  input[type=range]::-webkit-slider-thumb{ background:#f3e9d6; border:2px solid var(--amber); box-shadow:0 1px 4px #000a; }
+  input[type=range]::-moz-range-thumb{ background:#f3e9d6; border:2px solid var(--amber); }
+  input[type=checkbox]{ accent-color:var(--amber); }
+  select,input[type=number]{ background:#0b1016; border-color:var(--edge-2); }
+  select:focus,input:focus{ border-color:var(--amber); }
+
+  /* ---- tabs (viewport switcher) ---- */
+  .tabs{ background:#0c1117; border:1px solid var(--edge); border-radius:9px; padding:3px; gap:3px; }
+  .tabs button{ color:var(--dim); border-radius:7px; }
+  .tabs button.on{ background:var(--amber); color:#1a1206; border-color:var(--amber);
+    box-shadow:0 2px 8px -3px var(--amber); font-weight:700; }
+
+  /* ---- buttons in rows ---- */
+  .row button{ background:#0c1117; border-color:var(--edge-2); color:var(--ink); }
+  .row button:active{ border-color:var(--amber); color:var(--amber-soft); }
+  #exportBtn{ background:var(--amber-dim); border-color:#6a4d1e; color:var(--amber-soft); }
+
+  /* ---- Output inspector key/value rows ---- */
+  .kv{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:7px 0; border-bottom:1px solid var(--edge); font-size:11px; }
+  .kv:last-child{ border-bottom:none; }
+  .kv span{ color:var(--dim); text-transform:uppercase; letter-spacing:.5px; font-size:10px; }
+  .kv b{ color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; font-size:12.5px; }
+
+  /* ---- math drawer ---- */
+  .drawer{ background:var(--panel); border-color:var(--edge); }
+  .dhead .fx{ color:var(--amber); }
+
+  /* ---- viewport readout + present-mode controls ---- */
+  .stagewrap{ background:#06090d; border-color:var(--edge); box-shadow:0 18px 44px -30px #000; }
+  #exitPresent{ display:none; position:fixed; top:calc(14px + env(safe-area-inset-top, 0px)); right:calc(16px + env(safe-area-inset-right, 0px)); z-index:120;
+    background:#0c1117e6; border:1px solid var(--edge-2); color:var(--ink);
+    font-size:12px; padding:7px 13px; border-radius:8px; cursor:pointer; backdrop-filter:blur(6px); }
+  #exitPresent:hover{ border-color:var(--amber); color:var(--amber-soft); }
+
+  /* =================== MOBILE: stacked, viewport on top =================== */
+  @media (max-width:979px){
+    #work{ flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:env(safe-area-inset-bottom, 0px); }
+    #top{ position:sticky; top:0; z-index:10; flex:0 0 auto; padding:8px 12px 4px;
+      background:var(--app-bg); border-bottom:1px solid var(--edge); }
+    .stagewrap{ height:clamp(190px,38dvh,420px); }
+    .rail{ flex:0 0 auto; }
+    #paneL{ padding:0; } #paneR{ padding:0; }
+    #paneL .railhd, #paneR .railhd{ position:static; }
+    #paneL > .panel, #paneR > .panel, #paneR > .drawer{ margin:10px 12px; }
+    #paneL > .panel:first-of-type, #paneR > .panel:first-of-type{ margin-top:10px; }
+  }
+
+  /* =================== DESKTOP: true three-pane ========================== */
+  @media (min-width:980px){
+    body{ display:flex; flex-direction:column; }
+    #work{ display:grid; grid-template-columns:300px minmax(0,1fr) 290px;
+      grid-template-areas:"l c r"; gap:0; }
+    #paneL{ grid-area:l; border-right:1px solid var(--edge); overflow-y:auto; }
+    #top{ grid-area:c; overflow-y:auto; padding:16px 18px 18px; }
+    #paneR{ grid-area:r; border-left:1px solid var(--edge); overflow-y:auto; }
+    #paneL .panel, #paneR .panel, #paneR .drawer{ margin:12px; }
+    #paneL .panel:first-of-type, #paneR .panel:first-of-type{ margin-top:12px; }
+    .tabs{ flex:0 0 auto; }
+    .stagewrap{ flex:1 1 auto; min-height:320px; }
+    #stage{ height:100%; }
+    .ctl{ grid-template-columns:70px 1fr 48px; }
+  }
+  @media (min-width:1500px){
+    #work{ grid-template-columns:340px minmax(0,1fr) 320px; }
+  }
+
+  /* =================== PRESENT (fullscreen visualizer) =================== */
+  body.present header.bar{ display:none; }
+  body.present #exitPresent{ display:block; }
+  body.present #work{ display:block; grid-template-columns:none; }
+  body.present .rail{ display:none; }
+  body.present #top{ position:fixed; inset:0; z-index:100; padding:0; height:100dvh; }
+  body.present .tabs{ position:absolute; top:calc(14px + env(safe-area-inset-top, 0px)); left:50%; transform:translateX(-50%); z-index:110;
+    background:#0c1117cc; backdrop-filter:blur(6px); }
+  body.present .stagewrap{ position:absolute; inset:0; height:100%; border:none; border-radius:0; padding:0; }
+  body.present .applied{ position:absolute; left:14px; right:14px; bottom:14px; z-index:110;
+    background:#0c1117cc; backdrop-filter:blur(6px); border-radius:10px; padding:8px 10px; }
+  body.present #crt{ top:0; left:0; width:100%; height:100%; border-radius:0; }
+
+  /* ---- oscillator toggle on select generator params ---- */
+  .ctl.osc-row{ grid-template-columns:64px 22px 1fr 46px; }
+  @media (min-width:980px){ .ctl.osc-row{ grid-template-columns:70px 22px 1fr 48px; } }
+  .osc{ width:20px; height:20px; padding:0; border-radius:50%; cursor:pointer;
+    border:1px solid var(--edge-2); background:#0b1016; color:var(--mute);
+    font:700 10px/1 ui-monospace,Menlo,monospace; display:flex; align-items:center; justify-content:center;
+    transition:color .12s, background .12s, box-shadow .12s; }
+  .osc:hover{ color:var(--amber-soft); border-color:#6a4d1e; }
+  .osc.on{ color:#1a1206; background:var(--amber); border-color:var(--amber); animation:oscpulse 1.7s ease-in-out infinite; }
+  @keyframes oscpulse{ 0%,100%{ box-shadow:0 0 5px -1px var(--amber); } 50%{ box-shadow:0 0 11px 0 var(--amber); } }
+
+  /* ---- Applied: collapse the AE-expression preview (was a big code slab) ---- */
+  .exprwrap{ margin-top:8px; }
+  .exprtoggle{ display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+    background:#0b1016; border:1px solid var(--edge-2); color:var(--dim);
+    font:11px/1 ui-monospace,Menlo,monospace; letter-spacing:.3px; padding:7px 11px; border-radius:8px; }
+  .exprtoggle:hover{ color:var(--amber-soft); border-color:#6a4d1e; }
+  .exprtoggle .chev{ color:var(--amber); transition:transform .18s; }
+  .exprwrap.open .exprtoggle .chev{ transform:rotate(90deg); }
+  .exprwrap:not(.open) .expr{ display:none; }
+  .exprwrap.open .expr{ display:block; }
+  #exprCopy{ margin-left:8px; }
+  .exprwrap:not(.open) #exprCopy{ display:none; }
+
+  /* ---- collapsible panel sections (click the title) ---- */
+  .panel > h2:first-child{ cursor:pointer; user-select:none; }
+  .panel > h2:first-child::after{ content:"▾"; margin-left:auto; color:var(--mute); font-size:9px; transition:transform .18s; }
+  .panel.collapsed > h2:first-child::after{ transform:rotate(-90deg); }
+  .panel.collapsed > :not(:first-child){ display:none; }
+
+  /* ---- surprise / share buttons ---- */
+  .wide{ display:block; width:100%; margin:0 0 10px; padding:9px 12px; border-radius:8px; cursor:pointer;
+    font-size:13px; font-weight:600; background:var(--amber-dim); border:1px solid #6a4d1e; color:var(--amber-soft); }
+  .wide:hover{ filter:brightness(1.12); }
+  #shareBtn{ background:var(--amber-dim); border-color:#6a4d1e; color:var(--amber-soft); }
+
+  /* ---- Channel Y → X link (sync / mirror) ---- */
+  .linkrow{ margin:2px 0 8px; gap:14px; }
+  .linkrow label{ display:flex; align-items:center; gap:6px; color:var(--dim); font-size:11px; cursor:pointer; }
+  .chan.y.linked .ctl{ opacity:.38; pointer-events:none; }
+  #recBtn{ color:#f0a8a8; border-color:#5e2b2b; }
+
+  /* ---- ghost toolbar button + Help overlay ---- */
+  .btn.ghost{ background:#0c1117; color:var(--dim); border:1px solid var(--edge-2); box-shadow:none; }
+  .btn.ghost:hover{ color:var(--amber-soft); border-color:#6a4d1e; filter:none; }
+  #helpModal{ position:fixed; inset:0; z-index:200; display:flex; align-items:flex-start; justify-content:center;
+    background:rgba(4,6,9,0.74); backdrop-filter:blur(4px); padding:max(24px,env(safe-area-inset-top)) 16px 24px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #helpModal[hidden]{ display:none; }
+  .help-card{ position:relative; width:min(720px,100%); background:var(--panel); border:1px solid var(--edge-2);
+    border-radius:14px; padding:22px 24px 26px; box-shadow:0 30px 80px -30px #000; color:var(--ink); }
+  .help-card h2{ color:var(--amber); font-size:16px; letter-spacing:.4px; margin:0 0 8px; text-transform:none; }
+  .help-card h2::before{ content:none; }
+  .help-card h3{ color:var(--amber-soft); font-size:12px; letter-spacing:1px; text-transform:uppercase; margin:18px 0 6px; }
+  .help-card .lead{ color:var(--dim); margin:0 0 6px; }
+  .help-card p{ margin:6px 0; font-size:13px; line-height:1.55; color:#c4cfd8; }
+  .help-card ul{ margin:6px 0; padding-left:18px; } .help-card li{ font-size:13px; line-height:1.5; margin:3px 0; color:#c4cfd8; }
+  .help-card b{ color:#e6eef4; font-weight:600; }
+  .help-card .keys b{ color:var(--amber-soft); }
+  #helpClose{ position:absolute; top:12px; right:12px; width:30px; height:30px; border-radius:8px; cursor:pointer;
+    background:#0c1117; border:1px solid var(--edge-2); color:var(--dim); font-size:13px; }
+  #helpClose:hover{ color:var(--amber-soft); border-color:#6a4d1e; }
 </style>
 </head>
 <body>
-<header>
-  <h1>Signal Rack</h1>
-  <span class="tag">signal lab · generate · represent · apply</span>
-  <span id="engine" class="cpu" title="Click to try the WebGPU engine">engine: …</span>
+<header class="bar">
+  <div class="brand"><span class="logo"></span><div class="btxt"><div class="bname">Signal Rack</div><div class="bsub">Signal Lab · WebGPU</div></div></div>
+  <div class="bspace"></div>
+  <span id="engine" class="cpu" title="engine">engine: …</span>
+  <button class="btn ghost" id="helpBtn" title="What is this? (?)">? Guide</button>
+  <button class="btn" id="presentBtn" title="Fullscreen the visualizer">Present ▸</button>
 </header>
+<button id="exitPresent" title="Exit present (Esc)">✕ Exit</button>
 
-<div class="wrap">
-  <div class="panel">
-    <h2>Generator</h2>
-    <div class="chan x" data-ch="x"><div class="name">Channel X</div>
-      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Pulse</option><option value="3">Ramp</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
-      <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="2"><output></output></div>
-      <div class="ctl"><label>Phase</label><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
-      <div class="ctl"><label>Amount</label><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
-      <div class="ctl"><label>Offset</label><input type="range" data-p="offset" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
-      <div class="ctl"><label>Smooth</label><input type="range" data-p="smooth" min="0" max="1" step="0.02" value="0"><output></output></div>
-      <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="1941"><output></output></div>
-    </div>
-    <div class="chan y" data-ch="y"><div class="name">Channel Y</div>
-      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Pulse</option><option value="3">Ramp</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="7">Luma Probe</option></select><output></output></div>
-      <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="3"><output></output></div>
-      <div class="ctl"><label>Phase</label><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
-      <div class="ctl"><label>Amount</label><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
-      <div class="ctl"><label>Offset</label><input type="range" data-p="offset" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
-      <div class="ctl"><label>Smooth</label><input type="range" data-p="smooth" min="0" max="1" step="0.02" value="0"><output></output></div>
-      <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="77"><output></output></div>
-    </div>
-    <h2 style="margin-top:4px">Processor <span style="text-transform:none;color:#52606b">— shapes Channel X</span></h2>
-    <div id="proc">
-      <div class="ctl"><label>Gain</label><input type="range" data-q="gain" min="0" max="3" step="0.05" value="1"><output></output></div>
-      <div class="ctl"><label>Bias</label><input type="range" data-q="bias" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
-      <div class="ctl"><label>Quantize</label><input type="range" data-q="quantize" min="0" max="16" step="1" value="0"><output></output></div>
-      <div class="ctl"><label>Gate ≥</label><input type="range" data-q="gate" min="0" max="1" step="0.02" value="0"><output></output></div>
-      <div class="ctl"><label>Lag</label><input type="range" data-q="lag" min="0" max="0.97" step="0.01" value="0"><output></output></div>
-      <div class="row" style="margin-top:4px">
-        <label style="color:var(--dim)"><input type="checkbox" data-qb="invert"> invert</label>
-        <label style="color:var(--dim)"><input type="checkbox" data-qb="rectify"> rectify</label>
-      </div>
-    </div>
+<div id="helpModal" hidden>
+  <div class="help-card">
+    <button id="helpClose" title="Close (Esc)">✕</button>
+    <h2>Signal Rack — Signal Lab</h2>
+    <p class="lead">Build a signal, then watch it drive things. Everything you see runs on the same WebGPU engine the After-Effects bridge uses — so a look you dial in here can be reproduced exactly, even copied out as a working AE expression.</p>
 
-    <h2 style="margin-top:12px">Sidechain <span style="text-transform:none;color:#52606b">— X modulates Y</span></h2>
-    <div class="ctl"><label>Mode</label><select id="sideMode"><option value="off">off</option><option value="amp">amplitude</option><option value="rate">rate (FM)</option><option value="phase">phase</option></select><output></output></div>
-    <div class="ctl"><label>Depth</label><input type="range" id="sideDepth" min="0" max="1" step="0.02" value="0.5"><output></output></div>
+    <h3>1 · Make a signal</h3>
+    <p><b>Generator</b> has two channels, <b>X</b> and <b>Y</b>. Each is a source (Sine, Square, Saw, Triangle, Pulse, Noise, Random Walk) shaped by <b>Rate, Phase, Amount, Offset, Smooth</b> and a <b>Seed</b> (re-rolls the random sources and shifts the wave). The little <b>“o”</b> next to Amount/Phase oscillates that value slowly.</p>
+    <p><b>Channel Y</b> can <b>Sync to X</b> (becomes X) or <b>Invert (mirror X)</b> (becomes 1−X) for clean symmetric figures.</p>
 
-    <h2 style="margin-top:12px">Luma probe</h2>
-    <div class="row"><input type="file" id="probeFile" accept="image/*,video/*" style="font-size:11px;color:var(--dim)"></div>
-    <div class="ctl"><label>Mode</label><select id="probeMode"><option value="scan">line scan</option><option value="avg">average</option></select><output></output></div>
-    <div style="color:#52606b;font-size:11px;margin-top:4px">Then set a channel Source → “Luma Probe”.</div>
+    <h3>2 · Shape it</h3>
+    <ul>
+      <li><b>Processor</b> (shapes X): gain/bias, saturate, warp, fold, gate, quantize, lag, invert, rectify.</li>
+      <li><b>Window</b>: a feathered region that fades the signal in/out across the scope.</li>
+      <li><b>Sidechain</b>: let X modulate Y’s amplitude, rate (FM) or phase.</li>
+      <li><b>Distort</b>: a gentle third signal that phase-bends both channels.</li>
+    </ul>
 
-    <h2 style="margin-top:12px">Presets</h2>
-    <div class="row" id="presets">
-      <button data-preset="circle">Circle</button><button data-preset="lissa23">Lissa 2:3</button>
-      <button data-preset="lissa34">Lissa 3:4</button><button data-preset="pulsegate">Pulse×Sine</button>
-      <button data-preset="noise">Noise</button>
-    </div>
-    <h2 style="margin-top:12px">Display</h2>
-    <div class="ctl"><label>Window</label><input type="range" id="span" min="0.5" max="8" step="0.5" value="3"><output id="spanv"></output></div>
-    <div class="ctl"><label>Persist</label><input type="range" id="persist" min="0" max="0.95" step="0.05" value="0.8"><output id="persistv"></output></div>
-    <div class="ctl"><label>Freeze</label><input type="checkbox" id="freeze"><output></output></div>
-    <div class="row" style="margin-top:8px"><button id="exportBtn">Export recipe JSON</button></div>
-    <textarea id="recipeOut" readonly></textarea>
+    <h3>3 · See it</h3>
+    <p>Tabs switch the scope: <b>Waveform, Bars, Vectorscope, Polar, Heat</b>, and <b>Applied</b> — where the signal drives something:</p>
+    <ul>
+      <li><b>Transform / Visual / Meter</b>: scale, rotate, opacity, glow, gauges, LED ladders…</li>
+      <li><b>FUI</b>: HUD widgets — radar, oscilloscope, gyro rings, waveform ring, data stream, and the firing ones (<b>Synapse net, Data packets, Processor die</b>) that light up where the signal is active. <b>Fire ≥</b> sets how active it must be; <b>Seed</b> reshapes the synapse map.</li>
+      <li><b>Transitions</b>: a playhead ramps 0→100% across the signal (turn on <b>Freeze</b> to hold the curve) — loading bars, wipes, text reveals.</li>
+      <li><b>Particles / Text / Path</b>: fountains, confetti, kinetic type, Lissajous, spirographs…</li>
+    </ul>
+    <p><b>Drive</b> picks how X and Y combine into the value (Channel X, Y, X×Y ring, mix, difference, min, max).</p>
+
+    <h3>4 · Use it</h3>
+    <ul>
+      <li><b>ƒ AE expression</b> (in Applied): the full, self-contained After-Effects expression — copy it onto any property; it reproduces the exact driver, no plugin needed.</li>
+      <li><b>Record video</b>: capture the visualization to an mp4/webm.</li>
+      <li><b>Copy link</b> / <b>Export JSON</b>: the whole setup travels in a URL or a recipe file.</li>
+      <li><b>🎲 Surprise me</b>: roll a tasteful random rig.</li>
+    </ul>
+
+    <h3>Display</h3>
+    <p><b>Speed</b> (÷2 / 1×) is a master time scale. <b>Window</b> = scope length, <b>Persist</b> = trail, <b>Freeze</b> = hold, <b>CRT</b> = Cathode tube look, <b>Y opacity</b> = dim channel Y.</p>
+
+    <h3>Shortcuts</h3>
+    <p class="keys"><b>Space</b>/<b>F</b> freeze · <b>R</b> surprise · <b>P</b> present · <b>Esc</b> exit · <b>double-click</b> a slider to reset it.</p>
   </div>
+</div>
 
-  <div>
-    <div class="tabs" id="tabs">
-      <button data-mode="waveform" class="on">Waveform</button>
-      <button data-mode="bars">Bars</button>
-      <button data-mode="vector">Vectorscope</button>
-      <button data-mode="polar">Polar</button>
-      <button data-mode="heat">Heat strip</button>
-      <button data-mode="applied">Applied ▸</button>
-    </div>
-    <div class="stagewrap">
-      <span class="read" id="stageRead">—</span>
-      <canvas id="stage" height="440"></canvas>
-    </div>
+<div id="work">
 
-    <div class="applied panel" id="appliedPanel">
-      <h2>Applied — Channel X drives a property (the controller workflow)</h2>
-      <div class="row">
-        <select id="target" style="max-width:200px">
-          <option value="scale">Scale</option>
-          <option value="rotation">Rotation</option>
-          <option value="position">Position X</option>
-          <option value="opacity">Opacity / flicker</option>
-          <option value="glow">Glow</option>
-          <option value="color">Color (hue)</option>
-          <option value="meter">Bar meter + gate</option>
-          <option value="particles">Particles (birth driver)</option>
-          <option value="type">Kinetic type reveal</option>
-        </select>
-        <div class="ctl" style="grid-template-columns:auto 80px"><label>Min</label><input type="number" id="tmin" value="80" step="1"></div>
-        <div class="ctl" style="grid-template-columns:auto 80px"><label>Max</label><input type="number" id="tmax" value="120" step="1"></div>
-      </div>
+<!-- GRAPH (sticky top) -->
+<div id="top">
+  <div class="tabs" id="tabs">
+    <button data-mode="waveform" class="on">Waveform</button>
+    <button data-mode="bars">Bars</button>
+    <button data-mode="vector">Vectorscope</button>
+    <button data-mode="polar">Polar</button>
+    <button data-mode="heat">Heat</button>
+    <button data-mode="applied">Applied ▸</button>
+  </div>
+  <div class="stagewrap">
+    <span class="read" id="stageRead">—</span>
+    <canvas id="stage"></canvas>
+    <canvas id="crt"></canvas>
+  </div>
+  <div id="gpudbg" style="display:none;font:10px/1.3 ui-monospace,Menlo,monospace;color:#fb9;padding:4px 6px;word-break:break-all"></div>
+  <div class="applied" id="appliedPanel">
+    <div class="row" style="margin-top:8px">
+      <label style="color:var(--dim);font-size:11px;align-self:center">Apply to</label>
+      <select id="appCat" style="flex:1; min-width:120px"></select>
+      <select id="appVar" style="flex:1; min-width:140px"></select>
+    </div>
+    <div class="row" id="rangeRow" style="margin-top:8px; align-items:center">
+      <span style="color:var(--mute);font-size:11px;flex:0 0 auto">Output range</span>
+      <div class="ctl" style="grid-template-columns:auto 64px; flex:0 0 auto"><label>Min</label><input type="number" id="tmin" value="80" step="1"></div>
+      <div class="ctl" style="grid-template-columns:auto 64px; flex:0 0 auto"><label>Max</label><input type="number" id="tmax" value="120" step="1"></div>
+      <span style="color:#52606b;font-size:11px;flex:1 1 100%">The 0→1 driver is remapped into this range (e.g. Scale 80→120%). Hidden where a variant has no numeric range.</span>
+    </div>
+    <div class="row" id="fireRow" style="margin-top:8px; align-items:center; display:none">
+      <span style="color:var(--mute);font-size:11px;flex:0 0 auto">Fire ≥</span>
+      <input type="range" id="fireThresh" min="0.1" max="0.9" step="0.02" value="0.45" style="flex:1; min-width:120px"><output id="fireThreshv" style="font-size:11px;width:34px;text-align:right">0.45</output>
+      <span style="color:#52606b;font-size:11px;flex:1 1 100%">How active the signal must be for a node / cell / lane to light up. Lower = busier.</span>
+    </div>
+    <div class="row" style="margin-top:8px; align-items:center">
+      <label style="color:var(--dim);font-size:11px">Drive</label>
+      <select id="driveMode" style="flex:1; min-width:130px">
+        <option value="x">Channel X</option><option value="y">Channel Y</option>
+        <option value="mult">X × Y (ring)</option><option value="mix">Mix (X+Y)/2</option>
+        <option value="diff">Difference |X−Y|</option><option value="min">Min(X,Y)</option><option value="max">Max(X,Y)</option>
+      </select>
+      <span style="color:#52606b;font-size:11px;flex:1 1 100%">The driver feeds the property. Scope-style variants show a PIP (bottom-right): X (green), Y (amber), driver (white).</span>
+    </div>
+    <div class="exprwrap" id="exprwrap">
+      <button class="exprtoggle" id="exprToggle" aria-expanded="false">ƒ&nbsp;AE expression<span class="chev">▸</span></button>
+      <button class="exprtoggle" id="exprCopy">⧉ Copy</button>
       <div class="expr" id="expr"></div>
     </div>
   </div>
 </div>
 
-<div class="drawer" id="drawer">
-  <div class="dhead" id="dhead">
-    <span class="fx">ƒ(t)</span>
-    <span class="teaser" id="dteaser">the math behind this signal…</span>
-    <span class="chev">▾</span>
+<!-- CONTROLS (scrollable) -->
+<aside id="paneL" class="rail">
+  <div class="railhd">Parameters</div>
+  <div class="panel">
+    <h2>Generator</h2>
+    <div class="chan x" data-ch="x"><div class="name">Channel X</div>
+      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option></select><output></output></div>
+      <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="2"><output></output></div>
+      <div class="ctl osc-row"><label>Phase</label><button class="osc" data-osc="phase" title="Oscillate this value">o</button><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
+      <div class="ctl osc-row"><label>Amount</label><button class="osc" data-osc="amount" title="Oscillate this value">o</button><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
+      <div class="ctl"><label>Offset</label><input type="range" data-p="offset" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Smooth</label><input type="range" data-p="smooth" min="0" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="1941"><output></output></div>
+    </div>
+    <div class="chan y" data-ch="y"><div class="name">Channel Y</div>
+      <div class="row linkrow">
+        <label><input type="checkbox" id="ySync"> Sync to X</label>
+        <label><input type="checkbox" id="yInvert"> Invert (mirror X)</label>
+      </div>
+      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option></select><output></output></div>
+      <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="3"><output></output></div>
+      <div class="ctl osc-row"><label>Phase</label><button class="osc" data-osc="phase" title="Oscillate this value">o</button><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
+      <div class="ctl osc-row"><label>Amount</label><button class="osc" data-osc="amount" title="Oscillate this value">o</button><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
+      <div class="ctl"><label>Offset</label><input type="range" data-p="offset" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Smooth</label><input type="range" data-p="smooth" min="0" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Seed</label><input type="range" data-p="seed" min="1" max="9999" step="1" value="1941"><output></output></div>
+    </div>
   </div>
-  <div class="dbody"><div class="dinner" id="dinner"></div></div>
+
+  <div class="panel">
+    <h2>Processor <span class="lite">— shapes Channel X</span></h2>
+    <div id="proc">
+      <div class="ctl"><label>Gain</label><input type="range" data-q="gain" min="0" max="3" step="0.05" value="1"><output></output></div>
+      <div class="ctl"><label>Bias</label><input type="range" data-q="bias" min="-0.5" max="0.5" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Quantize</label><input type="range" data-q="quantize" min="0" max="16" step="1" value="0"><output></output></div>
+      <div class="ctl"><label>Saturate</label><input type="range" data-q="sat" min="0" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Warp</label><input type="range" data-q="warp" min="-1" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Fold</label><input type="range" data-q="fold" min="0" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Gate ≥</label><input type="range" data-q="gate" min="0" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Lag</label><input type="range" data-q="lag" min="0" max="0.97" step="0.01" value="0"><output></output></div>
+      <div class="row" style="margin-top:6px">
+        <label style="color:var(--dim);display:flex;align-items:center;gap:6px"><input type="checkbox" data-qb="invert"> invert</label>
+        <label style="color:var(--dim);display:flex;align-items:center;gap:6px"><input type="checkbox" data-qb="rectify"> rectify</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Window <span class="lite">— feathered region (Channel X)</span></h2>
+    <div class="ctl"><label>Left</label><input type="range" id="winL" min="0" max="1" step="0.01" value="0"><output></output></div>
+    <div class="ctl"><label>Right</label><input type="range" id="winR" min="0" max="1" step="0.01" value="1"><output></output></div>
+    <div class="ctl"><label>Feather L</label><input type="range" id="winFL" min="0" max="0.5" step="0.01" value="0"><output></output></div>
+    <div class="ctl"><label>Feather R</label><input type="range" id="winFR" min="0" max="0.5" step="0.01" value="0"><output></output></div>
+    <div style="color:#52606b;font-size:11px;margin-top:4px">Pull each edge in/out; feather ramps that side. Leave one hard, ramp the other.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Sidechain <span class="lite">— X modulates Y</span></h2>
+    <div class="ctl"><label>Mode</label><select id="sideMode"><option value="off">off</option><option value="amp">amplitude</option><option value="rate">rate (FM)</option><option value="phase">phase</option></select><output></output></div>
+    <div class="ctl"><label>Depth</label><input type="range" id="sideDepth" min="0" max="1" step="0.02" value="0.5"><output></output></div>
+  </div>
+
+  <div class="panel">
+    <h2>Distort <span class="lite">— third signal bends X &amp; Y</span></h2>
+    <div class="ctl"><label>Amount</label><input type="range" id="zAmt" min="0" max="0.6" step="0.01" value="0"><output></output></div>
+    <div class="ctl"><label>Rate</label><input type="range" id="zRate" min="0.1" max="6" step="0.1" value="1"><output></output></div>
+    <div class="ctl"><label>Shape</label><select id="zShape"><option value="1">Sine</option><option value="8">Triangle</option><option value="4">Noise</option></select><output></output></div>
+  </div>
+
+  </aside>
+
+  <aside id="paneR" class="rail">
+  <div class="railhd">Output</div>
+  <div class="panel">
+    <h2>Live values</h2>
+    <div class="kv"><span>Channel X</span><b id="ovX">–</b></div>
+    <div class="kv"><span>Channel Y</span><b id="ovY">–</b></div>
+    <div class="kv"><span>Driver</span><b id="ovD">–</b></div>
+    <div class="kv"><span>View · Engine</span><b id="ovView">–</b></div>
+  </div>
+  <div class="panel">
+    <h2>Preset browser</h2>
+    <button id="surpriseBtn" class="wide">🎲 Surprise me</button>
+    <div class="pgrid" id="presetGallery"></div>
+    <h2 style="margin-top:14px">Display</h2>
+    <div class="ctl"><label>Speed</label><input type="range" id="speed" min="0.1" max="2" step="0.05" value="1"><output id="speedv"></output></div>
+    <div class="row" style="margin:-2px 0 4px; gap:6px"><button id="halfBtn" style="font-size:11px;padding:4px 10px">÷2</button><button id="speed1Btn" style="font-size:11px;padding:4px 10px">1×</button><span style="color:#52606b;font-size:11px;align-self:center">master time scale</span></div>
+    <div class="ctl"><label>Window</label><input type="range" id="span" min="0.5" max="8" step="0.5" value="3"><output id="spanv"></output></div>
+    <div class="ctl"><label>Persist</label><input type="range" id="persist" min="0" max="0.95" step="0.05" value="0.8"><output id="persistv"></output></div>
+    <div class="ctl"><label>Freeze</label><input type="checkbox" id="freeze"><output></output></div>
+    <div class="ctl"><label>CRT</label><input type="checkbox" id="crtToggle" checked><output>Cathode</output></div>
+    <div class="ctl"><label>Y opacity</label><input type="range" id="yopac" min="0" max="1" step="0.05" value="0.7"><output id="yopacv"></output></div>
+    <div class="row" style="margin-top:10px"><button id="shareBtn">🔗 Copy link</button><button id="exportBtn">Export JSON</button><button id="importBtn">Import</button></div>
+    <div class="row" style="margin-top:8px"><button id="recBtn">● Record video</button><label style="color:var(--dim);font-size:11px;display:flex;align-items:center;gap:6px">sec <input type="number" id="recSec" value="8" min="2" max="30" style="width:54px"></label></div>
+    <textarea id="recipeOut" placeholder="Export fills this; or paste a recipe here and tap Import"></textarea>
+  </div>
+
+  <div class="drawer" id="drawer">
+    <div class="dhead" id="dhead">
+      <span class="fx">ƒ(t)</span>
+      <span class="teaser" id="dteaser">the math behind this signal…</span>
+      <span class="chev">▾</span>
+    </div>
+    <div class="dbody"><div class="dinner" id="dinner"></div></div>
+  </div>
+  </aside>
 </div>
 
 <script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
+<script src="cathode-crt.js"></script>
 <script>
+const BUILD = "2026-06-15f";   // bump on deploy → check console / brand tooltip to spot a stale cache
+console.info("Signal Rack — build " + BUILD);
+try{ const b=document.querySelector(".brand"); if(b) b.title="build "+BUILD; }catch(e){}
 const { Rack, SOURCE, MODE } = SignalCore;
 const N = 1024;
-let SPAN=3, PERSIST=0.8, FREEZE=false, frozenT=0, MODE_CUR="waveform";
+let SPAN=3, PERSIST=0.8, FREEZE=false, frozenT=0, MODE_CUR="waveform", YOPAC=0.7, SPEED=1;
 const state = {
   x:{ src:1, rate:2, phase:0, amount:1, offset:0, smooth:0, seed:1941 },
-  y:{ src:1, rate:3, phase:0, amount:1, offset:0, smooth:0, seed:77 },
+  y:{ src:1, rate:3, phase:0, amount:1, offset:0, smooth:0, seed:1941 },
 };
 const applied = { target:"scale", min:80, max:120 };
-const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, invert:false, rectify:false };
-const side = { target:"off", depth:0.5 };                        // X modulates Y
-const probe = { mode:"scan", loaded:false, el:null, kind:null }; // luma probe source
-const lumaHistory = new Float32Array(N).fill(0.5);               // scrolling probe signal
+const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, sat:0, invert:false, rectify:false };
+const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied property
+const side = { target:"off", depth:0.5 };
+const link = { sync:false, invert:false };   // Channel Y relationship to X (sync = copy, invert = mirror)
+const fire = { thresh:0.45 };   // firing threshold for the synapse / packets / die widgets
+const FIRE = new Set(["fuiSynapse","fuiPackets","fuiCore"]);
+const z = { shape:1, rate:1, amount:0 };   // third signal — gently distorts X & Y (phase bend)
+const zBuffer = new Float32Array(N).fill(0.5);   // third-signal (distort) per-sample
+const crt = { on:true, pass:null, failed:false };
+const win = { left:0, right:1, featherL:0, featherR:0 };   // feathered region window (drives Channel X)   // Cathode CRT/NTSC WebGPU overlay (default on)
 
-// The processor stage is NOT computed here — it lives in the engine
-// (ProcessParams -> signal_core.wgsl). The `proc` object is just the config the
-// host hands to the engine each frame. Same for sidechain (`side`) and luma.
-
-// ---------- engine (WebGPU primary, CPU reference fallback) ----------
-// The host (this tool) only CONFIGURES and CALLS the engine. All signal math —
-// source, smoothing, processor, sidechain modulation, luma mapping — lives in
-// the engine (shaders/signal_core.wgsl ⇄ signal-core-reference.js). Same code
-// the AE plugin runs through the Dawn bridge: "we run the demo how it ships."
+// The processor/sidechain/luma are NOT computed here — they live in the engine
+// (signal_core.wgsl ⇄ signal-core-reference.js). This host only configures and
+// calls the engine, the same way the AE plugin drives it through the Dawn bridge.
 const MODNUM = { off:0, amp:1, rate:2, phase:3 };
 const Engine = {
-  mode:"cpu", device:null, pipeline:null, bufs:null, bind:null,
+  mode:"cpu", gpuRejected:false, device:null, pipeline:null, bufs:null, bind:null,
   cpuRack(c,dt){ return new Rack({ srcType:+c.src, rate:c.rate, phase:c.phase, amount:c.amount, offset:c.offset||0,
     smooth:c.smooth, seed:c.seed, frameDur:dt, process:c.process||null, mod:c.mod||null,
-    modInput:c.modInput||null, lumaInput:c.lumaInput||null, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
+    modInput:c.modInput||null, lumaInput:c.lumaInput||null, win:c.win||null, sampleN:N, z:c.z||null, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
   sampleCPU(c,start,dt,out){ const r=this.cpuRack(c,dt); for(let i=0;i<N;i++) out[i]=r.output("A",start+i*dt,i); return out; },
   async tryWebGPU(){ if(!navigator.gpu) return false;
     try{ const a=await navigator.gpu.requestAdapter(); if(!a) return false; this.device=await a.requestDevice();
@@ -204,73 +588,315 @@ const Engine = {
       const m=this.device.createShaderModule({code});
       this.pipeline=this.device.createComputePipeline({layout:"auto",compute:{module:m,entryPoint:"main"}});
       const d=this.device;
-      this.bufs={ param:d.createBuffer({size:36*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
+      this.bufs={ param:d.createBuffer({size:44*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
+        z:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         out:d.createBuffer({size:N*16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),
         luma:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         mod:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         read:d.createBuffer({size:N*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}) };
       this.bind=d.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[
         {binding:0,resource:{buffer:this.bufs.param}},{binding:1,resource:{buffer:this.bufs.out}},
-        {binding:2,resource:{buffer:this.bufs.luma}},{binding:3,resource:{buffer:this.bufs.mod}}]});
+        {binding:2,resource:{buffer:this.bufs.luma}},{binding:3,resource:{buffer:this.bufs.mod}},{binding:4,resource:{buffer:this.bufs.z}}]});
       this.mode="webgpu"; return true;
     }catch(e){ console.warn("WebGPU init failed:",e); return false; } },
-  async sampleGPU(c,start,dt,out){ const p=new Float32Array(36), pr=c.process||{};
+  async sampleGPU(c,start,dt,out){ const p=new Float32Array(44), pr=c.process||{}, w=c.win||{}, zc=c.z||{};
     p[0]=+c.src;p[1]=c.rate;p[2]=c.amount;p[3]=c.phase;p[4]=c.seed;p[5]=c.offset||0;p[6]=c.smooth;
     p[8]=start;p[9]=dt;p[10]=dt;p[11]=N;p[12]=MODE.normalized;p[13]=0;p[14]=1;p[16]=MODE.normalized;p[20]=MODE.normalized;
     p[24]=pr.gain!=null?pr.gain:1;p[25]=pr.bias||0;p[26]=pr.quantize||0;p[27]=pr.gate||0;
     p[28]=pr.lag||0;p[29]=pr.invert?1:0;p[30]=pr.rectify?1:0;
     p[31]=c.mod?(MODNUM[c.mod.target]||0):0;p[32]=c.mod?c.mod.depth:0;
+    p[33]=pr.warp||0;p[34]=pr.fold||0;p[35]=pr.sat||0;
+    p[36]=w.left!=null?w.left:0;p[37]=w.right!=null?w.right:1;p[38]=w.featherL||0;p[39]=w.featherR||0;
+    p[40]=zc.depth||0;
     const d=this.device,b=this.bufs; d.queue.writeBuffer(b.param,0,p);
     if(c.lumaInput) d.queue.writeBuffer(b.luma,0,c.lumaInput);
+    if(zc.input) d.queue.writeBuffer(b.z,0,zc.input);
     if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
     const e=d.createCommandEncoder(); const pass=e.beginComputePass(); pass.setPipeline(this.pipeline); pass.setBindGroup(0,this.bind);
     pass.dispatchWorkgroups(Math.ceil(N/64)); pass.end(); e.copyBufferToBuffer(b.out,0,b.read,0,N*16); d.queue.submit([e.finish()]);
-    await b.read.mapAsync(GPUMapMode.READ); const arr=new Float32Array(b.read.getMappedRange()); for(let i=0;i<N;i++) out[i]=arr[i*4]; b.read.unmap(); return out; },
-  sample(c,start,dt,out){ return this.mode==="webgpu" ? this.sampleGPU(c,start,dt,out) : Promise.resolve(this.sampleCPU(c,start,dt,out)); }
+    if(d.queue.onSubmittedWorkDone) await d.queue.onSubmittedWorkDone(); // WebKit: ensure compute finished before map
+    await b.read.mapAsync(GPUMapMode.READ,0,N*16);
+    const arr=new Float32Array(b.read.getMappedRange(0,N*16).slice(0)); b.read.unmap();
+    for(let i=0;i<N;i++) out[i]=arr[i*4]; return out; },
+  sample(c,start,dt,out){ return this.mode==="webgpu" ? this.sampleGPU(c,start,dt,out) : Promise.resolve(this.sampleCPU(c,start,dt,out)); },
+  // Validate the GPU path against the proven CPU reference; fall back on mismatch.
+  async selfCheck(){
+    if(this.mode!=="webgpu") return;
+    const cfg={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1234,
+      process:{gain:1,bias:0,quantize:0,gate:0,lag:0,invert:false,rectify:false}};
+    const g=new Float32Array(N), cc=new Float32Array(N);
+    try{ await this.sampleGPU(cfg,0,1/60,g); }catch(e){ this.diag="gpu threw: "+(e&&e.message||e); this.mode="cpu"; this.gpuRejected=true; return; }
+    this.sampleCPU(cfg,0,1/60,cc);
+    let maxd=0, lo=2, hi=-2;
+    for(let i=0;i<N;i+=17){ maxd=Math.max(maxd,Math.abs(g[i]-cc[i])); lo=Math.min(lo,g[i]); hi=Math.max(hi,g[i]); }
+    const degenerate=(hi-lo)<1e-3;        // GPU produced a flat/dead signal
+    this.diag="gpu["+g[128].toFixed(2)+" "+g[512].toFixed(2)+" "+g[896].toFixed(2)+"] cpu["+cc[128].toFixed(2)+" "+cc[512].toFixed(2)+" "+cc[896].toFixed(2)+"] d="+maxd.toFixed(2);
+    if(maxd>0.08 || degenerate){ console.warn("GPU self-check failed — "+this.diag); this.mode="cpu"; this.gpuRejected=true; }
+  }
 };
 
 // ---------- UI wiring ----------
-function fmt(p,v){ if(p==="src")return["","Sine","Pulse","Ramp","Noise","Walk","Linked","Luma"][v]||v; if(p==="seed")return(+v).toFixed(0); if(p==="rate")return(+v).toFixed(1); return(+v).toFixed(2); }
+function fmt(p,v){ if(p==="src")return["","Sine","Square","Saw","Noise","Walk","Linked","Luma","Triangle","Pulse"][v]||v; if(p==="seed")return(+v).toFixed(0); if(p==="rate")return(+v).toFixed(1); return(+v).toFixed(2); }
 function bindCh(ch){ document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const p=el.dataset.p,o=el.parentElement.querySelector("output");
   const set=()=>{ state[ch][p]=+el.value; if(o)o.textContent=fmt(p,el.value); if(window._mathReady) updateMath(); }; el.addEventListener("input",set); set(); }); }
 bindCh("x"); bindCh("y");
-const presets={ circle:{x:{src:1,rate:1,phase:0},y:{src:1,rate:1,phase:0.25}}, lissa23:{x:{src:1,rate:2,phase:0},y:{src:1,rate:3,phase:0}},
-  lissa34:{x:{src:1,rate:3,phase:0},y:{src:1,rate:4,phase:0.12}}, pulsegate:{x:{src:2,rate:2,phase:0},y:{src:1,rate:2,phase:0.25}},
-  noise:{x:{src:5,rate:1.2,smooth:0.3},y:{src:5,rate:1.4,smooth:0.3,seed:412}} };
-document.getElementById("presets").onclick=e=>{ const k=e.target.dataset.preset; if(!k)return;
-  for(const ch of ["x","y"]) Object.assign(state[ch],presets[k][ch]||{});
-  for(const ch of ["x","y"]) document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const p=el.dataset.p; if(state[ch][p]!=null){ el.value=state[ch][p]; el.dispatchEvent(new Event("input")); }}); updateMath(); };
+
+// ---------- oscillators (macro LFO on a couple of generator params) ----------
+// A tasteful "o" toggle drifts Amount/Phase around the slider value. The slider
+// stays the center; the engine sees the live oscillated scalar each frame.
+const lfo = { x:{amount:false,phase:false}, y:{amount:false,phase:false} };
+let lfoClock = 0;   // frame-synced (respects Freeze) seconds
+let transP = 0;     // transition playhead 0..1 — advances even when the signal is frozen
+function oscVal(ch,p,base){
+  if(!lfo[ch][p]) return base; const t=lfoClock;
+  if(p==="amount") return Math.max(0, Math.min(1.5, base + 0.45*Math.sin(t*2*Math.PI*0.13)));
+  if(p==="phase")  return base + 0.5*Math.sin(t*2*Math.PI*0.08);   // engine wraps phase
+  return base;
+}
+function bindOsc(ch){ document.querySelectorAll(`.chan[data-ch="${ch}"] .osc`).forEach(btn=>{ const p=btn.dataset.osc;
+  btn.addEventListener("click",()=>{ lfo[ch][p]=!lfo[ch][p]; btn.classList.toggle("on",lfo[ch][p]); if(window._mathReady) updateMath(); }); }); }
+bindOsc("x"); bindOsc("y");
+// Preset browser — each entry has a name + thumbnail (mini vectorscope of X vs Y).
+const presetList=[
+  { name:"Circle 1:1",     x:{src:1,rate:1,phase:0},          y:{src:1,rate:1,phase:0.25} },
+  { name:"Lissajous 2:3",  x:{src:1,rate:2,phase:0},          y:{src:1,rate:3,phase:0} },
+  { name:"Lissajous 3:4",  x:{src:1,rate:3,phase:0},          y:{src:1,rate:4,phase:0.12} },
+  { name:"Pulse × Sine",   x:{src:2,rate:2,phase:0},          y:{src:1,rate:2,phase:0.25} },
+  { name:"Ring Mod",       x:{src:1,rate:3},                  y:{src:1,rate:2,phase:0.1}, drive:"mult" },
+  { name:"Folded Sine",    x:{src:1,rate:1.5},                y:{src:1,rate:1.5,phase:0.25}, proc:{fold:0.6} },
+  { name:"Warp Drive",     x:{src:1,rate:2},                  y:{src:1,rate:3,phase:0.2}, proc:{warp:0.8} },
+  { name:"Noise Cloud",    x:{src:5,rate:1.2,smooth:0.3},     y:{src:5,rate:1.4,smooth:0.3,seed:412} },
+  { name:"Sync Drift",     x:{src:5,rate:0.3,smooth:0.4},     y:{src:5,rate:0.4,smooth:0.4,seed:1972} },
+  { name:"Random Walk",    x:{src:5,rate:0.8,smooth:0.2},     y:{src:5,rate:1.0,smooth:0.2,seed:77} },
+  { name:"Needle Bounce",  x:{src:2,rate:1.5},                y:{src:1,rate:1.5,phase:0.25}, proc:{lag:0.7} },
+  { name:"Clock Gate",     x:{src:2,rate:4},                  y:{src:3,rate:2}, proc:{gate:0.5} },
+  { name:"Square × Saw",   x:{src:2,rate:2},                  y:{src:3,rate:3,phase:0.1} },
+  { name:"Triangle Lissa", x:{src:8,rate:2},                  y:{src:8,rate:3,phase:0.12} },
+  { name:"Pulse Train",    x:{src:9,rate:3},                  y:{src:1,rate:3,phase:0.25}, proc:{sat:0.4} },
+  { name:"Saturated Sine", x:{src:1,rate:1.5},                y:{src:1,rate:1.5,phase:0.25}, proc:{sat:0.85} },
+  { name:"Undulating Ray", view:"vector",
+    x:{src:1,rate:2.1,amount:1.36,offset:0.08,smooth:0.68,seed:962},
+    y:{src:1,rate:1.7,phase:0.915,offset:-0.22},
+    proc:{gain:0.85,bias:0.04,quantize:6,gate:0.74,lag:0.12} },
+  // ---- Applied showcases (open straight into a category to discover them) ----
+  { name:"Neural Net",  applied:"fuiSynapse", drive:"mult", fire:0.4,
+    x:{src:5,rate:0.8,smooth:0.25,seed:418}, y:{src:5,rate:1.1,smooth:0.25,seed:77} },
+  { name:"Radar",       applied:"fuiRadar",   x:{src:1,rate:1.5}, y:{src:1,rate:2,phase:0.2} },
+  { name:"Equalizer",   applied:"fuiBars",    x:{src:5,rate:1.4,smooth:0.15,seed:1972}, y:{src:1,rate:2} },
+  { name:"Processor",   applied:"fuiCore",    fire:0.42, x:{src:4,rate:2,seed:333}, y:{src:1,rate:3} },
+  { name:"Load In",     applied:"trLoad",     x:{src:3,rate:1}, y:{src:1,rate:1} },
+  { name:"Title Pump",  applied:"textPump",   drive:"mult", x:{src:9,rate:2}, y:{src:1,rate:2,phase:0.25}, proc:{sat:0.4} },
+];
+const X0={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1941}, Y0={src:1,rate:3,phase:0,amount:1,offset:0,smooth:0,seed:1941};
+const PROC0={gain:1,bias:0,quantize:0,gate:0,lag:0,warp:0,fold:0,sat:0,invert:false,rectify:false};
+function presetRack(base,cfg,pr){ const c=Object.assign({},base,cfg); return new Rack({srcType:+c.src,rate:c.rate,phase:c.phase,amount:c.amount,offset:c.offset,smooth:c.smooth,seed:c.seed,frameDur:1/60,process:pr||null,outputs:{A:{mode:MODE.normalized,min:0,max:1}}}); }
+function renderThumb(cvn,p){ const c=cvn.getContext("2d"), W=cvn.width, H=cvn.height; c.fillStyle="#05070a"; c.fillRect(0,0,W,H);
+  const rx=presetRack(X0,p.x,Object.assign({},PROC0,p.proc||{})), ry=presetRack(Y0,p.y,null);
+  const M=320, cx=W/2, cy=H/2, R=Math.min(W,H)/2-3; c.strokeStyle="#36f09a"; c.lineWidth=1; c.beginPath();
+  for(let i=0;i<M;i++){ const t=i/M*2; const xv=rx.output("A",t,i)*2-1, yv=ry.output("A",t,i)*2-1; const px=cx+xv*R, py=cy-yv*R; i?c.lineTo(px,py):c.moveTo(px,py); }
+  c.stroke(); }
+function reflectInputs(){
+  for(const ch of ["x","y"]) document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const k=el.dataset.p; if(state[ch][k]!=null){ el.value=state[ch][k]; const o=el.parentElement.querySelector("output"); if(o)o.textContent=fmt(k,el.value); } });
+  document.querySelectorAll("#proc [data-q]").forEach(el=>{ const q=el.dataset.q; el.value=proc[q]; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(q==="quantize"?proc[q].toFixed(0):proc[q].toFixed(2)); });
+  document.querySelectorAll("#proc [data-qb]").forEach(el=>{ el.checked=!!proc[el.dataset.qb]; });
+  if(document.getElementById("driveMode")) document.getElementById("driveMode").value=drive.mode;
+  [["winL",win.left],["winR",win.right],["winFL",win.featherL],["winFR",win.featherR]].forEach(([id,v])=>{ const el=document.getElementById(id); if(el){ el.value=v; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(+v).toFixed(2); } });
+  if(document.getElementById("sideMode")) document.getElementById("sideMode").value=side.target;
+  if(document.getElementById("sideDepth")) document.getElementById("sideDepth").value=side.depth;
+  if(typeof lfo==="object") for(const ch of ["x","y"]) document.querySelectorAll(`.chan[data-ch="${ch}"] .osc`).forEach(b=>b.classList.toggle("on", !!lfo[ch][b.dataset.osc]));
+  if(typeof syncLinkUI==="function") syncLinkUI();
+  if(typeof syncAppliedUI==="function") syncAppliedUI();
+  if(typeof updateExpr==="function") updateExpr();
+  { const yo=document.getElementById("yopac"); if(yo){ yo.value=YOPAC; const o=document.getElementById("yopacv"); if(o)o.textContent=(+YOPAC).toFixed(2); } }
+  { const sp=document.getElementById("speed"); if(sp){ sp.value=SPEED; const o=document.getElementById("speedv"); if(o)o.textContent=(+SPEED).toFixed(2)+"×"; } }
+  { const ft=document.getElementById("fireThresh"); if(ft){ ft.value=fire.thresh; const o=document.getElementById("fireThreshv"); if(o)o.textContent=(+fire.thresh).toFixed(2); } }
+  [["zShape",z.shape],["zRate",z.rate],["zAmt",z.amount]].forEach(([id,v])=>{ const el=document.getElementById(id); if(el){ el.value=v; const o=el.parentElement.querySelector("output"); if(o)o.textContent=(id==="zShape"?["","Sine","","","Noise","","","","Triangle"][v]||v:(+v).toFixed(2)); } });
+}
+function applyPreset(p){
+  Object.assign(proc,PROC0); drive.mode=p.drive||"x"; Object.assign(win,{left:0,right:1,featherL:0,featherR:0});
+  Object.assign(state.x,X0,p.x); Object.assign(state.y,Y0,p.y);
+  if(p.proc) Object.assign(proc,p.proc);
+  side.target = p.side ? (p.side.target||"off") : "off"; side.depth = (p.side&&p.side.depth!=null) ? p.side.depth : 0.5;
+  z.amount = (p.z&&p.z.amount!=null) ? p.z.amount : 0; if(p.z){ if(p.z.rate!=null)z.rate=p.z.rate; if(p.z.shape!=null)z.shape=p.z.shape; }
+  link.sync = !!(p.link&&p.link.sync); link.invert = !!(p.link&&p.link.invert);
+  if(p.fire!=null) fire.thresh=p.fire;
+  let view=p.view;
+  if(p.applied){ if(typeof setAppliedTarget==="function") setAppliedTarget(p.applied); if(!view) view="applied"; }
+  if(view){ MODE_CUR=view; [...document.getElementById("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===view));
+    document.getElementById("appliedPanel").classList.toggle("show",view==="applied"); needGraticule=true; }
+  reflectInputs(); updateMath();
+}
+function buildGallery(){ const g=document.getElementById("presetGallery"); g.innerHTML="";
+  presetList.forEach(p=>{ const card=document.createElement("div"); card.className="pcard"; card.title=p.name;
+    const cvn=document.createElement("canvas"); cvn.width=90; cvn.height=54;
+    const nm=document.createElement("div"); nm.className="pname"; nm.textContent=p.name;
+    card.appendChild(cvn); card.appendChild(nm); card.onclick=()=>applyPreset(p); g.appendChild(card); renderThumb(cvn,p); });
+}
+buildGallery();
 const $=id=>document.getElementById(id);
 $("span").oninput=()=>{SPAN=+$("span").value;$("spanv").textContent=SPAN.toFixed(1)+"s";}; $("span").oninput();
+function setSpeed(v){ SPEED=Math.max(0.1,Math.min(2,+v||1)); $("speed").value=SPEED; $("speedv").textContent=SPEED.toFixed(2)+"×"; }
+$("speed").oninput=()=>setSpeed($("speed").value); setSpeed(1);
+$("halfBtn").onclick=()=>setSpeed(SPEED/2);
+$("speed1Btn").onclick=()=>setSpeed(1);
 $("persist").oninput=()=>{PERSIST=+$("persist").value;$("persistv").textContent=PERSIST.toFixed(2);}; $("persist").oninput();
 $("freeze").onchange=()=>{FREEZE=$("freeze").checked; if(FREEZE)frozenT=now();};
+$("yopac").oninput=()=>{YOPAC=+$("yopac").value;$("yopacv").textContent=YOPAC.toFixed(2);}; $("yopac").oninput();
+$("crtToggle").onchange=()=>{ crt.on=$("crtToggle").checked; if(!crt.on) $("crt").style.display="none"; };
 $("tabs").onclick=e=>{ const m=e.target.dataset.mode; if(!m)return; MODE_CUR=m;
   [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===m));
   $("appliedPanel").classList.toggle("show",m==="applied"); needGraticule=true; updateMath(); };
-$("target").onchange=()=>{ applied.target=$("target").value; const d=defaults[applied.target]; if(d){$("tmin").value=d[0];$("tmax").value=d[1];applied.min=d[0];applied.max=d[1];} updateExpr(); updateMath(); };
+const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100],
+  positionY:[-200,200], skew:[-30,30], scaleX:[80,120], scaleY:[80,120], strobe:[0,1], ringPulse:[0,1], blur:[0,1], gradientSweep:[0,1],
+  meterRadial:[0,1], meterLED:[0,1], meterStereo:[0,1], meterHistogram:[0,1], meterDial:[0,1],
+  fuiRadar:[0,1], fuiScope:[0,1], fuiArc:[0,1], fuiBars:[0,1], fuiReticle:[0,1], fuiWaveRing:[0,1], fuiGyro:[0,1], fuiStream:[0,1], fuiSynapse:[0,1], fuiPackets:[0,1], fuiCore:[0,1],
+  particles:[0,1], partRings:[0,1], partStream:[0,1], partOrbit:[0,1], partFall:[0,1], partStars:[0,1],
+  type:[0,1], textOpacity:[0,1], textPump:[0,1], textGlitch:[0,1], textType:[0,1], textCounter:[0,1], textShake:[0,1],
+  trLoad:[0,1], trWipe:[0,1], trText:[0,1], trRadial:[0,1], trMeter:[0,1],
+  trace:[0,1], orbitPath:[0,1], spiro:[0,1], rose:[0,1] };
+// Applied targets grouped into a two-level Category → Variant picker. The
+// variant value IS the drawApplied() switch key, so old presets/recipes that
+// stored a bare target string keep working.
+const APP_CATS=[
+  ["Transform", [["scale","Scale"],["scaleX","Scale X"],["scaleY","Scale Y"],["rotation","Rotation"],["position","Position X"],["positionY","Position Y"],["opacity","Opacity / flicker"],["skew","Skew"]]],
+  ["Visual",    [["glow","Glow"],["color","Color (hue)"],["strobe","Strobe"],["ringPulse","Ring pulse"],["blur","Defocus blur"],["gradientSweep","Gradient sweep"]]],
+  ["Meter",     [["meter","Bar meter + gate"],["meterRadial","Radial gauge"],["meterLED","LED ladder"],["meterStereo","Stereo bars"],["meterHistogram","Histogram"],["meterDial","Rotary dial"]]],
+  ["Transitions",[["trLoad","Loading bar"],["trWipe","Wipe reveal"],["trText","Text reveal"],["trRadial","Radial fill"],["trMeter","Sweep meter"]]],
+  ["FUI",       [["fuiRadar","Radar sweep"],["fuiScope","Oscilloscope"],["fuiArc","Progress arc"],["fuiBars","Equalizer"],["fuiReticle","Targeting reticle"],["fuiWaveRing","Waveform ring"],["fuiGyro","Gyro rings"],["fuiStream","Data stream"],["fuiSynapse","Synapse net"],["fuiPackets","Data packets"],["fuiCore","Processor die"]]],
+  ["Particles", [["particles","Fountain"],["partRings","Shock rings"],["partStream","Stream field"],["partOrbit","Orbit swarm"],["partFall","Confetti fall"],["partStars","Starfield warp"]]],
+  ["Text",      [["type","Kinetic wave"],["textOpacity","Word opacity"],["textPump","Title pump"],["textGlitch","RGB glitch"],["textType","Typewriter"],["textCounter","Counter readout"],["textShake","Shake / impact"]]],
+  ["Path",      [["trace","Wave-runner"],["orbitPath","Vectorscope dot"],["spiro","Spirograph"],["rose","Rose curve"]]],
+];
+const APP_RANGE=new Set(["scale","scaleX","scaleY","rotation","position","positionY","opacity","skew","glow","color","meter"]); // variants that use Min/Max
+function appCatOf(t){ for(const [c,vs] of APP_CATS) if(vs.some(v=>v[0]===t)) return c; return APP_CATS[0][0]; }
+function fillAppVar(cat){ const sel=$("appVar"); if(!sel) return; sel.innerHTML="";
+  const vs=(APP_CATS.find(c=>c[0]===cat)||APP_CATS[0])[1];
+  for(const [val,lbl] of vs){ const o=document.createElement("option"); o.value=val; o.textContent=lbl; sel.appendChild(o); } }
+function syncRangeRow(){ const r=$("rangeRow"); if(r) r.style.display=APP_RANGE.has(applied.target)?"flex":"none";
+  const fr=$("fireRow"); if(fr) fr.style.display=FIRE.has(applied.target)?"flex":"none"; }
+function syncAppliedUI(){ const cat=appCatOf(applied.target);
+  if($("appCat")){ if(!$("appCat").options.length){ for(const [c] of APP_CATS){ const o=document.createElement("option"); o.value=c; o.textContent=c; $("appCat").appendChild(o); } }
+    $("appCat").value=cat; fillAppVar(cat); $("appVar").value=applied.target; }
+  if($("tmin")) $("tmin").value=applied.min; if($("tmax")) $("tmax").value=applied.max; syncRangeRow(); }
+function setAppliedTarget(t){ applied.target=t; const d=defaults[t]; if(d){ applied.min=d[0]; applied.max=d[1]; if($("tmin"))$("tmin").value=d[0]; if($("tmax"))$("tmax").value=d[1]; }
+  parts=[]; rings.length=0; appliedPrevE=0;   // reset emitter state between variants
+  syncRangeRow(); updateExpr(); updateMath(); }
+$("appCat").onchange=()=>{ fillAppVar($("appCat").value); setAppliedTarget($("appVar").value); };
+$("appVar").onchange=()=>{ setAppliedTarget($("appVar").value); };
 $("tmin").oninput=()=>{applied.min=+$("tmin").value; updateExpr(); updateMath();}; $("tmax").oninput=()=>{applied.max=+$("tmax").value; updateExpr(); updateMath();};
-const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100], particles:[0,250], type:[0,1] };
+$("fireThresh").oninput=()=>{ fire.thresh=+$("fireThresh").value; $("fireThreshv").textContent=fire.thresh.toFixed(2); };
+$("driveMode").onchange=()=>{ drive.mode=$("driveMode").value; updateMath(); };
+syncAppliedUI();
+// combine two channel values (0..1) into the Applied driver
+function combine(a,b){ switch(drive.mode){
+  case "y": return b; case "mult": return a*b; case "mix": return (a+b)/2;
+  case "diff": return Math.abs(a-b); case "min": return Math.min(a,b); case "max": return Math.max(a,b);
+  default: return a; } }
 
-// export recipe
-const SRC=["","sine","pulse","ramp","noise","randomWalk"];
-$("exportBtn").onclick=()=>{ const rec={ type:"wildconstruct.signalRecipe", name:"Experiment", id:"sg_experiment", version:"0.2", rackType:"generator",
-  source:{ type:SRC[state.x.src], rate:state.x.rate, amount:state.x.amount, phase:state.x.phase, offset:state.x.offset },
-  process:{ smooth:state.x.smooth }, outputs:{ A:{name:"X",profile:"normalized_0_1",range:[0,1]}, B:{name:"Y",profile:"normalized_0_1",range:[0,1]}, C:{name:"Gate",profile:"gate",range:[0,1]} },
-  timebase:{ mode:"compTime", seed:state.x.seed }, _channelY:{ type:SRC[state.y.src], rate:state.y.rate, phase:state.y.phase, offset:state.y.offset },
-  compatibilityTags:["engine:wgsl","tool:signal-lab"] };
-  const t=$("recipeOut"); t.style.display="block"; t.value=JSON.stringify(rec,null,2); t.select(); try{navigator.clipboard.writeText(t.value);}catch(e){} };
+const SRC=["","sine","square","saw","noise","randomWalk","linked","lumaProbe","triangle","pulse"];
+function srcName(v){ return SRC[v]||"sine"; }
+const SRCIDX={sine:1,square:2,saw:3,pulse:9,ramp:3,noise:4,randomWalk:5,linked:6,lumaProbe:7,triangle:8,pulseNarrow:9};
+function buildFullRecipe(){ return {
+  type:"wildconstruct.signalRecipe", name:"Experiment", id:"sg_experiment", version:"0.2", rackType:"generator",
+  source:{ type:srcName(state.x.src), rate:state.x.rate, amount:state.x.amount, phase:state.x.phase, offset:state.x.offset },
+  process:{ smooth:state.x.smooth, gain:proc.gain, bias:proc.bias, quantize:proc.quantize, gate:proc.gate, lag:proc.lag, warp:proc.warp, fold:proc.fold, sat:proc.sat, invert:proc.invert, rectify:proc.rectify, winLeft:win.left, winRight:win.right, winFeatherL:win.featherL, winFeatherR:win.featherR },
+  outputs:{ A:{name:"X",profile:"normalized_0_1",range:[0,1]}, B:{name:"Y",profile:"normalized_0_1",range:[0,1]}, C:{name:"Gate",profile:"gate",range:[0,1]} },
+  timebase:{ mode:"compTime", seed:state.x.seed },
+  _channelY:{ type:srcName(state.y.src), rate:state.y.rate, amount:state.y.amount, phase:state.y.phase, offset:state.y.offset, smooth:state.y.smooth, seed:state.y.seed },
+  visualization:{ mode:MODE_CUR },
+  _tool:{ x:Object.assign({},state.x), y:Object.assign({},state.y), proc:Object.assign({},proc), win:Object.assign({},win), drive:drive.mode, side:{target:side.target,depth:side.depth}, link:Object.assign({},link), fire:fire.thresh, z:Object.assign({},z), lfo:{x:Object.assign({},lfo.x),y:Object.assign({},lfo.y)}, view:MODE_CUR, crt:crt.on, yOpacity:YOPAC, speed:SPEED, applied:{target:applied.target,min:applied.min,max:applied.max} },
+  compatibilityTags:["engine:wgsl","tool:signal-lab"] }; }
+function applyToolState(t){
+  if(t.x) Object.assign(state.x,t.x); if(t.y) Object.assign(state.y,t.y);
+  if(t.proc) Object.assign(proc,t.proc); if(t.win) Object.assign(win,t.win);
+  if(t.drive) drive.mode=t.drive; if(t.side){ side.target=t.side.target; side.depth=t.side.depth; }
+  if(t.link) Object.assign(link,t.link);
+  if(t.fire!=null) fire.thresh=t.fire;
+  if(t.z) Object.assign(z,t.z);
+  if(t.lfo){ if(t.lfo.x)Object.assign(lfo.x,t.lfo.x); if(t.lfo.y)Object.assign(lfo.y,t.lfo.y); }
+  if(t.applied){ applied.target=t.applied.target; applied.min=t.applied.min; applied.max=t.applied.max; }
+  if(typeof t.crt==="boolean"){ crt.on=t.crt; const c=$("crtToggle"); if(c)c.checked=t.crt; }
+  if(t.yOpacity!=null) YOPAC=t.yOpacity;
+  if(t.speed!=null) SPEED=Math.max(0.1,Math.min(2,t.speed));
+  if(t.view){ MODE_CUR=t.view; [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===t.view)); $("appliedPanel").classList.toggle("show",t.view==="applied"); needGraticule=true; }
+}
+function importRecipe(txt){ let r; try{ r=JSON.parse(txt); }catch(e){ alert("Invalid recipe JSON"); return; }
+  if(r._tool){ applyToolState(r._tool); }
+  else {
+    if(r.source) Object.assign(state.x,{src:SRCIDX[r.source.type]||1, rate:r.source.rate, amount:r.source.amount, phase:r.source.phase, offset:r.source.offset});
+    if(r.process){ const p=r.process; Object.assign(proc,{gain:p.gain!=null?p.gain:1,bias:p.bias||0,quantize:p.quantize||0,gate:p.gate||0,lag:p.lag||0,warp:p.warp||0,fold:p.fold||0,sat:p.sat||0,invert:!!p.invert,rectify:!!p.rectify}); state.x.smooth=p.smooth||0; Object.assign(win,{left:p.winLeft!=null?p.winLeft:0,right:p.winRight!=null?p.winRight:1,featherL:p.winFeatherL||0,featherR:p.winFeatherR||0}); }
+    if(r.timebase&&r.timebase.seed!=null) state.x.seed=r.timebase.seed;
+    if(r._channelY){ const y=r._channelY; Object.assign(state.y,{src:SRCIDX[y.type]||1,rate:y.rate,phase:y.phase,offset:y.offset}); if(y.amount!=null)state.y.amount=y.amount; if(y.smooth!=null)state.y.smooth=y.smooth; if(y.seed!=null)state.y.seed=y.seed; }
+    if(r.visualization&&r.visualization.mode){ MODE_CUR=r.visualization.mode; [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===MODE_CUR)); $("appliedPanel").classList.toggle("show",MODE_CUR==="applied"); needGraticule=true; }
+  }
+  reflectInputs(); updateMath();
+}
+$("exportBtn").onclick=()=>{ const t=$("recipeOut"); t.style.display="block"; t.value=JSON.stringify(buildFullRecipe(),null,2); t.select(); try{navigator.clipboard.writeText(t.value);}catch(e){} };
+$("importBtn").onclick=()=>{ const t=$("recipeOut"); t.style.display="block"; if(!t.value.trim()){ alert("Paste a recipe JSON into the box below, then tap Import."); t.focus(); return; } importRecipe(t.value); };
 
-function updateExpr(){ const tgt=applied.target, mn=applied.min, mx=applied.max;
-  $("expr").innerHTML = `<span class="k">// Channel X drives ${tgt} — generated AE expression</span>\n`+
-    `s = thisComp.layer("SR · Experiment").effect("Signal Rack")("Output A");\n`+
-    `linear(s, 0, 1, ${mn}, ${mx})`; }
+// ---------- record the visualization to a video file (mp4 where supported, else webm) ----------
+let rec=null;
+function updateRecBtn(){ const b=$("recBtn"); if(!b)return; b.textContent=rec?"■ Stop / save":"● Record video"; b.style.color=rec?"#f0683a":""; }
+function startRec(){
+  if(rec){ try{ rec.mr.stop(); }catch(e){} return; }   // second click = stop early
+  if(!window.MediaRecorder || !cv.captureStream){ alert("Video recording isn't supported in this browser. Try Chrome, Edge or Safari."); return; }
+  const W=cv.width, H=cv.height, rc=document.createElement("canvas"); rc.width=W; rc.height=H; const rctx=rc.getContext("2d");
+  let stream; try{ stream=rc.captureStream(30); }catch(e){ alert("Couldn't start recording: "+e.message); return; }
+  const types=["video/mp4;codecs=avc1.42E01E","video/mp4","video/webm;codecs=vp9","video/webm"], mime=types.find(t=>MediaRecorder.isTypeSupported(t))||"";
+  const mr=new MediaRecorder(stream, mime?{mimeType:mime,videoBitsPerSecond:8e6}:undefined), chunks=[];
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.onstop=()=>{ const ext=mime.indexOf("mp4")>=0?"mp4":"webm", blob=new Blob(chunks,{type:mime||"video/webm"}), a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download="signal-rack-"+Date.now()+"."+ext; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); rec=null; updateRecBtn(); };
+  const secs=Math.max(2,Math.min(30,(+$("recSec").value)||8));
+  rec={ mr, rc, rctx, stopAt:performance.now()+secs*1000 }; mr.start(); updateRecBtn();
+}
+function recTick(){ const {rc,rctx}=rec; rctx.fillStyle="#05070a"; rctx.fillRect(0,0,rc.width,rc.height); rctx.drawImage(cv,0,0,rc.width,rc.height);
+  const crtC=$("crt"); if(crtC && crtC.style.display!=="none" && crtC.width>1){ try{ rctx.drawImage(crtC,0,0,rc.width,rc.height); }catch(e){} }
+  if(performance.now()>=rec.stopAt){ try{ rec.mr.stop(); }catch(e){} } }
+$("recBtn").onclick=startRec;
+
+// ---------- shareable link (full state encoded in the URL hash) ----------
+function encodeShare(){ try{ return btoa(unescape(encodeURIComponent(JSON.stringify(buildFullRecipe()._tool)))); }catch(e){ return ""; } }
+function shareURL(){ return location.origin+location.pathname+"#s="+encodeShare(); }
+function applyShareHash(){ const m=/[#&]s=([^&]+)/.exec(location.hash); if(!m) return false;
+  try{ const t=JSON.parse(decodeURIComponent(escape(atob(m[1])))); applyToolState(t); reflectInputs(); updateMath(); return true; }
+  catch(e){ console.warn("bad share hash",e); return false; } }
+$("shareBtn").onclick=()=>{ const url=shareURL(); history.replaceState(null,"","#s="+encodeShare());
+  const done=ok=>{ const b=$("shareBtn"); b.textContent=ok?"✓ Link copied":"link in address bar"; setTimeout(()=>b.textContent="🔗 Copy link",1600); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(()=>done(true),()=>done(false)); else done(false); };
+
+// ---------- surprise me (tasteful random signal + visual) ----------
+const SURPRISE_SRC=[1,2,3,8,9,4,5];   // skip Luma (needs media)
+const rnd=(a,b)=>a+Math.random()*(b-a), pick=a=>a[Math.floor(Math.random()*a.length)], chance=p=>Math.random()<p;
+function surprise(){
+  Object.assign(proc,PROC0); Object.assign(win,{left:0,right:1,featherL:0,featherR:0});
+  lfo.x.amount=chance(0.4); lfo.x.phase=chance(0.3); lfo.y.amount=chance(0.4); lfo.y.phase=chance(0.3);
+  const seed=Math.floor(rnd(1,9999));
+  Object.assign(state.x,{src:pick(SURPRISE_SRC), rate:+rnd(0.5,5).toFixed(1), phase:+rnd(0,1).toFixed(2), amount:+rnd(0.7,1.3).toFixed(2), offset:chance(0.3)?+rnd(-0.2,0.2).toFixed(2):0, smooth:chance(0.4)?+rnd(0,0.5).toFixed(2):0, seed});
+  Object.assign(state.y,{src:pick(SURPRISE_SRC), rate:+rnd(0.5,5).toFixed(1), phase:+rnd(0,1).toFixed(2), amount:+rnd(0.7,1.3).toFixed(2), offset:chance(0.3)?+rnd(-0.2,0.2).toFixed(2):0, smooth:chance(0.4)?+rnd(0,0.5).toFixed(2):0, seed:chance(0.5)?seed:Math.floor(rnd(1,9999))});
+  if(chance(0.6)) proc.sat=+rnd(0.2,0.8).toFixed(2);
+  if(chance(0.4)) proc.warp=+rnd(-0.7,0.7).toFixed(2);
+  if(chance(0.3)) proc.fold=+rnd(0.2,0.8).toFixed(2);
+  link.sync=chance(0.15); link.invert=!link.sync&&chance(0.15);   // occasional synced/mirrored Y
+  side.target=pick(["off","off","amp","rate","phase"]); side.depth=+rnd(0.2,0.8).toFixed(2);
+  z.amount=chance(0.4)?+rnd(0.1,0.4).toFixed(2):0; z.rate=+rnd(0.3,3).toFixed(1); z.shape=pick([1,8,4]);
+  drive.mode=pick(["x","y","mult","mix","diff"]);
+  const cat=pick(APP_CATS); setAppliedTarget(pick(cat[1])[0]);
+  MODE_CUR=pick(["vector","vector","polar","applied","applied","waveform"]);
+  [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===MODE_CUR));
+  $("appliedPanel").classList.toggle("show",MODE_CUR==="applied"); needGraticule=true;
+  reflectInputs(); updateMath();
+}
+$("surpriseBtn").onclick=surprise;
+
+function updateExpr(){ const el=$("expr"); if(el) el.textContent = buildAEExpression(); }   // full self-contained expression
 updateExpr();
 
-// ---------- live mathematical expression (bottom drawer) ----------
+// ---------- live mathematical expression ----------
 function num(v){ return (Math.round(v*1000)/1000).toString(); }
 function genMath(cfg){
-  if(+cfg.src===7){ const n0=`lumaProbe(media)` + (cfg.offset?` + ${num(cfg.offset)}`:""); return { b:`lumaProbe(media; ${probe.mode})`, n0:`clamp(${n0}, 0, 1)`, probe:true }; }
-  const inner = `${num(cfg.rate)}·t` + (cfg.phase ? ` + ${num(cfg.phase)}` : "");
+  if(+cfg.src===7){ const n0=`lumaProbe(media)` + (cfg.offset?` + ${num(cfg.offset)}`:""); return { b:`lumaProbe(media)`, n0:`clamp(${n0}, 0, 1)`, probe:true }; }
+  const sp=((cfg.seed*0.07)%1); const inner = `${num(cfg.rate)}·t` + (cfg.phase ? ` + ${num(cfg.phase)}` : "") + (sp ? ` + ${num(sp)}` : "");
   const sd = cfg.seed ? ` + ${num(0.123*cfg.seed)}` : "";
   let b;
   switch(+cfg.src){
@@ -279,6 +905,8 @@ function genMath(cfg){
     case 3: b=`2·frac(${inner}) − 1`; break;
     case 4: b=`noise(${inner}${sd})`; break;
     case 5: b=`Σ(k=0..3) 2^−k·noise(2^k·(${inner}) + ${num(cfg.seed)} + 7.7k) / 1.875`; break;
+    case 8: b=`4·|frac(${inner}) − 0.5| − 1`; break;
+    case 9: b=`sgn(0.2 − frac(${inner}))`; break;
     default: b="0";
   }
   if(cfg.amount!==1) b=`${num(cfg.amount)}·(${b})`;
@@ -293,6 +921,9 @@ function smoothMath(n0, cfg){
 function procMath(t){
   let e=t, p=proc;
   if(p.gain!==1||p.bias!==0) e=`clamp(0.5 + (${e} − 0.5)·${num(p.gain)}${p.bias?` + ${num(p.bias)}`:""}, 0, 1)`;
+  if(p.sat>0) e=`saturate₍${num(p.sat)}₎(${e})`;
+  if(p.warp) e=`warp₍${num(p.warp)}₎(${e})`;
+  if(p.fold>0) e=`fold₍${num(p.fold)}₎(${e})`;
   if(p.invert) e=`1 − (${e})`;
   if(p.rectify) e=`|2·(${e}) − 1|`;
   if(p.quantize>1) e=`round((${e})·${p.quantize-1}) / ${p.quantize-1}`;
@@ -300,16 +931,135 @@ function procMath(t){
   if(p.lag>0) e=`lag₍${num(p.lag)}₎(${e})`;
   return e;
 }
-function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rectify||p.quantize>1||p.gate>0||p.lag>0; }
+function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rectify||p.quantize>1||p.gate>0||p.lag>0||p.warp!==0||p.fold>0||p.sat>0; }
+
+// Build a self-contained, WORKING After Effects expression that reproduces the
+// current Channel X signal -> property. Paste onto a property in AE.
+function aeNum(v){ return (Math.round(v*1e6)/1e6).toString(); }
+function driveLabel(m){ return ({x:"Channel X",y:"Channel Y",mult:"X × Y (ring)",mix:"(X + Y)/2",diff:"|X − Y|",min:"min(X, Y)",max:"max(X, Y)"})[m]||m; }
+function buildAEExpression(){
+  const p=proc, inApplied=(MODE_CUR==="applied");
+  const mn=inApplied?applied.min:0, mx=inApplied?applied.max:1, tgt=inApplied?applied.target:"value (0..1)";
+  const dm=drive.mode, needY=(dm!=="x");
+  const L=[];
+  L.push("// Signal Rack — generated After Effects expression");
+  L.push("// "+(needY?("Driver: "+driveLabel(dm)):"Channel X")+" → "+tgt+". Paste onto the target property in AE.");
+  L.push("");
+
+  // Luma Probe (legacy, single-channel) — short path
+  if(+state.x.src===7 && !needY){
+    L.push("// Luma Probe: point srcLayer at your media layer.");
+    L.push('var srcLayer = thisComp.layer("YOUR SOURCE LAYER");');
+    L.push("var P = ["+aeNum(state.x.probeX||50)+", "+aeNum(state.x.probeY||50)+"];   // probe point (px)");
+    L.push("var col = srcLayer.sampleImage(P, [2.5, 2.5], true, time); // 5x5 average");
+    L.push("var n = clamp(0.299*col[0] + 0.587*col[1] + 0.114*col[2] + "+aeNum(state.x.offset)+", 0, 1);");
+    L.push(""); L.push("linear(n, 0, 1, "+aeNum(mn)+", "+aeNum(mx)+");");
+    return L.join("\n");
+  }
+
+  // shared helpers
+  L.push("function frac(x){ return x-Math.floor(x); }");
+  L.push("function hsh(n){ var v=Math.sin(n)*43758.5453123; return v-Math.floor(v); }");
+  L.push("function vnoise(x){ var i=Math.floor(x), f=x-i, a=hsh(i), b=hsh(i+1); return (a+(b-a)*(f*f*(3-2*f)))*2-1; }");
+  let zTerm="";
+  if(z.amount>0){
+    L.push("function zBend(tt){ var zx=tt*"+aeNum(z.rate)+"+0.49, fz=zx-Math.floor(zx), zv;");
+    if(+z.shape===8) L.push("  zv=Math.abs(fz-0.5)*2;");
+    else if(+z.shape===4) L.push("  zv=(vnoise(zx+0.861)+1)/2;");
+    else L.push("  zv=(Math.sin(zx*2*Math.PI)+1)/2;");
+    L.push("  return "+aeNum(z.amount)+"*(zv*2-1); }   // third signal: phase-bends both channels");
+    zTerm="+zBend(tt)";
+  }
+
+  // emit a channel generator: srcUni<S>(tt) + smoothed<S>(tt). modSpec drives the
+  // sidechain (Channel X modulating Y); ampLFO/phLFO add the "o" oscillators.
+  function emitGen(S, c, ampLFO, phLFO, modSpec){
+    const sc=+c.src;
+    L.push("var rate"+S+"="+aeNum(c.rate)+", off"+S+"="+aeNum(c.offset)+", smooth"+S+"="+aeNum(c.smooth)+", seed"+S+"="+aeNum(c.seed)+";");
+    L.push("var amount"+S+"="+aeNum(c.amount)+(ampLFO?" + 0.45*Math.sin(T*0.8168141)":"")+";   "+(ampLFO?"// amount oscillator":""));
+    L.push("var phase"+S+"="+aeNum(c.phase)+(phLFO?" + 0.5*Math.sin(T*0.5026548)":"")+";   "+(phLFO?"// phase oscillator":""));
+    L.push("function srcUni"+S+"(tt){ var amt=amount"+S+", ph=phase"+S+";");
+    if(modSpec){
+      L.push("  var m = shapedX(tt);   // sidechain: Channel X modulates Y");
+      if(modSpec==="amp")   L.push("  amt *= (1 - "+aeNum(side.depth)+" + "+aeNum(side.depth)+"*m);");
+      else if(modSpec==="phase") L.push("  ph += "+aeNum(side.depth)+"*m;");
+      else if(modSpec==="rate")  L.push("  ph += "+aeNum(side.depth)+"*(m*2-1)*0.5;   // FM sidechain approximated as phase vibrato");
+    }
+    L.push("  var x=tt*rate"+S+"+ph+(seed"+S+"*0.07-Math.floor(seed"+S+"*0.07))"+zTerm+", fx=x-Math.floor(x), bp;");
+    if(sc===1) L.push("  bp=Math.sin(x*2*Math.PI);");
+    else if(sc===2) L.push("  bp=fx<0.5?1:-1;");
+    else if(sc===3) L.push("  bp=fx*2-1;");
+    else if(sc===4) L.push("  bp=vnoise(x+seed"+S+"*0.123);");
+    else if(sc===5) L.push("  var sum=0,a=1,fr=1,nm=0; for(var o=0;o<4;o++){ sum+=a*vnoise(x*fr+seed"+S+"+o*7.7); nm+=a; a*=0.5; fr*=2; } bp=sum/nm;");
+    else if(sc===8) L.push("  bp=4*Math.abs(fx-0.5)-1;");
+    else if(sc===9) L.push("  bp=fx<0.2?1:-1;");
+    else L.push("  bp=0;");
+    L.push("  bp*=amt; return (bp+1)/2 + off"+S+"; }");
+    L.push("function smoothed"+S+"(tt){ if(smooth"+S+"<=0) return srcUni"+S+"(tt);");
+    L.push("  var win=smooth"+S+"*0.5, M=Math.round(Math.max(1,Math.min(24,smooth"+S+"*24))), acc=0;");
+    L.push("  for(var i=0;i<M;i++){ var f=(M==1)?0:i/(M-1); acc+=srcUni"+S+"(tt-win*f); } return acc/M; }");
+  }
+
+  // ---- Channel X: generator + processor (+ window + lag below) ----
+  L.push("var T = time*"+aeNum(SPEED)+";   // master Speed (time scale)");
+  emitGen("X", state.x, lfo.x.amount, lfo.x.phase, null);
+  L.push("function shapedX(tt){ var n=clamp(smoothedX(tt),0,1);");
+  if(p.gain!==1||p.bias!==0) L.push("  n=clamp(0.5+(n-0.5)*"+aeNum(p.gain)+"+"+aeNum(p.bias)+",0,1);");
+  if(p.sat>0) L.push("  { function th(x){var c=Math.max(-4,Math.min(4,x)),a=c*c;return c*(27+a)/(27+9*a);} var bp=n*2-1,g=1+"+aeNum(p.sat)+"*4,bb="+aeNum(p.sat)+"*0.2,sh=(th(bp*g+bb)-th(bb))/Math.max(th(g),0.001); n=((bp*(1-"+aeNum(p.sat)+")+sh*"+aeNum(p.sat)+")+1)/2; }");
+  if(p.warp) L.push("  { var bp=n*2-1; n=((bp<0?-1:1)*Math.pow(Math.abs(bp),Math.pow(3,"+aeNum(-p.warp)+"))+1)/2; }");
+  if(p.fold>0) L.push("  { var fx=(n*2-1)*"+aeNum(1+p.fold*6)+", fm=(fx-1)-4*Math.floor((fx-1)/4); n=Math.abs(fm-2)*0.5; }");
+  if(p.invert) L.push("  n=1-n;");
+  if(p.rectify) L.push("  n=Math.abs(n*2-1);");
+  if(p.quantize>1) L.push("  n=Math.round(n*"+(p.quantize-1)+")/"+(p.quantize-1)+";");
+  if(p.gate>0) L.push("  n=(n>="+aeNum(p.gate)+")?1:0;");
+  L.push("  return n; }");
+  if(p.lag>0){
+    L.push("var lag="+aeNum(p.lag)+", fdT=thisComp.frameDuration*"+aeNum(SPEED)+", K=Math.min(34,Math.round(lag*32)+2), accX=0, wX=1, wsX=0;");
+    L.push("for(var k=0;k<K;k++){ accX+=wX*shapedX(T-k*fdT); wsX+=wX; wX*=lag; }");
+    L.push("var nx = accX/wsX;");
+  } else {
+    L.push("var nx = shapedX(T);");
+  }
+  if(win.left>0||win.right<1||win.featherL>0||win.featherR>0){
+    L.push("// feathered region window (Channel X), mapped to this layer's in/out");
+    L.push("var tIn=thisLayer.inPoint, tOut=thisLayer.outPoint, dur=Math.max(tOut-tIn,0.001);");
+    L.push("var wL=tIn+dur*"+aeNum(win.left)+", wR=tIn+dur*"+aeNum(win.right)+", fL=dur*"+aeNum(win.featherL)+", fR=dur*"+aeNum(win.featherR)+";");
+    L.push("var eL=(fL>0)?linear(time,wL,wL+fL,0,1):(time>=wL?1:0), eR=(fR>0)?linear(time,wR-fR,wR,1,0):(time<=wR?1:0);");
+    L.push("nx = nx*eL*eR;");
+  }
+
+  // ---- Channel Y (only when the driver needs it) ----
+  if(needY){
+    if(link.sync){ L.push("var ny = nx;   // Channel Y synced to X"); }
+    else if(link.invert){ L.push("var ny = 1 - nx;   // Channel Y mirrors X"); }
+    else {
+      emitGen("Y", state.y, lfo.y.amount, lfo.y.phase, side.target!=="off"?side.target:null);
+      L.push("var ny = clamp(smoothedY(T), 0, 1);");
+    }
+  }
+
+  // ---- driver combine (matches the on-screen Drive) ----
+  const drv={ y:"ny", mult:"nx*ny", mix:"(nx+ny)/2", diff:"Math.abs(nx-ny)", min:"Math.min(nx,ny)", max:"Math.max(nx,ny)" }[dm] || "nx";
+  L.push("");
+  L.push("var n = "+drv+";");
+  L.push("linear(n, 0, 1, "+aeNum(mn)+", "+aeNum(mx)+");");
+  return L.join("\n");
+}
 function updateMath(){
   const gx=genMath(state.x), nx=smoothMath(gx.n0, state.x);
   let html = `<div class="lbl">Channel X — source</div><div class="math">x(t) = ${gx.b}</div>`;
   html += `<div class="lbl">Channel X — normalized${state.x.smooth>0?" + smoothing":""}</div><div class="math">n(t) = ${nx}</div>`;
   if(anyProc()) html += `<div class="lbl">Processor — shaped</div><div class="math">x′(t) = ${procMath("n(t)")}</div>`;
-  const gy=genMath(state.y);
-  html += `<div class="lbl">Channel Y</div><div class="math">y(t) = ${gy.b}</div>`;
+  if(link.sync||link.invert){
+    html += `<div class="lbl">Channel Y — ${link.invert?"mirror of X":"synced to X"}</div><div class="math">y(t) = ${link.invert?"1 − x(t)":"x(t)"}</div>`;
+  } else {
+    const gy=genMath(state.y);
+    html += `<div class="lbl">Channel Y</div><div class="math">y(t) = ${gy.b}</div>`;
+  }
   if(side.target!=="off"){ const w={amp:"amplitude",rate:"rate",phase:"phase"}[side.target];
     html += `<div class="lbl">Sidechain — X modulates Y ${w}</div><div class="math">y(t) = Y( ${w} ⊕ ${num(side.depth)}·x′(t) )</div>`; }
+  const anyWin = win.left>0||win.right<1||win.featherL>0||win.featherR>0;
+  if(anyWin) html += `<div class="lbl">Window — feathered region</div><div class="math">× window[${num(win.left)}, ${num(win.right)}] feather ${num(win.featherL)}/${num(win.featherR)}</div>`;
   const driver = anyProc() ? procMath("n(t)").replace(/n\(t\)/g, `(${nx})`) : nx;
   let punch, cap;
   if(MODE_CUR==="applied"){
@@ -320,9 +1070,12 @@ function updateMath(){
     cap = `You could dial that in above — or figure out and write this by hand.`;
   }
   html += `<div class="punch">${punch}<span class="cap">${cap}</span></div>`;
+  html += `<button id="copyAE" style="margin-top:10px;background:#13251c;color:#9fe;border:1px solid #2b6;border-radius:8px;padding:9px 12px;font-size:12px;cursor:pointer;width:100%">⧉ Copy as After Effects expression</button>`;
+  html += `<textarea id="aeOut" readonly style="display:none;width:100%;height:160px;margin-top:8px;background:#0b0e12;color:#bfe;border:1px solid var(--edge);border-radius:8px;font:11px/1.4 ui-monospace,Menlo,monospace;padding:8px"></textarea>`;
   html += `<div class="legend">t = seconds · frac = fractional part · noise = value noise · clamp(v,0,1) bounds · [P] = 1 if P else 0 · lag = one-pole smoothing</div>`;
   document.getElementById("dinner").innerHTML = html;
-  const tz=document.getElementById("dteaser"); tz.textContent = punch.length>96 ? punch.slice(0,96)+"…" : punch;
+  const tz=document.getElementById("dteaser"); tz.textContent = punch.length>70 ? punch.slice(0,70)+"…" : punch;
+  if(typeof updateExpr==="function") updateExpr();   // keep the Applied AE expression live with every change
 }
 function bindProc(){
   document.querySelectorAll("#proc [data-q]").forEach(el=>{ const q=el.dataset.q, o=el.parentElement.querySelector("output");
@@ -332,31 +1085,92 @@ function bindProc(){
     el.addEventListener("change",()=>{ proc[q]=el.checked; updateMath(); }); });
 }
 bindProc();
+function bindWin(){ const map={winL:"left",winR:"right",winFL:"featherL",winFR:"featherR"};
+  Object.keys(map).forEach(id=>{ const el=document.getElementById(id), o=el.parentElement.querySelector("output");
+    const set=()=>{ win[map[id]]=+el.value; if(o)o.textContent=(+el.value).toFixed(2); updateMath(); }; el.addEventListener("input",set); set(); }); }
+bindWin();
+function bindZ(){ const map={zAmt:["amount",v=>(+v).toFixed(2)],zRate:["rate",v=>(+v).toFixed(1)],zShape:["shape",v=>(["","Sine","","","Noise","","","","Triangle"][v]||v)]};
+  Object.keys(map).forEach(id=>{ const el=document.getElementById(id), o=el.parentElement.querySelector("output"), key=map[id][0], f=map[id][1];
+    const set=()=>{ z[key]=+el.value; if(o)o.textContent=f(el.value); if(window._mathReady) updateMath(); };
+    el.addEventListener("input",set); el.addEventListener("change",set); set(); }); }
+bindZ();
 document.getElementById("dhead").onclick=()=>document.getElementById("drawer").classList.toggle("open");
+{ const et=document.getElementById("exprToggle"); if(et) et.onclick=()=>{ const w=document.getElementById("exprwrap"); const open=w.classList.toggle("open"); et.setAttribute("aria-expanded",open); if(open) updateExpr(); }; }
+{ const ec=document.getElementById("exprCopy"); if(ec) ec.onclick=()=>{ const expr=buildAEExpression(); let ok=false; try{ navigator.clipboard.writeText(expr); ok=true; }catch(_){}
+  ec.textContent= ok ? "Copied ✓" : "Select & copy"; setTimeout(()=>ec.textContent="⧉ Copy", 1600); }; }
+// "Copy AE expression" lives inside the (re-rendered) drawer body — delegate the click.
+document.getElementById("dinner").addEventListener("click", e=>{
+  if(!e.target || e.target.id!=="copyAE") return;
+  const expr=buildAEExpression(), ta=document.getElementById("aeOut");
+  if(ta){ ta.style.display="block"; ta.value=expr; ta.focus(); ta.select(); }
+  let ok=false; try{ navigator.clipboard.writeText(expr); ok=true; }catch(_){}
+  e.target.textContent = ok ? "Copied ✓ — paste onto a property in AE" : "Select the text below & copy";
+  setTimeout(()=>{ e.target.textContent="⧉ Copy as After Effects expression"; }, 1800);
+});
 window._mathReady=true;
 updateMath();
 
 // engine badge
 const badge=$("engine");
-function setBadge(){ badge.textContent="engine: "+(Engine.mode==="webgpu"?"WebGPU (signal_core.wgsl)":"CPU reference"); badge.className=Engine.mode==="webgpu"?"web":"cpu"; }
-badge.onclick=async()=>{ if(Engine.mode==="webgpu")return; badge.textContent="engine: starting WebGPU…"; await Engine.tryWebGPU(); setBadge(); };
+function setBadge(){
+  if(Engine.mode==="webgpu"){ badge.textContent="engine: WebGPU"; badge.className="web"; }
+  else { badge.textContent= Engine.gpuRejected ? "engine: CPU (GPU mismatch)" : "engine: CPU reference"; badge.className="cpu"; }
+}
+badge.onclick=async()=>{ if(Engine.mode==="webgpu")return; badge.textContent="engine: starting WebGPU…"; if(await Engine.tryWebGPU()){ await Engine.selfCheck(); } setBadge(); };
+
+// ---------- present (fullscreen visualizer) ----------
+function setPresent(on){ document.body.classList.toggle("present", on); needGraticule=true; }
+{ const pb=$("presentBtn"), xb=$("exitPresent");
+  if(pb) pb.onclick=()=>setPresent(true);
+  if(xb) xb.onclick=()=>setPresent(false);
+  window.addEventListener("keydown", e=>{ if(e.key==="Escape"&&document.body.classList.contains("present")) setPresent(false); }); }
+
+// ---------- polish: double-click a slider to reset it; keyboard shortcuts ----------
+document.querySelectorAll('input[type=range]').forEach(el=>{ if(!el.title) el.title="Double-click to reset"; });
+document.addEventListener("dblclick", e=>{ const el=e.target;
+  if(el && el.tagName==="INPUT" && el.type==="range"){ el.value=el.defaultValue; el.dispatchEvent(new Event("input",{bubbles:true})); } });
+window.addEventListener("keydown", e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  if(e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;   // don't hijack typing
+  const k=e.key.toLowerCase();
+  if(k===" "||k==="f"){ e.preventDefault(); const cb=$("freeze"); if(cb){ cb.checked=!cb.checked; cb.onchange(); } }
+  else if(k==="r"){ surprise(); }
+  else if(k==="p"){ setPresent(!document.body.classList.contains("present")); }
+});
+{ const pb=$("presentBtn"); if(pb) pb.title="Fullscreen the visualizer (P)";
+  const sb=$("surpriseBtn"); if(sb) sb.title="Random signal + visual (R)";
+  const fz=$("freeze"); if(fz) fz.title="Freeze the signal (Space or F)"; }
+
+// ---------- Help / Guide overlay ----------
+{ const hm=$("helpModal"), open=()=>hm.hidden=false, close=()=>hm.hidden=true;
+  const hb=$("helpBtn"); if(hb) hb.onclick=open;
+  const hc=$("helpClose"); if(hc) hc.onclick=close;
+  if(hm) hm.addEventListener("click", e=>{ if(e.target===hm) close(); });   // click backdrop to dismiss
+  window.addEventListener("keydown", e=>{ if(hm && !hm.hidden && e.key==="Escape"){ e.stopPropagation(); close(); }
+    else if(hm && hm.hidden && e.key==="?" && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target||{}).tagName||"")) open(); }); }
+
+// ---------- collapsible panel sections (click the title) ----------
+document.querySelectorAll(".panel").forEach(p=>{ const h=p.querySelector("h2"); if(h) h.addEventListener("click",()=>p.classList.toggle("collapsed")); });
 
 // ---------- representations ----------
 const cv=$("stage"), ctx=cv.getContext("2d");
 const bufX=new Float32Array(N), bufY=new Float32Array(N);
-let parts=[]; let needGraticule=true; let lastGate=false;
-function now(){ return performance.now()/1000; }
+let parts=[], rings=[], appliedPrevE=0; let needGraticule=true;
+// Accumulated, SPEED-scaled clock — one master control slows the whole tool
+// (signal scroll + every FUI rotation). The per-frame delta is capped so a
+// backgrounded tab doesn't jump on resume, and changing SPEED never lurches.
+let _clk=0, _lastPerf=null;
+function now(){ const p=performance.now(); if(_lastPerf==null) _lastPerf=p; _clk += Math.min(0.1,(p-_lastPerf)/1000)*SPEED; _lastPerf=p; return _clk; }
 function sizeCanvas(){ const r=cv.getBoundingClientRect(); const dpr=Math.min(devicePixelRatio||1,2);
-  const w=Math.round(r.width*dpr), h=Math.round(440*dpr); if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;needGraticule=true;} }
+  const w=Math.round(r.width*dpr), h=Math.round(r.height*dpr); if(w<2||h<2)return;
+  if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; needGraticule=true; } }
 function bip(i){ return bufX[i]*2-1; }
 function heatColor(v){ const r=Math.round(255*Math.min(1,Math.max(0,1.6-Math.abs(4*v-3)))), g=Math.round(255*Math.min(1,Math.max(0,1.6-Math.abs(4*v-2)))), b=Math.round(255*Math.min(1,Math.max(0,1.6-Math.abs(4*v-1)))); return `rgb(${r},${g},${b})`; }
 
 const Render = {
-  waveform(W,H){ ctx.clearRect(0,0,W,H); grid(W,H);
-    line(bufX,W,H,"#36f09a"); line(bufY,W,H,"#f0b23a"); },
-  bars(W,H){ ctx.clearRect(0,0,W,H); grid(W,H); const B=64, bw=W/B;
-    for(let k=0;k<B;k++){ const v=bufX[Math.floor(k/B*N)]; const h=v*(H-16); ctx.fillStyle="#36f09a";
-      ctx.globalAlpha=0.85; ctx.fillRect(k*bw+1,H-h,bw-2,h); }
+  waveform(W,H){ clearBG(W,H); grid(W,H); line(bufX,W,H,"#36f09a",1); line(bufY,W,H,"#f0b23a",YOPAC); },
+  bars(W,H){ clearBG(W,H); grid(W,H); const B=64, bw=W/B;
+    for(let k=0;k<B;k++){ const v=bufX[Math.floor(k/B*N)]; const h=v*(H-16); ctx.fillStyle="#36f09a"; ctx.globalAlpha=0.85; ctx.fillRect(k*bw+1,H-h,bw-2,h); }
     ctx.globalAlpha=1; ctx.strokeStyle="#1d2a34"; ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); },
   vector(W,H){ persistFade(W,H); const S=Math.min(W,H), cx=W/2, cy=H/2, R=S/2-14;
     if(needGraticule){ vGrat(W,H,cx,cy,R); needGraticule=false; }
@@ -366,88 +1180,401 @@ const Render = {
     if(needGraticule){ vGrat(W,H,cx,cy,R); needGraticule=false; }
     ctx.strokeStyle="#36f09a"; ctx.lineWidth=1.5; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath();
     for(let i=0;i<N;i++){ const a=i/(N-1)*Math.PI*2; const rr=(0.15+0.85*bufX[i])*R; const px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr; i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.stroke(); ctx.shadowBlur=0; },
-  heat(W,H){ ctx.clearRect(0,0,W,H); const cw=W/N+1;
-    for(let i=0;i<N;i++){ ctx.fillStyle=heatColor(bufX[i]); ctx.fillRect(i/N*W,0,cw,H); } },
-  applied(W,H){ ctx.clearRect(0,0,W,H); drawApplied(W,H); },
+  heat(W,H){ ctx.clearRect(0,0,W,H); const cw=W/N+1; for(let i=0;i<N;i++){ ctx.fillStyle=heatColor(bufX[i]); ctx.fillRect(i/N*W,0,cw,H); } },
+  applied(W,H){ clearBG(W,H); drawApplied(W,H); },
 };
+// Clear to an OPAQUE background (not clearRect → transparent). Semi-transparent
+// fills (Channel-Y line opacity, Applied text) on a transparent canvas pick up
+// premultiplied-alpha fringing when the Cathode pass uploads it as a WebGL
+// texture — most visible on large text. An opaque base composites cleanly.
+function clearBG(W,H){ ctx.globalAlpha=1; ctx.fillStyle="#05070a"; ctx.fillRect(0,0,W,H); }
 function grid(W,H){ ctx.strokeStyle="#101820"; ctx.lineWidth=1;
   for(let i=0;i<=8;i++){const x=i/8*W; ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
   for(let j=0;j<=4;j++){const y=j/4*H; ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
   ctx.strokeStyle="#1d2a34"; ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); }
-function line(buf,W,H,c){ ctx.strokeStyle=c; ctx.lineWidth=2; ctx.shadowColor=c; ctx.shadowBlur=6; ctx.beginPath();
-  for(let i=0;i<N;i++){ const x=i/(N-1)*W, y=(0.5-(buf[i]*2-1)*0.46)*H; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke(); ctx.shadowBlur=0; }
+function line(buf,W,H,c,alpha){ ctx.globalAlpha=(alpha==null?1:alpha); ctx.strokeStyle=c; ctx.lineWidth=1.6; ctx.shadowColor=c; ctx.shadowBlur=3; ctx.beginPath();
+  for(let i=0;i<N;i++){ const x=i/(N-1)*W, y=(0.5-(buf[i]*2-1)*0.46)*H; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1; }
 function vGrat(W,H,cx,cy,R){ ctx.fillStyle="#05070a"; ctx.fillRect(0,0,W,H); ctx.strokeStyle="#101a20"; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(cx,cy-R-6); ctx.lineTo(cx,cy+R+6); ctx.moveTo(cx-R-6,cy); ctx.lineTo(cx+R+6,cy); ctx.stroke();
   ctx.strokeStyle="#13202899"; for(let r=1;r<=3;r++){ ctx.beginPath(); ctx.arc(cx,cy,(r/3)*R,0,Math.PI*2); ctx.stroke(); } }
 function persistFade(W,H){ ctx.fillStyle=`rgba(5,7,10,${1-PERSIST})`; ctx.fillRect(0,0,W,H); }
+// Soft inner-black edge so persistence trails + glow don't smear hard against
+// the borders. Four feathered bands (corners overlap into a gentle vignette);
+// drawn into the scope canvas itself so the CRT pass samples the softened edge.
+function edgeVignette(W,H){
+  const e=Math.max(14,Math.round(Math.min(W,H)*0.07)), c0="rgba(3,5,8,0.92)", c1="rgba(3,5,8,0)";
+  ctx.save(); ctx.globalCompositeOperation="source-over";
+  let g=ctx.createLinearGradient(0,0,0,e);     g.addColorStop(0,c0); g.addColorStop(1,c1); ctx.fillStyle=g; ctx.fillRect(0,0,W,e);
+  g=ctx.createLinearGradient(0,H,0,H-e);        g.addColorStop(0,c0); g.addColorStop(1,c1); ctx.fillStyle=g; ctx.fillRect(0,H-e,W,e);
+  g=ctx.createLinearGradient(0,0,e,0);          g.addColorStop(0,c0); g.addColorStop(1,c1); ctx.fillStyle=g; ctx.fillRect(0,0,e,H);
+  g=ctx.createLinearGradient(W,0,W-e,0);        g.addColorStop(0,c0); g.addColorStop(1,c1); ctx.fillStyle=g; ctx.fillRect(W-e,0,e,H);
+  ctx.restore();
+}
 
-// ----- applied: signal drives a real property -----
 function drawApplied(W,H){
-  const n=bufX[N-1]; const val=applied.min+(applied.max-applied.min)*n; const cx=W/2, cy=H/2;
+  const n=combine(bufX[N-1],bufY[N-1]); const val=applied.min+(applied.max-applied.min)*n; const cx=W/2, cy=H/2;
   ctx.save();
   switch(applied.target){
-    case "scale":{ const s=val/100; const d=120*s; ctx.fillStyle="#36f09a"; ctx.translate(cx,cy); ctx.fillRect(-d/2,-d/2,d,d); break; }
-    case "rotation":{ ctx.translate(cx,cy); ctx.rotate(val*Math.PI/180); ctx.fillStyle="#36f09a"; ctx.fillRect(-8,-90,16,180); ctx.beginPath(); ctx.arc(0,0,12,0,7); ctx.fill(); break; }
-    case "position":{ ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx+val,cy,40,0,7); ctx.fill(); break; }
-    case "opacity":{ ctx.globalAlpha=Math.max(0,Math.min(1,val/100)); ctx.fillStyle="#36f09a"; ctx.fillRect(cx-80,cy-80,160,160); break; }
-    case "glow":{ ctx.shadowColor="#36f09a"; ctx.shadowBlur=val; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx,cy,55,0,7); ctx.fill(); break; }
-    case "color":{ ctx.fillStyle=`hsl(${n*320},80%,55%)`; ctx.beginPath(); ctx.arc(cx,cy,80,0,7); ctx.fill(); break; }
-    case "meter":{ const bw=120, bh=300, x=cx-bw/2, y=cy+bh/2; const f=Math.max(0,Math.min(1,(val-applied.min)/(applied.max-applied.min)));
+    case "trace":{ // an object that rides the driver's distorted waveform path
+      ctx.strokeStyle="#1d2a34"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+      ctx.strokeStyle="#2a6"; ctx.lineWidth=2; ctx.beginPath();
+      for(let i=0;i<N;i++){ const dv=combine(bufX[i],bufY[i]); const x=i/(N-1)*W, y=(1-dv)*(H-24)+12; i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+      ctx.stroke();
+      const dv=combine(bufX[N-1],bufY[N-1]); const px=W-14, py=(1-dv)*(H-24)+12;
+      ctx.shadowColor="#36f09a"; ctx.shadowBlur=16; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(px,py,9,0,7); ctx.fill(); ctx.shadowBlur=0;
+      break; }
+    case "orbitPath":{ const R=Math.min(W,H)*0.4;   // dot rides the live X/Y point on the vectorscope path
+      ctx.strokeStyle="#16323f"; ctx.lineWidth=1; ctx.beginPath();
+      for(let i=0;i<N;i++){ const x=cx+bip(i)*R, y=cy-(bufY[i]*2-1)*R; i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
+      const hx=cx+bip(N-1)*R, hy=cy-(bufY[N-1]*2-1)*R;
+      ctx.shadowColor="#36f09a"; ctx.shadowBlur=16; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(hx,hy,9,0,7); ctx.fill(); ctx.shadowBlur=0; break; }
+    case "spiro":{ const R=Math.min(W,H)*0.42;   // rosette: angle sweeps, radius follows Channel X
+      ctx.strokeStyle="#36f09a"; ctx.lineWidth=1.4; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath();
+      for(let i=0;i<N;i++){ const a=i/(N-1)*Math.PI*8; const rr=R*(0.18+0.82*bufX[i]); const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr; i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke(); ctx.shadowBlur=0; break; }
+    case "scale":{ const s=val/100; const d=Math.min(W,H)*0.55*s; ctx.fillStyle="#36f09a"; ctx.translate(cx,cy); ctx.fillRect(-d/2,-d/2,d,d); break; }
+    case "rotation":{ ctx.translate(cx,cy); ctx.rotate(val*Math.PI/180); ctx.fillStyle="#36f09a"; const L=Math.min(W,H)*0.4; ctx.fillRect(-8,-L,16,2*L); ctx.beginPath(); ctx.arc(0,0,12,0,7); ctx.fill(); break; }
+    case "position":{ ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx+val*Math.min(1,W/520),cy,36,0,7); ctx.fill(); break; }
+    case "positionY":{ ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx, cy - val*Math.min(1,H/360), 36, 0, 7); ctx.fill(); break; }
+    case "skew":{ ctx.translate(cx,cy); ctx.transform(1,0,Math.tan(val*Math.PI/180),1,0,0); ctx.fillStyle="#36f09a"; const d=Math.min(W,H)*0.42; ctx.fillRect(-d/2,-d/2,d,d); break; }
+    case "opacity":{ ctx.globalAlpha=Math.max(0,Math.min(1,val/100)); ctx.fillStyle="#36f09a"; const d=Math.min(W,H)*0.5; ctx.fillRect(cx-d/2,cy-d/2,d,d); break; }
+    case "glow":{ ctx.shadowColor="#36f09a"; ctx.shadowBlur=val; ctx.fillStyle="#36f09a"; ctx.beginPath(); ctx.arc(cx,cy,48,0,7); ctx.fill(); break; }
+    case "color":{ ctx.fillStyle=`hsl(${n*320},80%,55%)`; ctx.beginPath(); ctx.arc(cx,cy,Math.min(W,H)*0.32,0,7); ctx.fill(); break; }
+    case "strobe":{ const e=Math.max(0,Math.min(1,n)); ctx.fillStyle=`hsl(${150+e*60},85%,${5+e*54}%)`; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle=`rgba(255,255,255,${e*e*0.3})`; ctx.fillRect(0,0,W,H); break; }   // full-frame light flicker
+    case "ringPulse":{ const e=Math.max(0,Math.min(1,n)); const R=Math.min(W,H)*(0.12+e*0.32);
+      ctx.strokeStyle=`hsl(${150+e*120},85%,60%)`; ctx.lineWidth=2+e*16; ctx.globalAlpha=0.5+0.5*e;
+      ctx.shadowColor=`hsl(${150+e*120},85%,60%)`; ctx.shadowBlur=10+e*30;
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1; break; }
+    case "meter":{ const bw=90, bh=Math.min(H*0.7,260), x=cx-bw/2, y=cy+bh/2; const f=Math.max(0,Math.min(1,(val-applied.min)/(applied.max-applied.min)));
       ctx.strokeStyle="#1d2a34"; ctx.strokeRect(x,y-bh,bw,bh); ctx.fillStyle=f>0.85?"#f0683a":"#36f09a"; ctx.fillRect(x,y-bh*f,bw,bh*f);
-      const gate=n>=0.5; ctx.fillStyle=gate?"#f0683a":"#16221c"; ctx.beginPath(); ctx.arc(cx,cy-bh/2-40,12,0,7); ctx.fill(); break; }
-    case "particles":{ const birth=Math.round(n*(applied.max/60)); for(let i=0;i<birth;i++) parts.push({x:cx,y:cy,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,l:1});
-      parts=parts.filter(p=>p.l>0); for(const p of parts){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.l-=0.02; ctx.globalAlpha=Math.max(0,p.l); ctx.fillStyle="#36f09a"; ctx.fillRect(p.x,p.y,3,3);} ctx.globalAlpha=1; break; }
-    case "type":{ const txt="SIGNAL RACK"; const vis=Math.round(n*txt.length); ctx.font="bold 48px ui-monospace,Menlo,monospace"; ctx.textAlign="center";
-      for(let i=0;i<txt.length;i++){ ctx.fillStyle=i<vis?"#36f09a":"#16221c"; ctx.fillText(txt[i], cx-txt.length*16+i*32, cy+16); } break; }
+      ctx.fillStyle=(n>=0.5)?"#f0683a":"#16221c"; ctx.beginPath(); ctx.arc(cx,y-bh-26,11,0,7); ctx.fill(); break; }
+    case "meterRadial":{ const e=Math.max(0,Math.min(1,n)); const R=Math.min(W,H)*0.34, a0=Math.PI*0.75, a1=Math.PI*2.25;
+      ctx.lineWidth=12; ctx.lineCap="round"; ctx.strokeStyle="#16222b"; ctx.beginPath(); ctx.arc(cx,cy,R,a0,a1); ctx.stroke();
+      const a=a0+(a1-a0)*e; ctx.strokeStyle=e>0.85?"#f0683a":"#36f09a"; ctx.beginPath(); ctx.arc(cx,cy,R,a0,a); ctx.stroke();
+      ctx.lineWidth=3; ctx.strokeStyle="#dff"; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*R*0.9, cy+Math.sin(a)*R*0.9); ctx.stroke();
+      ctx.fillStyle="#dff"; ctx.beginPath(); ctx.arc(cx,cy,5,0,7); ctx.fill(); ctx.lineCap="butt"; break; }
+    case "meterLED":{ const e=Math.max(0,Math.min(1,n)); const segs=16, gap=4, bw=54, areaH=Math.min(H*0.74,300);
+      const sh=(areaH-gap*(segs-1))/segs, x=cx-bw/2, y0=cy+areaH/2, lit=Math.round(e*segs);
+      for(let i=0;i<segs;i++){ const frac=i/segs, col=frac>0.85?"#f0683a":frac>0.6?"#f0c23a":"#36f09a";
+        ctx.fillStyle=i<lit?col:"#16242c"; ctx.globalAlpha=i<lit?1:0.5; ctx.fillRect(x, y0-(i+1)*sh-i*gap, bw, sh); }
+      ctx.globalAlpha=1; break; }
+    case "particles":{ const e=Math.max(0,Math.min(1,n));   // driver energy 0..1 drives the whole emitter
+      const birth=Math.round(e*e*16);                        // curved: quiet → sparse, peaks → eruption
+      const spread=2.5+e*11;                                 // high energy throws particles faster & wider
+      for(let i=0;i<birth;i++){ const a=Math.random()*Math.PI*2, v=Math.random()*spread;
+        parts.push({x:cx,y:cy, vx:Math.cos(a)*v, vy:Math.sin(a)*v-1.5, l:1, sz:2+e*4, h:150+e*120}); }
+      parts=parts.filter(p=>p.l>0);
+      for(const p of parts){ p.x+=p.vx*SPEED; p.y+=p.vy*SPEED; p.vy+=0.07*SPEED; p.l-=0.018*SPEED;
+        ctx.globalAlpha=Math.max(0,p.l*0.92); ctx.fillStyle=`hsl(${p.h},85%,58%)`; ctx.fillRect(p.x,p.y,p.sz,p.sz); }
+      ctx.globalAlpha=1; break; }
+    case "partRings":{ const e=Math.max(0,Math.min(1,n));   // concentric shock rings fired on signal peaks
+      if(e>0.5 && e>appliedPrevE+0.03) rings.push({r:8, l:1, h:150+e*120, w:1.5+e*3.5});
+      appliedPrevE=e;
+      rings=rings.filter(R=>R.l>0);
+      for(const R of rings){ R.r+=(3.2+(1-R.l)*7)*SPEED; R.l-=0.02*SPEED;
+        ctx.globalAlpha=Math.max(0,R.l); ctx.strokeStyle=`hsl(${R.h},85%,60%)`; ctx.lineWidth=Math.max(0.5,R.w*R.l);
+        ctx.shadowColor=`hsl(${R.h},85%,60%)`; ctx.shadowBlur=8*R.l;
+        ctx.beginPath(); ctx.arc(cx,cy,R.r,0,7); ctx.stroke(); }
+      ctx.shadowBlur=0; ctx.globalAlpha=1;
+      ctx.fillStyle=`hsl(${150+e*120},85%,60%)`; ctx.beginPath(); ctx.arc(cx,cy,3+e*5,0,7); ctx.fill(); break; }
+    case "partStream":{ const e=Math.max(0,Math.min(1,n));   // left→right field; density/speed/spread follow the signal
+      const birth=Math.round(1+e*6);
+      for(let i=0;i<birth;i++) parts.push({x:0, y:cy+(Math.random()-0.5)*H*0.78*(0.25+e), vx:2.5+e*8+Math.random()*2, vy:(Math.random()-0.5)*1.4, l:1, sz:1.5+e*3, h:150+e*120});
+      parts=parts.filter(p=>p.l>0 && p.x<W+12);
+      for(const p of parts){ p.x+=p.vx*SPEED; p.y+=p.vy*SPEED; p.l-=0.006*SPEED;
+        ctx.globalAlpha=Math.max(0,Math.min(1,p.l)); ctx.fillStyle=`hsl(${p.h},85%,60%)`; ctx.fillRect(p.x,p.y,p.sz*2.2,p.sz); }
+      ctx.globalAlpha=1; break; }
+    case "partOrbit":{ const e=Math.max(0,Math.min(1,n)), t=lfoClock;   // swarm orbiting the center; radius+speed follow the signal
+      const cnt=18, baseR=Math.min(W,H)*0.13, R=baseR*(0.7+e*1.7);
+      for(let i=0;i<cnt;i++){ const a=t*(0.5+e*2.4) + i/cnt*Math.PI*2;
+        const v=combine(bufX[Math.floor(i/cnt*(N-1))], bufY[Math.floor(i/cnt*(N-1))]);
+        const rr=R*(0.55+0.65*v), px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr, sz=1.5+e*3+v*2;
+        ctx.globalAlpha=0.45+0.55*v; ctx.shadowColor=`hsl(${150+v*120},85%,60%)`; ctx.shadowBlur=9*v;
+        ctx.fillStyle=`hsl(${150+v*120},85%,62%)`; ctx.beginPath(); ctx.arc(px,py,sz,0,7); ctx.fill(); }
+      ctx.globalAlpha=1; ctx.shadowBlur=0; break; }
+    case "partFall":{ const e=Math.max(0,Math.min(1,n));   // confetti raining from the top; rate/size/hue follow the signal
+      const birth=Math.round(e*e*10);
+      for(let i=0;i<birth;i++) parts.push({x:Math.random()*W, y:-6, vx:(Math.random()-0.5)*2, vy:1+Math.random()*2+e*2, l:1, sz:2+e*3, h:150+e*150, rot:Math.random()*7});
+      parts=parts.filter(p=>p.l>0 && p.y<H+12);
+      for(const p of parts){ p.x+=p.vx*SPEED; p.y+=p.vy*SPEED; p.vy+=0.12*SPEED; p.rot+=0.2*SPEED; p.l-=0.0035*SPEED;
+        ctx.globalAlpha=Math.max(0,Math.min(1,p.l)); ctx.fillStyle=`hsl(${p.h},85%,60%)`;
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillRect(-p.sz/2,-p.sz*0.8,p.sz,p.sz*1.6); ctx.restore(); }
+      ctx.globalAlpha=1; break; }
+    case "type":{ const txt="SIGNAL RACK"; const fs=Math.max(20,Math.min(54,W/10));
+      ctx.font=`bold ${fs}px ui-monospace,Menlo,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      const cw=fs*0.64, x0=cx-(txt.length-1)*cw/2, stride=Math.max(1,Math.floor(N/(txt.length*1.4)));
+      for(let i=0;i<txt.length;i++){ if(txt[i]===" ") continue;
+        const idx=Math.max(0,Math.min(N-1, N-1-i*stride));      // each later glyph reads an older sample → wave travels
+        const v=combine(bufX[idx],bufY[idx]);
+        const yoff=(v*2-1)*H*0.17, s=0.82+v*0.5;
+        ctx.save(); ctx.translate(x0+i*cw, cy+yoff); ctx.scale(s,s);
+        ctx.shadowColor="#36f09a"; ctx.shadowBlur=10*v;
+        ctx.fillStyle=`hsl(${150+v*45},85%,${42+v*34}%)`;
+        ctx.fillText(txt[i],0,0); ctx.restore(); }
+      ctx.textBaseline="alphabetic"; break; }
+    case "textOpacity":{ const words=["WILD","CONSTRUCT","SIGNAL","RACK"];   // each word fades on the signal (staggered)
+      const fs=Math.max(18,Math.min(40,W/12)); ctx.font=`bold ${fs}px ui-monospace,Menlo,monospace`;
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      const gap=fs*1.5, y0=cy-(words.length-1)*gap/2;
+      for(let i=0;i<words.length;i++){
+        const idx=Math.max(0,Math.min(N-1, Math.floor(N-1 - i*(N/words.length))));   // staggered read → words pulse in sequence
+        const v=combine(bufX[idx],bufY[idx]);
+        ctx.globalAlpha=Math.max(0.05, v); ctx.shadowColor="#36f09a"; ctx.shadowBlur=12*v;
+        ctx.fillStyle="#e6f2f4"; ctx.fillText(words[i], cx, y0+i*gap); }
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.textBaseline="alphabetic"; break; }
+    case "textPump":{ const e=Math.max(0,Math.min(1,n));   // single title word scales + glows on peaks
+      const fs=Math.max(26,Math.min(96,W/7))*(0.78+e*0.5);
+      ctx.font=`900 ${fs}px ui-monospace,Menlo,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.globalAlpha=0.32+e*0.68; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8+e*44;
+      ctx.fillStyle=`hsl(${150+e*60},85%,${50+e*22}%)`; ctx.fillText("SIGNAL", cx, cy);
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.textBaseline="alphabetic"; break; }
+    case "textGlitch":{ const e=Math.max(0,Math.min(1,n)), txt="SIGNAL RACK";   // chromatic RGB split driven by the signal
+      const fs=Math.max(22,Math.min(64,W/8)); ctx.font=`900 ${fs}px ui-monospace,Menlo,monospace`;
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      const ox=(n*2-1)*(4+e*18), oy=(combine(bufY[N>>1],bufX[N>>1])*2-1)*e*5;   // signed offset around center
+      ctx.globalCompositeOperation="lighter";
+      ctx.globalAlpha=0.85; ctx.fillStyle="#ff2d4d"; ctx.fillText(txt, cx-ox, cy-oy);
+      ctx.fillStyle="#2dd4ff"; ctx.fillText(txt, cx+ox, cy+oy);
+      ctx.globalAlpha=0.95; ctx.fillStyle="#eaf6f5"; ctx.fillText(txt, cx, cy);
+      ctx.globalCompositeOperation="source-over"; ctx.globalAlpha=1; ctx.textBaseline="alphabetic"; break; }
+    case "textType":{ const e=Math.max(0,Math.min(1,n)), phrase="WILD CONSTRUCT // SIGNAL RACK";   // typewriter reveal: chars shown = driver
+      const show=Math.max(0,Math.min(phrase.length, Math.round(e*phrase.length)));
+      const shown=phrase.slice(0,show)+((Math.floor(lfoClock*2)%2)?"_":" ");
+      const fs=Math.max(12,Math.min(34,W/18)); ctx.font=`bold ${fs}px ui-monospace,Menlo,monospace`;
+      ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=6;
+      ctx.fillStyle="#36f09a"; ctx.fillText(shown, 16, cy); ctx.shadowBlur=0; break; }
+    case "scaleX":{ const s=val/100; ctx.translate(cx,cy); ctx.scale(s,1); ctx.fillStyle="#36f09a"; const d=Math.min(W,H)*0.5; ctx.fillRect(-d/2,-d/2,d,d); break; }
+    case "scaleY":{ const s=val/100; ctx.translate(cx,cy); ctx.scale(1,s); ctx.fillStyle="#36f09a"; const d=Math.min(W,H)*0.5; ctx.fillRect(-d/2,-d/2,d,d); break; }
+    case "blur":{ const e=Math.max(0,Math.min(1,n)); ctx.filter=`blur(${(1-e)*14}px)`; ctx.fillStyle="#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=20*e; ctx.beginPath(); ctx.arc(cx,cy,Math.min(W,H)*0.24,0,7); ctx.fill(); ctx.filter="none"; ctx.shadowBlur=0; break; }
+    case "gradientSweep":{ const e=Math.max(0,Math.min(1,n)); const g=ctx.createLinearGradient(0,0,W,0);
+      g.addColorStop(Math.max(0,e-0.28),"#05070a"); g.addColorStop(e,`hsl(${150+e*150},85%,60%)`); g.addColorStop(Math.min(1,e+0.28),"#05070a"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); break; }
+    case "meterStereo":{ const ex=Math.max(0,Math.min(1,bufX[N-1])), ey=Math.max(0,Math.min(1,bufY[N-1])), bw=46, gap=22, bh=Math.min(H*0.7,260), y=cy+bh/2;
+      const bar=(x,f,c)=>{ ctx.strokeStyle="#1d2a34"; ctx.strokeRect(x,y-bh,bw,bh); ctx.fillStyle=f>0.85?"#f0683a":c; ctx.fillRect(x,y-bh*f,bw,bh*f); };
+      bar(cx-bw-gap/2,ex,"#36f09a"); bar(cx+gap/2,ey,"#f0b23a"); break; }
+    case "meterHistogram":{ const cols=48, gap=3, total=Math.min(W*0.82,560), bw=(total-gap*(cols-1))/cols, x0=cx-total/2;
+      for(let i=0;i<cols;i++){ const v=Math.max(0,Math.min(1,bufX[Math.floor(i/cols*N)])), h=v*Math.min(H*0.6,240);
+        ctx.fillStyle=`hsl(${150+v*120},85%,58%)`; ctx.fillRect(x0+i*(bw+gap), cy+Math.min(H*0.3,150)-h, bw, h); } break; }
+    case "meterDial":{ const e=Math.max(0,Math.min(1,n)), R=Math.min(W,H)*0.28;
+      ctx.strokeStyle="#16222b"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+      for(let i=0;i<24;i++){ const a=i/24*Math.PI*2; ctx.strokeStyle=i/24<e?"#36f09a":"#1d2a34"; ctx.lineWidth=i%6===0?3:1.5; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*(R-10),cy+Math.sin(a)*(R-10)); ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R); ctx.stroke(); }
+      const a=(-Math.PI/2)+e*Math.PI*2; ctx.strokeStyle="#dff"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*(R-16),cy+Math.sin(a)*(R-16)); ctx.stroke();
+      ctx.fillStyle="#dff"; ctx.beginPath(); ctx.arc(cx,cy,5,0,7); ctx.fill(); break; }
+    case "fuiRadar":{ const e=Math.max(0,Math.min(1,n)), t=lfoClock, R=Math.min(W,H)*0.4;
+      ctx.strokeStyle="#143b33"; ctx.lineWidth=1;
+      for(let r=1;r<=4;r++){ ctx.beginPath(); ctx.arc(cx,cy,R*r/4,0,7); ctx.stroke(); }
+      for(let i=0;i<12;i++){ const a=i/12*Math.PI*2; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R); ctx.stroke(); }
+      const sweep=t*(0.22+e*0.6);
+      for(let k=0;k<44;k++){ const a=sweep-k*0.028; ctx.strokeStyle=`rgba(54,240,154,${0.5*(1-k/44)})`; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R); ctx.stroke(); }
+      const blips=4+(state.x.seed%4); for(let i=0;i<blips;i++){ const v=combine(bufX[Math.floor(i/blips*N)],bufY[Math.floor(i/blips*N)]), ba=i*1.7+v*3+state.x.seed*0.017, br=R*(0.3+0.6*v), bx=cx+Math.cos(ba)*br, by=cy+Math.sin(ba)*br;
+        ctx.fillStyle="#7df0c2"; ctx.beginPath(); ctx.arc(bx,by,3+v*3,0,7); ctx.fill(); }
+      break; }
+    case "fuiScope":{ const pw=Math.min(W*0.84,720), ph=Math.min(H*0.56,300), px=cx-pw/2, py=cy-ph/2;
+      ctx.strokeStyle="#1f5e4e"; ctx.lineWidth=1.5; ctx.strokeRect(px,py,pw,ph);
+      ctx.strokeStyle="#10241d"; ctx.lineWidth=1; for(let i=1;i<10;i++){ const x=px+pw*i/10; ctx.beginPath(); ctx.moveTo(x,py); ctx.lineTo(x,py+ph); ctx.stroke(); } for(let j=1;j<4;j++){ const y=py+ph*j/4; ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px+pw,y); ctx.stroke(); }
+      ctx.strokeStyle="#36f09a"; ctx.lineWidth=2; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath();
+      for(let i=0;i<N;i++){ const x=px+i/(N-1)*pw, y=py+(1-bufX[i])*(ph-8)+4; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke(); ctx.shadowBlur=0;
+      ctx.fillStyle="#7df0c2"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="left"; ctx.fillText("CH1  "+(n*100).toFixed(1)+"%", px+8, py-9);
+      ctx.textAlign="right"; ctx.fillText("◉ LIVE", px+pw-8, py-9); break; }
+    case "fuiArc":{ const e=Math.max(0,Math.min(1,n)), R=Math.min(W,H)*0.3, a0=-Math.PI/2;
+      ctx.lineCap="round"; ctx.lineWidth=10; ctx.strokeStyle="#16222b"; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+      ctx.strokeStyle=e>0.85?"#f0683a":"#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=14*e; ctx.beginPath(); ctx.arc(cx,cy,R,a0,a0+e*Math.PI*2); ctx.stroke(); ctx.shadowBlur=0; ctx.lineCap="butt";
+      ctx.fillStyle="#eaf6f5"; ctx.font=`700 ${Math.round(Math.min(W,H)*0.13)}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(Math.round(e*100)+"%", cx, cy); ctx.textBaseline="alphabetic"; break; }
+    case "fuiBars":{ const bars=24, gap=6, total=Math.min(W*0.72,480), bw=(total-gap*(bars-1))/bars, x0=cx-total/2, base=cy+Math.min(H*0.28,150);
+      for(let i=0;i<bars;i++){ const v=Math.max(0,Math.min(1,bufX[Math.floor(i/bars*N)])), h=v*Math.min(H*0.5,220);
+        ctx.fillStyle=v>0.8?"#f0683a":v>0.55?"#f0c23a":"#36f09a"; ctx.fillRect(x0+i*(bw+gap), base-h, bw, h);
+        ctx.globalAlpha=0.22; ctx.fillRect(x0+i*(bw+gap), base+5, bw, h*0.4); ctx.globalAlpha=1; } break; }
+    case "fuiReticle":{ const e=Math.max(0,Math.min(1,n)), t=lfoClock, lock=e, gap=Math.min(W,H)*(0.28-lock*0.12), len=Math.min(W,H)*0.08, jit=()=>(1-lock)*(Math.random()-0.5)*10;
+      ctx.strokeStyle=lock>0.85?"#f0683a":"#36f09a"; ctx.lineWidth=2;
+      for(let q=0;q<4;q++){ const sx=q<2?-1:1, sy=q%2?-1:1, bx=cx+sx*gap+jit(), by=cy+sy*gap+jit();
+        ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx-sx*len,by); ctx.moveTo(bx,by); ctx.lineTo(bx,by-sy*len); ctx.stroke(); }
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(t*(0.5+e)); ctx.strokeStyle="#36f09a"; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(0,0,gap*0.5,0.3,2.4); ctx.stroke(); ctx.beginPath(); ctx.arc(0,0,gap*0.5,3.4,5.5); ctx.stroke(); ctx.restore();
+      ctx.fillStyle=lock>0.85?"#f0683a":"#36f09a"; ctx.beginPath(); ctx.arc(cx,cy,3,0,7); ctx.fill(); break; }
+    case "fuiWaveRing":{ const R=Math.min(W,H)*0.3; ctx.strokeStyle="#143b33"; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+      ctx.strokeStyle="#36f09a"; ctx.lineWidth=2; ctx.shadowColor="#36f09a"; ctx.shadowBlur=10; ctx.beginPath();
+      for(let i=0;i<=N;i++){ const idx=i%N, a=i/N*Math.PI*2, rr=R+(bufX[idx]*2-1)*R*0.45, x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.closePath(); ctx.stroke(); ctx.shadowBlur=0; break; }
+    case "fuiGyro":{ const t=lfoClock, e=Math.max(0,Math.min(1,n)), R=Math.min(W,H)*0.36;
+      const ring=(rad,spd,start,len,col,lw)=>{ ctx.save(); ctx.translate(cx,cy); ctx.rotate(t*spd*(0.5+e)); ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.beginPath(); ctx.arc(0,0,rad,start,start+len); ctx.stroke();
+        ctx.fillStyle=col; ctx.beginPath(); ctx.arc(Math.cos(start+len)*rad,Math.sin(start+len)*rad,lw,0,7); ctx.fill(); ctx.restore(); };
+      ring(R,0.6,0,4.2,"#36f09a",2); ring(R*0.78,-0.9,1,3.6,"#3ad6cf",2); ring(R*0.56,1.3,2,4.8,"#f0b23a",1.5); ring(R*0.34,-1.8,0.5,3.0,"#7df0c2",1.5);
+      ctx.fillStyle="#eaf6f5"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText((e*100).toFixed(0), cx, cy); ctx.textBaseline="alphabetic"; break; }
+    case "fuiStream":{ const e=Math.max(0,Math.min(1,n)), t=lfoClock, fs=15, colW=22, cols=Math.max(6,Math.floor((W-20)/colW)), hx="0123456789ABCDEF";
+      ctx.font=`${fs}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      for(let c=0;c<cols;c++){ const sp=40+(((c*53)+state.x.seed*3)%70)+e*120, headY=((t*sp+c*97+state.x.seed)%(H+60))-30;
+        for(let k=0;k<14;k++){ const y=headY-k*fs*1.2; if(y<-10||y>H+10) continue; const ch=hx.charAt((c*7+k+Math.floor(t*8)+state.x.seed)&15), a=Math.max(0,1-k/14)*(0.35+e*0.65);
+          ctx.fillStyle=k===0?`rgba(220,255,240,${0.6+e*0.4})`:`rgba(54,240,154,${a})`; ctx.fillText(ch, 14+c*colW, y); } }
+      ctx.textBaseline="alphabetic"; break; }
+    case "fuiSynapse":{ const t=lfoClock, sd=state.x.seed*0.137, hx=k=>{ const s=Math.sin(k*127.1+311.7+sd)*43758.5453; return s-Math.floor(s); };   // Channel X seed reshapes the whole net
+      const NODES=11+Math.floor(hx(901)*9);   // seed varies node count (11..19)
+      const pos=[]; for(let i=0;i<NODES;i++) pos.push([cx+(hx(i)-0.5)*Math.min(W*0.84,820), cy+(hx(i+50)-0.5)*Math.min(H*0.74,440)]);
+      const act=i=>Math.max(0,Math.min(1, combine(bufX[Math.floor(hx(i+9)*(N-1))], bufY[Math.floor(hx(i+9)*(N-1))])));
+      const edges=[]; for(let i=0;i<NODES;i++){ const deg=1+Math.floor(hx(i*5+311)*3);   // seed-varied connectivity (1..3 per node)
+        for(let d=0;d<deg;d++){ let j=Math.floor(hx(i*5+d+617)*NODES); if(j===i) j=(j+1)%NODES; edges.push([i,j]); } }
+      for(let ei=0;ei<edges.length;ei++){ const a=edges[ei][0], b=edges[ei][1], A=pos[a], B=pos[b];
+        ctx.strokeStyle="#15303a"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+        const aa=act(a); if(aa>Math.max(0.05,fire.thresh-0.1)){ const ph=(t*0.6+hx(ei*3))%1, x=A[0]+(B[0]-A[0])*ph, y=A[1]+(B[1]-A[1])*ph;
+          ctx.globalAlpha=aa; ctx.fillStyle="#7df0c2"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(x,y,2+aa*2,0,7); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1; } }
+      for(let i=0;i<NODES;i++){ const a=act(i), P=pos[i], fired=a>fire.thresh;
+        ctx.fillStyle=fired?`hsl(${150+a*120},90%,${55+a*20}%)`:"#1b2a30"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=fired?14*a:0;
+        ctx.beginPath(); ctx.arc(P[0],P[1],4+a*8,0,7); ctx.fill(); ctx.shadowBlur=0;
+        if(fired){ ctx.strokeStyle=`rgba(54,240,154,${a*(1-((t*1.5+i)%1))})`; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(P[0],P[1],8+24*((t*1.5+i)%1),0,7); ctx.stroke(); } }
+      break; }
+    case "fuiPackets":{ const e=Math.max(0,Math.min(1,n)), t=lfoClock, lanes=8, span=Math.min(H*0.8,440), laneH=span/lanes, y0=cy-span/2;
+      ctx.font="11px ui-monospace,monospace"; ctx.textBaseline="middle";
+      for(let L=0;L<lanes;L++){ const ly=y0+laneH*(L+0.5), actS=Math.max(0,Math.min(1,bufX[(Math.floor((L/lanes)*N)+state.x.seed*7)%N]));
+        ctx.strokeStyle="#11242b"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(64,ly); ctx.lineTo(W-30,ly); ctx.stroke();
+        ctx.fillStyle=actS>fire.thresh?"#7df0c2":"#2a4a44"; ctx.textAlign="right"; ctx.fillText("0x"+(((L*16+state.x.seed*16)&255).toString(16).toUpperCase().padStart(2,"0")), 56, ly);
+        const speed=0.05+(L%3)*0.018+e*0.11;
+        for(let k=0;k<3;k++){ if(actS<=fire.thresh+k*0.16) continue; const ph=((t*speed+L*0.13+k*0.34)%1), x=64+ph*(W-94);
+          ctx.fillStyle="#7df0c2"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.fillRect(x-7,ly-3,14,6); ctx.shadowBlur=0; } }
+      ctx.textBaseline="alphabetic"; break; }
+    case "fuiCore":{ const cols=10, rows=7, gap=4, total=Math.min(W*0.8,560), cw=(total-gap*(cols-1))/cols, gh=Math.min(H*0.7,380), chh=(gh-gap*(rows-1))/rows, x0=cx-total/2, y0=cy-gh/2, t=lfoClock;
+      for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){ const i=r*cols+c, v=Math.max(0,Math.min(1, bufX[(i*37+state.x.seed*13)%N]*(0.6+0.4*Math.sin(t*3+i+state.x.seed)))), on=v>fire.thresh;
+        ctx.fillStyle=on?`hsl(${150+v*120},85%,${28+v*42}%)`:"#0e1a1f"; if(on){ ctx.shadowColor="#36f09a"; ctx.shadowBlur=10*v; }
+        ctx.fillRect(x0+c*(cw+gap), y0+r*(chh+gap), cw, chh); ctx.shadowBlur=0; }
+      ctx.strokeStyle="#1f5e4e"; ctx.lineWidth=1.5; ctx.strokeRect(x0-6,y0-6,total+12,gh+12); break; }
+    case "partStars":{ const e=Math.max(0,Math.min(1,n)), birth=Math.round(1+e*5);
+      for(let i=0;i<birth;i++){ const a=Math.random()*Math.PI*2; parts.push({x:cx,y:cy, vx:Math.cos(a)*(0.5+Math.random()), vy:Math.sin(a)*(0.5+Math.random()), l:1, sz:1+e*2, h:150+e*120, sp:1+e*6}); }
+      parts=parts.filter(p=>p.l>0 && p.x>-20&&p.x<W+20&&p.y>-20&&p.y<H+20);
+      for(const p of parts){ p.vx*=1.045; p.vy*=1.045; p.x+=p.vx*p.sp*SPEED; p.y+=p.vy*p.sp*SPEED; p.l-=0.012*SPEED;
+        ctx.globalAlpha=Math.max(0,Math.min(1,p.l)); ctx.strokeStyle=`hsl(${p.h},85%,62%)`; ctx.lineWidth=p.sz; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-p.vx*p.sp*2,p.y-p.vy*p.sp*2); ctx.stroke(); }
+      ctx.globalAlpha=1; break; }
+    case "textCounter":{ const e=Math.max(0,Math.min(1,n)), v=applied.min+(applied.max-applied.min)*e;
+      ctx.fillStyle="#36f09a"; ctx.font=`700 ${Math.round(Math.min(W,H)*0.16)}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.fillText(v.toFixed(2).padStart(7,"0"), cx, cy); ctx.shadowBlur=0;
+      ctx.fillStyle="#52606b"; ctx.font="12px ui-monospace,monospace"; ctx.fillText("◉ SIGNAL VALUE", cx, cy+Math.min(W,H)*0.13); ctx.textBaseline="alphabetic"; break; }
+    case "textShake":{ const e=Math.max(0,Math.min(1,n)), amp=e*e*22, dx=(Math.random()-0.5)*amp, dy=(Math.random()-0.5)*amp, fs=Math.round(Math.min(W,H)*0.16*(0.9+e*0.3));
+      ctx.font=`900 ${fs}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      if(e>0.6){ ctx.globalAlpha=0.5; ctx.fillStyle="#ff2d4d"; ctx.fillText("IMPACT", cx+dx-amp*0.3, cy+dy); ctx.fillStyle="#2dd4ff"; ctx.fillText("IMPACT", cx+dx+amp*0.3, cy+dy); ctx.globalAlpha=1; }
+      ctx.fillStyle="#eaf6f5"; ctx.fillText("IMPACT", cx+dx, cy+dy); ctx.textBaseline="alphabetic"; break; }
+    case "rose":{ const R=Math.min(W,H)*0.42, k=3+Math.round(Math.max(0,Math.min(1,n))*4); ctx.strokeStyle="#36f09a"; ctx.lineWidth=1.5; ctx.shadowColor="#36f09a"; ctx.shadowBlur=8; ctx.beginPath();
+      for(let i=0;i<=N;i++){ const th=i/N*Math.PI*2, rr=R*Math.abs(Math.cos(k*th))*(0.3+0.7*bufX[i%N]), x=cx+Math.cos(th)*rr, y=cy+Math.sin(th)*rr; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke(); ctx.shadowBlur=0; break; }
+    case "trLoad":{ const prog=loadProgress(transP), bw=Math.min(W*0.7,560), bh=Math.min(H*0.12,52), x=cx-bw/2, y=cy-bh/2;   // monotonic fill, signal-shaped pace
+      ctx.strokeStyle="#1f5e4e"; ctx.lineWidth=2; ctx.strokeRect(x,y,bw,bh);
+      ctx.fillStyle="#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=14; ctx.fillRect(x+3,y+3,(bw-6)*prog,bh-6); ctx.shadowBlur=0;
+      ctx.fillStyle="#eaf6f5"; ctx.font=`700 ${Math.round(bh*0.62)}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(Math.round(prog*100)+"%", cx, y-bh*0.7); ctx.textBaseline="alphabetic"; break; }
+    case "trWipe":{ const prog=loadProgress(transP), txt="SIGNAL", fs=Math.round(Math.min(W,H)*0.2);   // wipe-reveal (animate in)
+      ctx.font=`900 ${fs}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillStyle="#16242c"; ctx.fillText(txt,cx,cy);
+      ctx.save(); ctx.beginPath(); ctx.rect(0,0,prog*W,H); ctx.clip(); ctx.fillStyle="#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=16; ctx.fillText(txt,cx,cy); ctx.restore();
+      ctx.strokeStyle="#7df0c2"; ctx.lineWidth=2; ctx.globalAlpha=0.8; ctx.beginPath(); ctx.moveTo(prog*W,cy-fs*0.6); ctx.lineTo(prog*W,cy+fs*0.6); ctx.stroke(); ctx.globalAlpha=1; ctx.textBaseline="alphabetic"; break; }
+    case "trText":{ const txt="ANIMATE IN", fs=Math.round(Math.min(W,H)*0.13);   // per-letter staggered reveal, signal shapes the rise
+      ctx.font=`800 ${fs}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      const cw=fs*0.62, x0=cx-(txt.length-1)*cw/2;
+      for(let i=0;i<txt.length;i++){ if(txt[i]===" ") continue; const lp=i/Math.max(1,txt.length-1);
+        const local=Math.max(0,Math.min(1,(transP-lp*0.7)/0.32)), ease=local*local*(3-2*local), sig=bufX[Math.floor(lp*(N-1))];
+        const yoff=(1-ease)*fs*0.7*(0.4+sig);
+        ctx.globalAlpha=ease; ctx.fillStyle="#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=10*ease; ctx.fillText(txt[i], x0+i*cw, cy+yoff); }
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.textBaseline="alphabetic"; break; }
+    case "trRadial":{ const prog=loadProgress(transP), R=Math.min(W,H)*0.3, a0=-Math.PI/2;
+      ctx.lineCap="round"; ctx.lineWidth=12; ctx.strokeStyle="#16222b"; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+      ctx.strokeStyle="#36f09a"; ctx.shadowColor="#36f09a"; ctx.shadowBlur=14; ctx.beginPath(); ctx.arc(cx,cy,R,a0,a0+prog*Math.PI*2); ctx.stroke(); ctx.shadowBlur=0; ctx.lineCap="butt";
+      ctx.fillStyle="#eaf6f5"; ctx.font=`700 ${Math.round(Math.min(W,H)*0.13)}px ui-monospace,monospace`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(Math.round(prog*100)+"%",cx,cy); ctx.textBaseline="alphabetic"; break; }
+    case "trMeter":{ const v=Math.max(0,Math.min(1,bufX[Math.floor(transP*(N-1))])), bw=90, bh=Math.min(H*0.6,260), x=cx-bw/2, y=cy+bh/2;   // fluctuates with the raw signal under the playhead
+      ctx.strokeStyle="#1d2a34"; ctx.strokeRect(x,y-bh,bw,bh); ctx.fillStyle=v>0.85?"#f0683a":"#36f09a"; ctx.fillRect(x,y-bh*v,bw,bh*v);
+      ctx.fillStyle="#eaf6f5"; ctx.font="13px ui-monospace,monospace"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(Math.round(v*100)+"%", cx, y-bh-20); ctx.textBaseline="alphabetic"; break; }
   }
   ctx.restore();
-  ctx.fillStyle="#6b7a87"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="left";
-  ctx.fillText(`n=${n.toFixed(3)}  →  ${applied.target} = ${val.toFixed(1)}`, 14, H-14);
+  // Transitions show a playhead timeline instead of the PIP; everything else
+  // gets the PIP + readout (both skipped while recording for a clean capture).
+  if(!rec){
+    if(TRANS.has(applied.target)) drawTransStrip(W,H);
+    else if(!NOPIP.has(applied.target)){
+      drawPip(W,H);
+      ctx.fillStyle="#8ea3b0"; ctx.font="12px ui-monospace,monospace"; ctx.textAlign="left";
+      ctx.fillText(`drive ${drive.mode}  ·  n=${n.toFixed(3)}  →  ${applied.target} = ${val.toFixed(1)}`, 12, H-12);
+    }
+  }
+}
+const NOPIP=new Set(["trace","fuiRadar","fuiScope","fuiArc","fuiBars","fuiReticle","fuiWaveRing","fuiGyro","fuiStream","fuiSynapse","fuiPackets","fuiCore","meterHistogram"]);
+const TRANS=new Set(["trLoad","trWipe","trText","trRadial","trMeter"]);
+// Monotonic "loading" progress at playhead tp: cumulative signal energy so the
+// fill always climbs 0→1 but at a signal-shaped (non-linear) pace.
+function loadProgress(tp){ const idx=Math.min(N-1,Math.floor(tp*N)); let tot=0,acc=0; for(let i=0;i<N;i++){ const w=0.04+Math.abs(bufX[i]-0.5); tot+=w; if(i<=idx) acc+=w; } return tot>0?acc/tot:tp; }
+// Timeline strip: the (frozen) signal curve with the playhead ramping across it.
+function drawTransStrip(W,H){ const sw=Math.min(W*0.8,640), sh=46, x=W/2-sw/2, y=H-sh-16;
+  ctx.fillStyle="rgba(5,7,10,0.72)"; ctx.fillRect(x,y,sw,sh); ctx.strokeStyle="#15303a"; ctx.lineWidth=1; ctx.strokeRect(x,y,sw,sh);
+  ctx.strokeStyle="#2a6"; ctx.lineWidth=1.3; ctx.beginPath(); for(let i=0;i<N;i+=4){ const px=x+i/(N-1)*sw, py=y+sh-bufX[i]*(sh-8)-4; (i?ctx.lineTo(px,py):ctx.moveTo(px,py)); } ctx.stroke();
+  const phx=x+transP*sw; ctx.fillStyle="rgba(54,240,154,0.10)"; ctx.fillRect(x,y,transP*sw,sh);
+  ctx.strokeStyle="#7df0c2"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(phx,y); ctx.lineTo(phx,y+sh); ctx.stroke();
+  ctx.fillStyle="#52606b"; ctx.font="9px ui-monospace,monospace"; ctx.textAlign="left"; ctx.fillText("playhead ramps across the signal — Freeze to hold the curve", x, y-5); ctx.textAlign="left"; }
+function drawPip(W,H){
+  const pw=Math.max(120,Math.min(220,W*0.34)), ph=pw*0.42, px=W-pw-12, py=H-ph-30;
+  ctx.save();
+  ctx.fillStyle="rgba(5,7,10,0.82)"; ctx.strokeStyle="#1c242c"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.rect(px,py,pw,ph); ctx.fill(); ctx.stroke(); ctx.clip();
+  ctx.strokeStyle="#11202a"; ctx.beginPath(); ctx.moveTo(px,py+ph/2); ctx.lineTo(px+pw,py+ph/2); ctx.stroke();
+  const trace=(get,col,glow)=>{ ctx.strokeStyle=col; ctx.lineWidth=glow?2:1.3; ctx.beginPath();
+    for(let i=0;i<N;i+=4){ const v=get(i); const x=px+i/(N-1)*pw, y=py+(1-v)*(ph-6)+3; (i?ctx.lineTo(x,y):ctx.moveTo(x,y)); } ctx.stroke(); };
+  trace(i=>bufX[i],"#36f09a55",false);
+  trace(i=>bufY[i],"#f0b23a55",false);
+  trace(i=>combine(bufX[i],bufY[i]),"#eef",true);     // the driver (bright)
+  ctx.restore();
+  ctx.fillStyle="#52606b"; ctx.font="9px ui-monospace,monospace"; ctx.textAlign="right";
+  ctx.fillText("driver", W-14, py-4);
 }
 
-// ---------- luma probe + sidechain ----------
-const mcvs=document.createElement("canvas"); mcvs.width=120; mcvs.height=68;
-const mctx=mcvs.getContext("2d",{willReadFrequently:true});
-const probeFile=$("probeFile");
-if(probeFile) probeFile.onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const url=URL.createObjectURL(f);
-  if(f.type.indexOf("video")===0){ const v=document.createElement("video"); v.src=url; v.loop=true; v.muted=true; v.playsInline=true; v.play().catch(()=>{}); probe.el=v; probe.kind="video"; }
-  else { const im=new Image(); im.src=url; probe.el=im; probe.kind="image"; }
-  probe.loaded=true; };
-$("probeMode").onchange=()=>{ probe.mode=$("probeMode").value; updateMath(); };
+// ---------- sidechain + Channel-Y link ----------
 $("sideMode").onchange=()=>{ side.target=$("sideMode").value; updateMath(); };
 $("sideDepth").oninput=()=>{ side.depth=+$("sideDepth").value; updateMath(); };
+function syncLinkUI(){ const y=document.querySelector('.chan[data-ch="y"]'); if(y) y.classList.toggle("linked", link.sync||link.invert);
+  const s=$("ySync"), iv=$("yInvert"); if(s)s.checked=link.sync; if(iv)iv.checked=link.invert; }
+$("ySync").onchange=()=>{ link.sync=$("ySync").checked; syncLinkUI(); updateMath(); };
+$("yInvert").onchange=()=>{ link.invert=$("yInvert").checked; syncLinkUI(); updateMath(); };
 
-function sampleMediaLuma(t){ if(!probe.el) return 0.5;
-  try{ mctx.drawImage(probe.el,0,0,mcvs.width,mcvs.height); }catch(e){ return 0.5; }
-  let data; try{ data=mctx.getImageData(0,0,mcvs.width,mcvs.height).data; }catch(e){ return 0.5; }
-  const MW=mcvs.width, MH=mcvs.height;
-  if(probe.mode==="scan"){ const col=Math.floor(((t*0.25)%1)*MW); let s=0; for(let y=0;y<MH;y++){ const o=(y*MW+col)*4; s+=0.299*data[o]+0.587*data[o+1]+0.114*data[o+2]; } return s/MH/255; }
-  let s=0,c=0; for(let i=0;i<data.length;i+=4){ s+=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]; c++; } return s/c/255;
-}
-function pushLuma(t){ const v=sampleMediaLuma(t); lumaHistory.copyWithin(0,1); lumaHistory[N-1]=v; }
-
-// Build the per-channel engine config (the host configures; the engine computes).
-function cfgX(){ return Object.assign({}, state.x, { process: proc, lumaInput: (+state.x.src===7?lumaHistory:null) }); }
-function cfgY(){ return Object.assign({}, state.y, {
+function cfgX(){ return Object.assign({}, state.x, { amount:oscVal("x","amount",state.x.amount), phase:oscVal("x","phase",state.x.phase), process: proc, win: win, z:{input:zBuffer,depth:z.amount} }); }
+function cfgY(){
+  // Sync/Invert link Channel Y to X. Synced → Y mirrors X's full pipeline
+  // (generator + processor + window), so they track even with shaping on.
+  // Invert reuses that and flips to 1 − X after sampling (see frame()).
+  if(link.sync || link.invert) return cfgX();
+  return Object.assign({}, state.y, { amount:oscVal("y","amount",state.y.amount), phase:oscVal("y","phase",state.y.phase),
     mod: (side.target!=="off" ? { target:side.target, depth:side.depth } : null),
     modInput: (side.target!=="off" ? bufX : null),
-    lumaInput: (+state.y.src===7 ? lumaHistory : null) }); }
+    z:{input:zBuffer,depth:z.amount} }); }
 
 // ---------- loop ----------
 function frame(){
-  const t=FREEZE?frozenT:now(); const dt=SPAN/N, start=t-SPAN;
-  if(probe.loaded) pushLuma(t);
-  Engine.sample(cfgX(),start,dt,bufX)            // engine: source+smooth+processor+luma
-    .then(()=> Engine.sample(cfgY(),start,dt,bufY))  // engine: Y, sidechain-modulated by bufX
+  const live=now(); const t=FREEZE?frozenT:live; const dt=SPAN/N, start=t-SPAN; lfoClock=t; transP=(live/3)%1;
+  for(const ch of ["x","y"]) for(const p of ["amount","phase"]) if(lfo[ch][p]){
+    const o=document.querySelector(`.chan[data-ch="${ch}"] [data-p="${p}"]`).parentElement.querySelector("output");
+    if(o) o.textContent=fmt(p, oscVal(ch,p,state[ch][p])); }
+  if(z.amount>0){ const zr=Engine.cpuRack({src:z.shape,rate:z.rate,phase:0,amount:1,offset:0,smooth:0,seed:7},dt); for(let i=0;i<N;i++) zBuffer[i]=zr.output("A",start+i*dt,i); }
+  Engine.sample(cfgX(),start,dt,bufX)
+    .then(()=> Engine.sample(cfgY(),start,dt,bufY))
     .then(()=>{
+      if(link.invert) for(let i=0;i<N;i++) bufY[i]=1-bufY[i];   // mirror Channel X
       sizeCanvas(); const W=cv.width,H=cv.height; (Render[MODE_CUR]||Render.waveform)(W,H);
+      if(MODE_CUR!=="applied") edgeVignette(W,H);   // soften/blur the smear at the borders
+      // Cathode CRT/NTSC — real WebGPU overlay sampling the 2D scope as a texture
+      const crtCanvas=$("crt");
+      if(crt.on && !crt.failed && Engine.device && typeof CathodeCRT!=="undefined"){
+        try{
+          if(!crt.pass) crt.pass=CathodeCRT.create(Engine.device, crtCanvas);
+          const shown = crt.pass && crt.pass.render(cv, t);
+          crtCanvas.style.display = shown ? "block" : "none";
+        }catch(e){ console.warn("CRT failed:",e); crt.failed=true; crtCanvas.style.display="none"; }
+      } else { crtCanvas.style.display="none"; }
+      if(rec) recTick();   // capture this frame into the video recording
       const xc=bip(N-1), yc=bufY[N-1]*2-1;
       $("stageRead").textContent = `${Engine.mode==="webgpu"?"GPU":"CPU"} · X ${xc>=0?"+":""}${xc.toFixed(3)} · Y ${yc>=0?"+":""}${yc.toFixed(3)}`;
-      requestAnimationFrame(frame);
-    });
+      // Output inspector (right pane) — live scalar readouts
+      const drv=combine(bufX[N-1],bufY[N-1])*2-1;
+      const sgn=v=>(v>=0?"+":"")+v.toFixed(3);
+      const ov=(id,t)=>{ const e=$(id); if(e)e.textContent=t; };
+      ov("ovX",sgn(xc)); ov("ovY",sgn(yc)); ov("ovD",sgn(drv));
+      ov("ovView",`${MODE_CUR} · ${Engine.mode==="webgpu"?"WebGPU":"CPU"}`);
+      schedule();
+    }).catch(err=>{ console.warn("frame error, falling back to CPU:",err); Engine.mode="cpu"; Engine.gpuRejected=true; setBadge(); schedule(); });
 }
-setBadge();
-Engine.tryWebGPU().then(()=>{ setBadge(); requestAnimationFrame(frame); });
+// Pause the render loop while the page is hidden (saves battery/GPU on mobile);
+// resume on return. RAF already throttles when backgrounded — this makes it explicit.
+let _hidden=false;
+function schedule(){ if(document.hidden){ _hidden=true; return; } requestAnimationFrame(frame); }
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && _hidden){ _hidden=false; requestAnimationFrame(frame); } });
+(async()=>{ if(await Engine.tryWebGPU()){ await Engine.selfCheck(); } setBadge();
+  if(Engine.gpuRejected){ const d=$("gpudbg"); d.style.display="block"; d.textContent="WebGPU ran but output was wrong → using CPU. "+(Engine.diag||""); }
+  applyShareHash();   // restore a shared link's state before the first frame
+  requestAnimationFrame(frame); })();
 </script>
 </body>
 </html>

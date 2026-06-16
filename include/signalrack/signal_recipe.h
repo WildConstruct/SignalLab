@@ -76,6 +76,15 @@ struct ProcessParams {
     float quantize  = 0.0f;           // 0 = off, else number of steps
     float gate      = 0.0f;           // 0 = off, else threshold
     float lag       = 0.0f;           // 0..1 finite EWMA
+    float warp      = 0.0f;           // -1..1 contrast S-curve (0 = identity)
+    float fold      = 0.0f;           // 0..1 triangle wavefolder (0 = identity)
+    float sat       = 0.0f;           // 0..1 soft saturation (drive + asymmetric warmth)
+    // feathered region window (position 0..1 across the evaluated span):
+    float winLeft     = 0.0f;
+    float winRight    = 1.0f;
+    float winFeatherL = 0.0f;
+    float winFeatherR = 0.0f;
+    float zDepth      = 0.0f;          // third-signal distort depth (per-sample input via request)
     bool  invert    = false;
     bool  rectify   = false;
     // sidechain modulation (signal-drives-signal); per-sample input via request:

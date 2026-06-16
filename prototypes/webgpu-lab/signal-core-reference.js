@@ -32,14 +32,15 @@
   function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
   function linear(t, t0, t1, v0, v1) { if (t <= t0) return v0; if (t >= t1) return v1; return v0 + (v1 - v0) * (t - t0) / (t1 - t0); }
 
-  var SOURCE = { sine:1, pulse:2, ramp:3, noise:4, randomWalk:5, linked:6, lumaProbe:7 };
+  var SOURCE = { sine:1, pulse:2, ramp:3, noise:4, randomWalk:5, linked:6, lumaProbe:7, triangle:8, pulseNarrow:9 };
   var MODE   = { normalized:1, signed:2, percentage:3, degrees:4, pixels:5, custom:6, gate:7, trigger:8 };
   var MOD    = { off:0, amp:1, rate:2, phase:3 };
 
   function normProcess(p) {
     p = p || {};
     return { gain: p.gain != null ? p.gain : 1, bias: p.bias || 0, quantize: p.quantize || 0,
-             gate: p.gate || 0, lag: p.lag || 0, invert: !!p.invert, rectify: !!p.rectify };
+             gate: p.gate || 0, lag: p.lag || 0, invert: !!p.invert, rectify: !!p.rectify,
+             warp: p.warp || 0, fold: p.fold || 0, sat: p.sat || 0 };
   }
   function modCode(m) { if (!m || !m.target || m.target === "off") return 0; return MOD[m.target] || (typeof m.target === "number" ? m.target : 0); }
 
@@ -61,6 +62,11 @@
     this.modDepth = (cfg.mod && cfg.mod.depth != null) ? cfg.mod.depth : 0;
     this.modInput = cfg.modInput || null;      // per-sample modulator 0..1 (sidechain)
     this.lumaInput= cfg.lumaInput || null;     // per-sample luma 0..1 (probe)
+    var w = cfg.win || {};                     // feathered region window
+    this.win = { left: w.left != null ? w.left : 0, right: w.right != null ? w.right : 1, featherL: w.featherL || 0, featherR: w.featherR || 0 };
+    this.sampleN = cfg.sampleN || 0;           // total samples (for window position)
+    this.zInput = (cfg.z && cfg.z.input) || null;   // third signal per-sample (distort)
+    this.zDepth = (cfg.z && cfg.z.depth) || 0;
     var d = cfg.outputs || {};
     this.outputs = { A: d.A || { mode: MODE.normalized, min: 0, max: 1 },
                      B: d.B || { mode: MODE.degrees, min: -15, max: 15 },
@@ -76,20 +82,27 @@
       var l = this.lumaInput ? this.lumaInput[idx] : (this.luma ? this.luma(tt) : 0);
       return clamp(l + this.offset, 0, 1);
     }
-    var rate = this.rate, amount = this.amount, phase = this.phase;
+    var rate = this.rate, amount = this.amount, phase = this.phase, fmDev = 0;
     if (this.modTarget && this.modInput) {                 // sidechain modulation
       var m = this.modInput[idx];
       if (this.modTarget === MOD.amp)   amount *= (1 - this.modDepth + this.modDepth * m);
-      if (this.modTarget === MOD.rate)  rate   *= (1 + this.modDepth * (m * 2 - 1));
+      // FM/vibrato: apply the frequency deviation over window-relative time
+      // (idx*dt, bounded by the span) instead of scaling absolute-time rate —
+      // which exploded because tt is absolute seconds since load.
+      if (this.modTarget === MOD.rate)  fmDev = rate * this.modDepth * (m * 2 - 1) * (idx * this.frameDur) * 0.5;
       if (this.modTarget === MOD.phase) phase  += this.modDepth * m;
     }
-    var x = tt * rate + phase, bp;
+    var seedPhase = (this.seed * 0.07) - Math.floor(this.seed * 0.07);   // Seed shifts the waveform
+    var zBend = this.zDepth && this.zInput ? this.zDepth * (this.zInput[idx] * 2 - 1) : 0;  // third signal phase-bend
+    var x = tt * rate + fmDev + phase + seedPhase + zBend, fx = x - Math.floor(x), bp;
     switch (this.srcType) {
-      case SOURCE.sine:  bp = Math.sin(x * Math.PI * 2); break;
-      case SOURCE.pulse: bp = (x - Math.floor(x)) < 0.5 ? 1 : -1; break;
-      case SOURCE.ramp:  bp = (x - Math.floor(x)) * 2 - 1; break;
-      case SOURCE.noise: bp = valueNoise(x + this.seed * 0.123); break;
-      case SOURCE.randomWalk: { var sum = 0, amp = 1, fr = 1, norm = 0; for (var o = 0; o < 4; o++) { sum += amp * valueNoise(x * fr + this.seed + o * 7.7); norm += amp; amp *= 0.5; fr *= 2; } bp = sum / norm; break; }
+      case SOURCE.sine:       bp = Math.sin(x * Math.PI * 2); break;                                  // 1
+      case SOURCE.pulse:      bp = fx < 0.5 ? 1 : -1; break;                                          // 2 Square
+      case SOURCE.ramp:       bp = fx * 2 - 1; break;                                                 // 3 Saw
+      case SOURCE.noise:      bp = valueNoise(x + this.seed * 0.123); break;                          // 4
+      case SOURCE.randomWalk: { var sum = 0, amp = 1, fr = 1, norm = 0; for (var o = 0; o < 4; o++) { sum += amp * valueNoise(x * fr + this.seed + o * 7.7); norm += amp; amp *= 0.5; fr *= 2; } bp = sum / norm; break; } // 5
+      case 8:                 bp = 4 * Math.abs(fx - 0.5) - 1; break;                                 // 8 Triangle
+      case 9:                 bp = fx < 0.2 ? 1 : -1; break;                                          // 9 Pulse (narrow)
       default: bp = 0;
     }
     bp *= amount;
@@ -104,9 +117,13 @@
   };
 
   // pointwise processor on a normalized value
+  function tanhA(x) { var c = clamp(x, -4, 4), a = c * c; return c * (27 + a) / (27 + 9 * a); }
   Rack.prototype.pointwise = function (n) {
     var p = this.process;
     if (p.gain !== 1 || p.bias) n = clamp01(0.5 + (n - 0.5) * p.gain + p.bias);
+    if (p.sat > 0) { var bp = n * 2 - 1, g = 1 + p.sat * 8, bias = p.sat * 0.25; var sh = tanhA(bp * g + bias) - tanhA(bias); n = ((bp * (1 - p.sat) + sh * p.sat) + 1) * 0.5; }
+    if (p.warp) { var bp = n * 2 - 1, pw = Math.pow(3, -p.warp); n = ((bp < 0 ? -1 : 1) * Math.pow(Math.abs(bp), pw) + 1) * 0.5; }
+    if (p.fold > 0) { var x = (n * 2 - 1) * (1 + p.fold * 6); var xm = (x - 1) - 4 * Math.floor((x - 1) / 4); n = Math.abs(xm - 2) * 0.5; }
     if (p.invert) n = 1 - n;
     if (p.rectify) n = Math.abs(n * 2 - 1);
     if (p.quantize > 1) n = Math.round(n * (p.quantize - 1)) / (p.quantize - 1);
@@ -125,8 +142,18 @@
     return acc / wsum;
   };
 
+  Rack.prototype.windowEnv = function (idx) {
+    var w = this.win, L = w.left, R = w.right, fL = w.featherL, fR = w.featherR;
+    if (L <= 0 && R >= 1 && fL <= 0 && fR <= 0) return 1;
+    var pos = this.sampleN > 1 ? (idx || 0) / (this.sampleN - 1) : 0;
+    if (pos < L || pos > R) return 0;
+    var e = 1, ss = function (t) { return t * t * (3 - 2 * t); };
+    if (fL > 1e-4 && pos < L + fL) e *= ss(clamp((pos - L) / fL, 0, 1));
+    if (fR > 1e-4 && pos > R - fR) e *= ss(clamp((R - pos) / fR, 0, 1));
+    return e;
+  };
   Rack.prototype.output = function (ch, tt, idx) {
-    var o = this.outputs[ch], n = clamp01(this.normN(tt, idx));
+    var o = this.outputs[ch], n = clamp01(this.normN(tt, idx)) * this.windowEnv(idx);
     if (o.mode === MODE.gate) return n >= 0.5 ? o.max : o.min;
     if (o.mode === MODE.trigger) {
       for (var k = 1; k <= 3; k++) { var a = this.srcUni(tt - k * this.frameDur, idx) >= 0.5, b = this.srcUni(tt - (k - 1) * this.frameDur, idx) >= 0.5; if (b && !a) return o.max; }
