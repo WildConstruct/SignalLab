@@ -34,7 +34,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] **Path & Scope** MVP — wave-runner (ported `trace`): combined driver drawn across the window + glowing head dot on the live value. 3 presets. Headless-verified.
 
 ## Phase 2 — Fill each demo's structure + shaping (breadth first, one slice each)
-- [ ] FUI Kit — add Data packets (`fuiPackets`) + Processor die (`fuiCore`); widget picker; lane/grid-size controls.
+- [x] FUI Kit — added Data packets (`fuiPackets`) + Processor die (`fuiCore`) + a widget picker. 4 presets. Headless-verified all three widgets.
 - [ ] Glitch — add block displacement from an imported image (the "retro logo machine"); displacement-scale control.
 - [ ] Transitions — add wipe + radial-fill + text-reveal variants; easing control.
 - [ ] Kinetic Type — add shake-on-peak + RGB-glitch threshold variants.
