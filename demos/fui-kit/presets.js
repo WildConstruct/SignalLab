@@ -21,6 +21,14 @@
     "Hex Grid":    { driver: { x: { src: "sine", rate: 1.2 }, y: { src: "sine", rate: 1.8, phase: 0.2 }, drive: "mult" },
                      S: { widget: "hex", cols: 9, rows: 7, hexr: 24, seed: 404, fire: 0.4, field: "stagger", _src: "sine", _rate: 1.2, _drive: "mult" } },
     "Hex (3D)":    { driver: { x: { src: "sine", rate: 1.4 }, y: { src: "noise", rate: 2.5 }, drive: "max" },
-                     S: { widget: "hex3d", cols: 7, rows: 6, hexr: 20, depth: 6, seed: 99, fire: 0.4, field: "stagger", _src: "sine", _rate: 1.4, _drive: "max" } }
+                     S: { widget: "hex3d", cols: 7, rows: 6, hexr: 20, depth: 6, seed: 99, fire: 0.4, field: "stagger", _src: "sine", _rate: 1.4, _drive: "max" } },
+    "Radial Spectrum": { driver: { x: { src: "sine", rate: 1.5 }, y: { src: "sine", rate: 2, phase: 0.2 }, drive: "mult" },
+                     S: { widget: "radial", bins: 48, rin: 0.4, seed: 7, fire: 0.15, field: "sweep", _src: "sine", _rate: 1.5, _drive: "mult" } },
+    "Lock-on":     { driver: { x: { src: "pulse", rate: 0.8 }, y: { src: "sine", rate: 1.5 }, drive: "max" },
+                     S: { widget: "reticle", rsize: 1, spin: 0.4, callouts: true, seed: 12, fire: 0.5, _src: "pulse", _rate: 0.8, _drive: "max" } },
+    "Heading":     { driver: { x: { src: "sine", rate: 0.4 }, drive: "x" },
+                     S: { widget: "compass", crange: 120, seed: 1, fire: 0.5, _src: "sine", _rate: 0.4, _drive: "x" } },
+    "Globe":       { driver: { x: { src: "randomWalk", rate: 1.2 }, y: { src: "noise", rate: 2 }, drive: "max" },
+                     S: { widget: "globe", gr: 1, lon: 6, lat: 4, orbits: 10, gspin: 0.3, seed: 33, fire: 0.4, field: "stagger", _src: "randomWalk", _rate: 1.2, _drive: "max" } }
   };
 })(typeof self !== "undefined" ? self : this);
