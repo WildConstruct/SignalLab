@@ -27,11 +27,11 @@ the structure statically; animate it with the built-in driver through ONE
 shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] **FUI Kit** MVP — Synapse net (ported `fuiSynapse`): Nodes/Connectivity/Seed (Structure), source/rate/combine (Signal), `Fire ≥` (Shaping). 3 presets. Headless-render + HTTP verified.
 - [x] **Glitch / Distortion** MVP — procedural NTSC test card with RGB chroma split + sample-and-hold sync jitter + scanlines + peak dropout tear; signal drives chroma phase + sync drift. 3 presets. Headless-render verified.
-- [ ] **Transitions** MVP — loading bar with monotonic signal-shaped pace (port `trLoad`) + sweep playhead.
-- [ ] **Kinetic Type** MVP — per-letter wave/stagger on a word (port `type`/`trText`); signal drives the rise.
-- [ ] **Meters** MVP — bar meter + gate (port `meter`) with a fill response curve.
-- [ ] **Particles** MVP — fountain emitter (port `particles`): signal → birth-rate spikes + spread.
-- [ ] **Path & Scope** MVP — wave-runner (port `trace`): object rides the raw `bufX` waveform; head dot tracks the live value.
+- [x] **Transitions** MVP — loading bar with monotonic, signal-shaped fill pace (ported `trLoad`); loops for the demo. 3 presets. Headless-verified.
+- [x] **Kinetic Type** MVP — per-letter kinetic wave (ported `type`): later glyphs read older samples so a wave travels; editable word. 3 presets. Headless-verified.
+- [x] **Meters** MVP — bar meter + gate (ported `meter`) with response γ, redline, peak-hold. 3 presets. Headless-verified.
+- [x] **Particles** MVP — fountain (ported `particles`): curved birth rate + spread from signal energy; dt-independent. 3 presets. Headless-verified.
+- [x] **Path & Scope** MVP — wave-runner (ported `trace`): combined driver drawn across the window + glowing head dot on the live value. 3 presets. Headless-verified.
 
 ## Phase 2 — Fill each demo's structure + shaping (breadth first, one slice each)
 - [ ] FUI Kit — add Data packets (`fuiPackets`) + Processor die (`fuiCore`); widget picker; lane/grid-size controls.
