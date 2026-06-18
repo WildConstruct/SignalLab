@@ -17,17 +17,20 @@
     var cx = W / 2, cy = H / 2, seed = (+S.seed || 1) * 0.137;
     function hx(k) { var s = Math.sin(k * 127.1 + 311.7 + seed) * 43758.5453; return s - Math.floor(s); }
     var NODES = Math.max(3, Math.round(S.nodes)), deg0 = Math.max(1, Math.round(S.connect)), fire = S.fire;
+    var prop = S.propag != null ? S.propag : 0.6, seqAmt = S.seq || 0;
     var pos = [];
     for (var i = 0; i < NODES; i++) pos.push([cx + (hx(i) - 0.5) * Math.min(W * 0.84, 820), cy + (hx(i + 50) - 0.5) * Math.min(H * 0.74, 440)]);
+    // per-node sequencing envelope → nodes fire in a travelling sequence
+    function seqEnv(i) { return seqAmt <= 0 ? 1 : (1 - seqAmt) + seqAmt * (0.5 + 0.5 * Math.sin(t * prop * 3 - i * 1.1)); }
     // field map decides which point of the signal each node reads (default: stagger)
-    function act(i) { return Shaping.fieldValue(F, i, NODES, Math.round(+S.seed || 0) + 9); }
+    function act(i) { return Math.max(0, Math.min(1, Shaping.fieldValue(F, i, NODES, Math.round(+S.seed || 0) + 9) * seqEnv(i))); }
     var edges = [];
     for (i = 0; i < NODES; i++) for (var d = 0; d < deg0; d++) { var j = Math.floor(hx(i * 5 + d + 617) * NODES); if (j === i) j = (j + 1) % NODES; edges.push([i, j]); }
     for (var ei = 0; ei < edges.length; ei++) {
       var a = edges[ei][0], b = edges[ei][1], A = pos[a], B = pos[b];
       ctx.strokeStyle = "#15303a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
       var aa = act(a);
-      if (aa > Math.max(0.05, fire - 0.1)) { var ph = (t * 0.6 + hx(ei * 3)) % 1, x = A[0] + (B[0] - A[0]) * ph, y = A[1] + (B[1] - A[1]) * ph;
+      if (aa > Math.max(0.05, fire - 0.1)) { var ph = (t * prop + hx(ei * 3)) % 1, x = A[0] + (B[0] - A[0]) * ph, y = A[1] + (B[1] - A[1]) * ph;
         ctx.globalAlpha = aa; ctx.fillStyle = "#7df0c2"; ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(x, y, 2 + aa * 2, 0, 7); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
     }
     for (i = 0; i < NODES; i++) {
@@ -85,7 +88,9 @@
     ],
     shaping: [
       root.SignalShaping.fieldSpec("stagger"),
-      { tier: "shaping", key: "fire", label: "Fire ≥ <span>threshold</span>", type: "slider", min: 0, max: 1, step: 0.01, value: 0.45, fmt: function (v) { return (+v).toFixed(2); } }
+      { tier: "shaping", key: "fire",   label: "Fire ≥ <span>threshold</span>", type: "slider", min: 0, max: 1, step: 0.01, value: 0.45, fmt: function (v) { return (+v).toFixed(2); } },
+      { tier: "shaping", key: "propag", label: "Edge speed <span>(synapse)</span>", type: "slider", min: 0.1, max: 3, step: 0.05, value: 0.6, fmt: function (v) { return (+v).toFixed(2); } },
+      { tier: "shaping", key: "seq",    label: "Sequencing <span>(synapse)</span>", type: "slider", min: 0, max: 1, step: 0.01, value: 0, fmt: function (v) { return (+v).toFixed(2); } }
     ],
     presets: (root.DemoPresets || {}),
     render: render
