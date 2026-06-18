@@ -13,6 +13,8 @@
     "Equalizer":   { driver: { x: { src: "sine", rate: 1.5 }, y: { src: "sine", rate: 2, phase: 0.2 }, drive: "mult" },
                      S: { widget: "equalizer", bands: 28, seed: 7, fire: 0.2, field: "sweep", _src: "sine", _rate: 1.5, _drive: "mult" } },
     "Radar":       { driver: { x: { src: "randomWalk", rate: 1 }, y: { src: "noise", rate: 2 }, drive: "max" },
-                     S: { widget: "radar", blips: 14, seed: 23, fire: 0.4, sweep: 0.8, field: "stagger", _src: "randomWalk", _rate: 1, _drive: "max" } }
+                     S: { widget: "radar", blips: 14, seed: 23, fire: 0.4, sweep: 0.8, field: "stagger", _src: "randomWalk", _rate: 1, _drive: "max" } },
+    "Telemetry":   { driver: { x: { src: "sine", rate: 1 }, y: { src: "noise", rate: 2.5 }, drive: "max" },
+                     S: { widget: "telemetry", lines: 8, lineh: 30, seed: 51, fire: 0.6, field: "sweep", _src: "sine", _rate: 1, _drive: "max" } }
   };
 })(typeof self !== "undefined" ? self : this);
