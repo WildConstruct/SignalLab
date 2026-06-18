@@ -14,7 +14,7 @@ gets a thin MVP slice before any demo gets polish. Build breadth first.
 ---
 
 ## Phase 0 — Shared foundation (unblocks all demos)
-- [ ] `demos/shared/signal-engine.js` — UMD wrapper re-exporting `SignalCore` + the `driver` (sample/window/fromRecipe/toExpression) per `README.md`. Reuse `prototypes/webgpu-lab/signal-core-reference.js`; do not fork the math.
+- [x] `demos/shared/signal-engine.js` — driver wrapping two `SignalCore.Rack` channels + the exact `combine()` modes; exposes `sample/window/set/fromRecipe`. Node-verified against the parity engine. (`toExpression` deferred to Phase 4.)
 - [ ] `demos/shared/host.js` — boot + render loop + canvas sizing + engine badge + copy-link/export-JSON/import (lift from `tool/index.html`).
 - [ ] `demos/shared/controls.js` — three-tier panel kit (Structure / Signal / Shaping), sliders w/ double-click-reset, dropdowns, Signal-source selector, math drawer.
 - [ ] `demos/shared/style.css` — shared palette/typography extracted from `tool/index.html`.
