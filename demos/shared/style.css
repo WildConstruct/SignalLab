@@ -72,6 +72,13 @@ select.sh-btn{padding-right:6px}
   letter-spacing:.01em;text-transform:none;font-weight:400}
 .sh-sec-body{padding:2px 0 8px}
 
+/* signal scope (collapsible graph at the bottom of the inspector) */
+.sh-scope-cv{display:block;width:100%;height:128px;background:#0c0c0e;
+  border:1px solid var(--line);border-radius:6px}
+.sh-scope-legend{display:flex;gap:14px;padding:7px 2px 0;font-size:10px;color:var(--muted)}
+.sh-scope-legend i{display:inline-block;width:9px;height:2px;vertical-align:middle;
+  margin-right:5px;border-radius:1px}
+
 /* dense inspector rows */
 .sh-ctl{padding:4px 14px 5px}
 .sh-ctl label{display:flex;justify-content:space-between;align-items:center;gap:10px;
@@ -105,6 +112,9 @@ select.sh-btn{padding-right:6px}
   border-radius:9px;padding:14px;transition:border-color .14s,transform .14s,background .14s}
 .sh-card:hover{border-color:var(--accent-dim);background:var(--panel2);transform:translateY(-2px)}
 .sh-card h2{margin:0 0 5px;font-size:13.5px;color:var(--ink);font-weight:600}
+/* thumbnail canvas must stay inside the card frame (intrinsic px is larger) */
+.sh-card canvas.sh-thumb{display:block;width:100%;height:64px;border-radius:6px;
+  background:#0d0d0f;border:1px solid var(--line);margin-bottom:11px}
 .sh-card p{margin:0;color:var(--muted);font-size:11.5px;line-height:1.55}
 .sh-card .tag{display:inline-block;margin-top:11px;font-size:9.5px;letter-spacing:.06em;
   text-transform:uppercase;color:var(--accent);border:1px solid var(--accent-dim);

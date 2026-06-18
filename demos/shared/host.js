@@ -97,6 +97,47 @@
     function onChange(s) { applySignal(s); pushHash(); }
     applySignal(ui.state);
 
+    // ---- Signal Scope: collapsible live graph of the wave function ----
+    var scopeSec = div("sh-section sh-scope collapsed");
+    var scopeH = document.createElement("h3"); scopeH.appendChild(document.createTextNode("Signal Scope"));
+    var scopeHint = div("sh-hint"); scopeHint.textContent = "the wave function"; scopeH.appendChild(scopeHint);
+    var scopeBody = div("sh-sec-body");
+    var scopeCanvas = document.createElement("canvas"); scopeCanvas.className = "sh-scope-cv";
+    var legend = div("sh-scope-legend");
+    legend.innerHTML = '<span><i style="background:#7ec77a"></i>signal</span>'
+      + '<span><i style="background:#5aa9e6"></i>X</span><span><i style="background:#9a9aa0"></i>Y</span>';
+    scopeBody.append(scopeCanvas, legend);
+    scopeSec.append(scopeH, scopeBody);
+    panel.appendChild(scopeSec);
+    var sctx = scopeCanvas.getContext("2d"), sW = 0, sH = 0;
+    function resizeScope() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      sW = scopeCanvas.clientWidth; sH = scopeCanvas.clientHeight;
+      if (!sW || !sH) return;
+      scopeCanvas.width = sW * dpr; scopeCanvas.height = sH * dpr; sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    scopeH.onclick = function () { scopeSec.classList.toggle("collapsed"); setTimeout(resizeScope, 0); };
+    window.addEventListener("resize", resizeScope);
+    function drawScope(w) {
+      if (scopeSec.classList.contains("collapsed")) return;
+      if (!sW) { resizeScope(); if (!sW) return; }
+      var L = w.bufX.length;
+      sctx.clearRect(0, 0, sW, sH);
+      sctx.strokeStyle = "#1b1b1f"; sctx.lineWidth = 1;
+      sctx.beginPath(); sctx.moveTo(0, sH / 2); sctx.lineTo(sW, sH / 2); sctx.stroke();   // mid line
+      function plot(buf, color, lw, alpha) {
+        sctx.globalAlpha = alpha; sctx.strokeStyle = color; sctx.lineWidth = lw; sctx.beginPath();
+        for (var i = 0; i < L; i++) { var x = i / (L - 1) * sW, y = (1 - buf[i]) * (sH - 6) + 3; i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); }
+        sctx.stroke(); sctx.globalAlpha = 1;
+      }
+      var needY = driver.drive !== "x";
+      plot(w.bufX, "#5aa9e6", 1, 0.5);                         // channel X
+      if (needY) plot(w.bufY, "#9a9aa0", 1, 0.45);            // channel Y
+      sctx.strokeStyle = "#7ec77a"; sctx.lineWidth = 1.7; sctx.beginPath();   // combined = the signal
+      for (var i = 0; i < L; i++) { var dv = SignalEngine.combine(driver.drive, w.bufX[i], w.bufY[i]); var x = i / (L - 1) * sW, y = (1 - dv) * (sH - 6) + 3; i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); }
+      sctx.stroke();
+    }
+
     // canvas sizing
     var ctx = canvas.getContext("2d"), W = 0, H = 0;
     function resize() {
@@ -117,6 +158,7 @@
         cfg.render(ctx, W, H, { t: t, n: w.n, x: w.bufX[511], y: w.bufY[511],
           bufX: w.bufX, bufY: w.bufY, S: ui.state });
       } catch (e) { badge.textContent = "render error: " + e.message; badge.classList.remove("live"); }
+      drawScope(w);
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
