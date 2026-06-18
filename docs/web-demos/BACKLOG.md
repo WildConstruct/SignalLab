@@ -56,7 +56,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] Every demo: 3–6 presets via a host **Presets…** dropdown + `🎲 Surprise` (already present). Done across all 7 demos.
 - [x] Every demo: host **ƒ AE** button copies a self-contained After Effects expression via `driver.toExpression` (channels → combine → remap). Validated to ~1e-8 parity vs. the live driver across all sources + combine modes.
 - [x] `demos/index.html` gallery polish + live per-demo thumbnails (each card animates its signature driver waveform via the shared engine).
-- [ ] Cross-link demos ↔ `docs/product-breakup.md` and the Notion sub-project.
+- [x] Cross-linked: `product-breakup.md` now points to `docs/web-demos/`, `demos/`, the backlog, and Notion; added `demos/README.md`; gallery footer links back to all of them. **Phase 4 complete — backlog fully cleared.**
 
 ---
 

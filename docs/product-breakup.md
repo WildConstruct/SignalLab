@@ -5,6 +5,13 @@
 > plugin scaffold, and the WGSL core. This is a strategy doc, not a spec — it
 > proposes how the one big "Signal Lab" tool breaks into a product line, and how
 > the visual generators become signal-driven effect tools in their own right.
+>
+> **Implementation status:** this analysis is now being executed. See
+> [`docs/web-demos/`](web-demos/README.md) for the architecture + per-demo plans
+> and [`demos/`](../demos/) for the working seven-demo suite over a shared signal
+> engine. Build progress is tracked in
+> [`docs/web-demos/BACKLOG.md`](web-demos/BACKLOG.md) and the Notion sub-project
+> **[Signal Rack — Web Demos (Engineering)](https://app.notion.com/p/383b77d6cd4f81699963d80c643576a5)**.
 
 ---
 
