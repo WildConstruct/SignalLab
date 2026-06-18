@@ -8,7 +8,7 @@
  */
 (function (root) {
   "use strict";
-  var peak = 0;
+  var Shaping = root.SignalShaping, peakHold = new Shaping.PeakHold(0.006), peak = 0;
 
   function barMeter(ctx, W, H, n, f, red) {
     var cx = W / 2, bw = 90, bh = Math.min(H * 0.7, 260), x = cx - bw / 2, y = (H + bh) / 2;
@@ -41,8 +41,8 @@
   }
 
   function render(ctx, W, H, F) {
-    var S = F.S, n = Math.max(0, Math.min(1, F.n)), f = Math.pow(n, S.gamma), red = S.redline;
-    peak = Math.max(f, peak - 0.006);
+    var S = F.S, n = Math.max(0, Math.min(1, F.n)), f = Shaping.response(n, S), red = S.redline;
+    peak = peakHold.push(f);
     switch (S.variant) {
       case "radial": radialGauge(ctx, W, H, f, red); break;
       case "led":    ledLadder(ctx, W, H, f, Math.max(4, Math.round(S.segs))); break;
@@ -58,10 +58,9 @@
         { value: "bar", label: "Bar + gate" }, { value: "radial", label: "Radial gauge" }, { value: "led", label: "LED ladder" } ] },
       { tier: "structure", key: "segs", label: "Segments <span>(LED)</span>", type: "slider", min: 6, max: 28, step: 1, value: 16 }
     ],
-    shaping: [
-      { tier: "shaping", key: "gamma",   label: "Response <span>γ</span>", type: "slider", min: 0.3, max: 3, step: 0.05, value: 1, fmt: function (v) { return (+v).toFixed(2); } },
+    shaping: root.SignalShaping.responseSpecs({ gamma: 1 }).concat([
       { tier: "shaping", key: "redline", label: "Redline ≥", type: "slider", min: 0.5, max: 1, step: 0.01, value: 0.85, fmt: function (v) { return (+v).toFixed(2); } }
-    ],
+    ]),
     presets: (root.DemoPresets || {}),
     render: render
   };

@@ -13,7 +13,7 @@
   function step(F) { var t = F.t, dt = last == null ? 1 / 60 : Math.max(0, Math.min(0.1, t - last)); last = t; return dt * 60; }
 
   function fountain(ctx, W, H, F, sp) {
-    var S = F.S, e = Math.max(0, Math.min(1, F.n)), cx = W / 2, cy = H * 0.62;
+    var S = F.S, e = root.SignalShaping.response(Math.max(0, Math.min(1, F.n)), F.S), cx = W / 2, cy = H * 0.62;
     var birth = Math.round(e * e * S.rate), spread = 2.5 + e * S.spread;
     for (var i = 0; i < birth; i++) { var a = Math.random() * Math.PI * 2, v = Math.random() * spread;
       parts.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.5, l: 1, sz: 2 + e * 4, h: 150 + e * 120 }); }
@@ -25,7 +25,7 @@
     ctx.globalAlpha = 1;
   }
   function shockRings(ctx, W, H, F, sp) {
-    var S = F.S, e = Math.max(0, Math.min(1, F.n)), cx = W / 2, cy = H / 2, thr = S.burst;
+    var S = F.S, e = root.SignalShaping.response(Math.max(0, Math.min(1, F.n)), F.S), cx = W / 2, cy = H / 2, thr = S.burst;
     if (e > thr && e > prevE + 0.03) rings.push({ r: 8, l: 1, h: 150 + e * 120, w: 1.5 + e * 3.5 });
     prevE = e; rings = rings.filter(function (R) { return R.l > 0; });
     for (var i = 0; i < rings.length; i++) { var R = rings[i];
@@ -36,7 +36,7 @@
     ctx.fillStyle = "hsl(" + (150 + e * 120) + ",85%,60%)"; ctx.beginPath(); ctx.arc(cx, cy, 3 + e * 5, 0, 7); ctx.fill();
   }
   function stream(ctx, W, H, F, sp) {
-    var S = F.S, e = Math.max(0, Math.min(1, F.n)), cy = H / 2;
+    var S = F.S, e = root.SignalShaping.response(Math.max(0, Math.min(1, F.n)), F.S), cy = H / 2;
     var birth = Math.round(1 + e * (S.rate / 6 + 1));
     for (var i = 0; i < birth; i++) parts.push({ x: 0, y: cy + (Math.random() - 0.5) * H * 0.78 * (0.25 + e), vx: 2.5 + e * 8 + Math.random() * 2, vy: (Math.random() - 0.5) * 1.4, l: 1, sz: 1.5 + e * 3, h: 150 + e * 120 });
     parts = parts.filter(function (p) { return p.l > 0 && p.x < W + 12; });
@@ -67,7 +67,7 @@
     shaping: [
       { tier: "shaping", key: "spread", label: "Spread / velocity <span>(fountain)</span>", type: "slider", min: 2, max: 20, step: 0.5, value: 11, fmt: function (v) { return (+v).toFixed(1); } },
       { tier: "shaping", key: "burst",  label: "Burst threshold <span>(rings)</span>", type: "slider", min: 0.2, max: 0.9, step: 0.01, value: 0.5, fmt: function (v) { return (+v).toFixed(2); } }
-    ],
+    ].concat(root.SignalShaping.responseSpecs({ gamma: 1 })),
     presets: (root.DemoPresets || {}),
     render: render
   };

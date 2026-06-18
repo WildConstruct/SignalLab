@@ -43,7 +43,7 @@
   }
 
   function render(ctx, W, H, F) {
-    var S = F.S, bx = F.bufX, L = bx.length, e = Math.max(0, Math.min(1, F.n)), t = F.t;
+    var S = F.S, bx = F.bufX, L = bx.length, e = root.SignalShaping.response(Math.max(0, Math.min(1, F.n)), S), t = F.t;
     var chroma = e * S.chroma;
     var stepN = Math.floor(t * 14); var jh = Math.sin(stepN * 91.7) * 43758.5453; jh -= Math.floor(jh);
     var sync = (jh - 0.5) * 2 * e * S.drift;
@@ -85,7 +85,7 @@
       { tier: "shaping", key: "chroma", label: "Chroma phase <span>px</span>",  type: "slider", min: 0, max: 40, step: 1, value: 14 },
       { tier: "shaping", key: "drift",  label: "Sync drift <span>px</span>",     type: "slider", min: 0, max: 120, step: 1, value: 48 },
       { tier: "shaping", key: "block",  label: "Block displace <span>px</span>", type: "slider", min: 0, max: 200, step: 2, value: 0, fmt: function (v) { return v > 0.5 ? v : "off"; } }
-    ],
+    ].concat(root.SignalShaping.responseSpecs({ gamma: 1 })),
     presets: (root.DemoPresets || {}),
     render: render
   };
