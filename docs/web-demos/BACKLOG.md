@@ -15,11 +15,11 @@ gets a thin MVP slice before any demo gets polish. Build breadth first.
 
 ## Phase 0 — Shared foundation (unblocks all demos)
 - [x] `demos/shared/signal-engine.js` — driver wrapping two `SignalCore.Rack` channels + the exact `combine()` modes; exposes `sample/window/set/fromRecipe`. Node-verified against the parity engine. (`toExpression` deferred to Phase 4.)
-- [ ] `demos/shared/host.js` — boot + render loop + canvas sizing + engine badge + copy-link/export-JSON/import (lift from `tool/index.html`).
-- [ ] `demos/shared/controls.js` — three-tier panel kit (Structure / Signal / Shaping), sliders w/ double-click-reset, dropdowns, Signal-source selector, math drawer.
-- [ ] `demos/shared/style.css` — shared palette/typography extracted from `tool/index.html`.
-- [ ] `demos/index.html` — a launcher page linking all seven demos (the "Lab" gallery).
-- [ ] Verify foundation: a throwaway `demos/_smoke/` page mounts host+controls and animates `driver.sample(t).n` on a canvas. Delete once a real demo exists.
+- [x] `demos/shared/host.js` — boot + render loop + canvas sizing + engine badge + copy-link/export-JSON + 🎲; schema-driven, demos are render-fn-only.
+- [x] `demos/shared/controls.js` — three-tier panel kit (Structure / Signal / Shaping), sliders w/ double-click-reset, dropdowns, signal-source selector.
+- [x] `demos/shared/style.css` — shared palette/typography extracted from `tool/index.html`.
+- [x] `demos/index.html` — launcher gallery linking all seven demos (ready vs. planned).
+- [x] Verify foundation: Node parse/wire-check of all shared modules passes; the FUI Kit MVP (below) serves as the live foundation smoke test in-browser.
 
 ## Phase 1 — One thin MVP per demo (breadth first)
 *Each: scaffold `index.html` + `render.js` + `presets.js` + `README.md`; render

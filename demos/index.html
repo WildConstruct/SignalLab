@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signal Rack — Demo Lab</title>
+<link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+<div class="sh-gallery">
+  <h1>Signal Rack — Demo Lab</h1>
+  <p class="lead">One signal engine, many instruments. Each demo is a standalone
+  renderer driven by the same parity engine the After-Effects bridge uses — built
+  on the shared <b>Structure / Signal / Shaping</b> control language. Pick one.</p>
+
+  <div class="sh-grid" id="grid"></div>
+</div>
+<script>
+// Keep in sync with docs/web-demos/*.md. "ready" demos link out; others are stubs.
+var DEMOS = [
+  { dir:"fui-kit",          name:"FUI Kit",            ready:true,
+    desc:"HUD widgets where the signal decides which elements fire and in what sequence.", tag:"lead generator" },
+  { dir:"glitch-distortion",name:"Glitch / Distortion", ready:false,
+    desc:"An image in the foreground; the signal subtly warps it — sync drift, chroma, dropout.", tag:"signal in background" },
+  { dir:"transitions",      name:"Transitions",         ready:false,
+    desc:"Signal-shaped animate-ins: a playhead climbs and the signal shapes its pace.", tag:"load-in" },
+  { dir:"kinetic-type",     name:"Kinetic Type",        ready:false,
+    desc:"Per-letter motion driven by the signal — wave, stagger, shake-on-peak.", tag:"type" },
+  { dir:"meters",           name:"Meters",              ready:false,
+    desc:"Calibrated readouts: response curves, peak-hold, redline gate.", tag:"readout" },
+  { dir:"particles",        name:"Particles",           ready:false,
+    desc:"Emitters whose birth-rate spikes with the signal. Bridge to Entropy.", tag:"emitter" },
+  { dir:"path-scope",       name:"Path & Scope",        ready:false,
+    desc:"The raw signal as geometry — ride the waveform, trace the vectorscope.", tag:"scope" }
+];
+var grid = document.getElementById("grid");
+DEMOS.forEach(function(d){
+  var a = document.createElement("a");
+  a.className = "sh-card" + (d.ready ? "" : " sh-soon");
+  a.href = d.ready ? (d.dir + "/") : "#";
+  a.innerHTML = "<h2>" + d.name + "</h2><p>" + d.desc + "</p>" +
+    "<span class='tag'>" + (d.ready ? d.tag : "planned") + "</span>";
+  grid.appendChild(a);
+});
+</script>
+</body>
+</html>
