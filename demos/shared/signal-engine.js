@@ -121,6 +121,52 @@
     return this;
   };
 
+  function aeNum(v) { return (Math.round((+v || 0) * 1e4) / 1e4).toString(); }
+  var DRIVE_LABEL = { x: "Channel X", y: "Channel Y", mult: "X × Y (ring)", mix: "(X + Y)/2", diff: "|X − Y|", min: "min(X, Y)", max: "max(X, Y)" };
+
+  /**
+   * Self-contained After Effects expression reproducing this driver: both
+   * channels (source/rate/phase/amount/offset/smooth/seed) → normalized →
+   * combine → linear remap into `range` ([min,max], default [0,1]). Mirrors the
+   * tool's emitter for the core sources; no plugin needed. (Processor/sidechain
+   * /window are not part of the shared demo driver and are omitted.)
+   */
+  Driver.prototype.toExpression = function (range) {
+    range = range || [0, 1];
+    var dm = this.drive, needY = dm !== "x", L = [];
+    L.push("// Signal Rack — generated After Effects expression");
+    L.push("// Driver: " + (DRIVE_LABEL[dm] || "Channel X") + " → property. Paste onto the target property in AE.");
+    L.push("function frac(x){ return x-Math.floor(x); }");
+    L.push("function hsh(n){ var v=Math.sin(n)*43758.5453123; return v-Math.floor(v); }");
+    L.push("function vnoise(x){ var i=Math.floor(x), f=x-i, a=hsh(i), b=hsh(i+1); return (a+(b-a)*(f*f*(3-2*f)))*2-1; }");
+    L.push("var T = time;");
+    emitChan("X", this.x);
+    L.push("var nx = clamp(smoothedX(T),0,1);");
+    if (needY) { emitChan("Y", this.y); L.push("var ny = clamp(smoothedY(T),0,1);"); }
+    var drv = { y: "ny", mult: "nx*ny", mix: "(nx+ny)/2", diff: "Math.abs(nx-ny)", min: "Math.min(nx,ny)", max: "Math.max(nx,ny)" }[dm] || "nx";
+    L.push("var n = " + drv + ";");
+    L.push("linear(n, 0, 1, " + aeNum(range[0]) + ", " + aeNum(range[1]) + ");");
+    return L.join("\n");
+
+    function emitChan(S, c) {
+      var sc = +c.src;
+      L.push("var rate" + S + "=" + aeNum(c.rate) + ", off" + S + "=" + aeNum(c.offset) + ", smooth" + S + "=" + aeNum(c.smooth) + ", seed" + S + "=" + aeNum(c.seed) + ", amount" + S + "=" + aeNum(c.amount) + ", phase" + S + "=" + aeNum(c.phase) + ";");
+      L.push("function srcUni" + S + "(tt){ var x=tt*rate" + S + "+phase" + S + "+(seed" + S + "*0.07-Math.floor(seed" + S + "*0.07)), fx=x-Math.floor(x), bp;");
+      if (sc === 1) L.push("  bp=Math.sin(x*2*Math.PI);");
+      else if (sc === 2) L.push("  bp=fx<0.5?1:-1;");
+      else if (sc === 3) L.push("  bp=fx*2-1;");
+      else if (sc === 4) L.push("  bp=vnoise(x+seed" + S + "*0.123);");
+      else if (sc === 5) L.push("  var sum=0,a=1,fr=1,nm=0; for(var o=0;o<4;o++){ sum+=a*vnoise(x*fr+seed" + S + "+o*7.7); nm+=a; a*=0.5; fr*=2; } bp=sum/nm;");
+      else if (sc === 8) L.push("  bp=4*Math.abs(fx-0.5)-1;");
+      else if (sc === 9) L.push("  bp=fx<0.2?1:-1;");
+      else L.push("  bp=Math.sin(x*2*Math.PI);");
+      L.push("  bp*=amount" + S + "; return (bp+1)/2 + off" + S + "; }");
+      L.push("function smoothed" + S + "(tt){ if(smooth" + S + "<=0) return srcUni" + S + "(tt);");
+      L.push("  var win=smooth" + S + "*0.5, M=Math.round(Math.max(1,Math.min(24,smooth" + S + "*24))), acc=0;");
+      L.push("  for(var i=0;i<M;i++){ var f=(M==1)?0:i/(M-1); acc+=srcUni" + S + "(tt-win*f); } return acc/M; }");
+    }
+  };
+
   function create(cfg) { return new Driver(cfg); }
   return { create: create, Driver: Driver, combine: combine, SignalCore: SignalCore, SRCIDX: SRCIDX };
 });

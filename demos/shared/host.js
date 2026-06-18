@@ -59,8 +59,8 @@
     var presetSel = document.createElement("select"); presetSel.className = "sh-btn"; presetSel.title = "Presets";
     var optDef = document.createElement("option"); optDef.textContent = "Presets…"; optDef.value = ""; presetSel.appendChild(optDef);
     Object.keys(cfg.presets || {}).forEach(function (name) { var o = document.createElement("option"); o.value = name; o.textContent = name; presetSel.appendChild(o); });
-    var bLink = btn("Copy link"), bExport = btn("Export JSON"), bImport = btn("Import"), bSurprise = btn("🎲");
-    bar.append(title, badge, spacer, presetSel, bSurprise, bLink, bExport, bImport);
+    var bLink = btn("Copy link"), bExport = btn("Export JSON"), bImport = btn("Import"), bAE = btn("ƒ AE"), bSurprise = btn("🎲");
+    bar.append(title, badge, spacer, presetSel, bSurprise, bLink, bExport, bImport, bAE);
     var wrap = div("sh-canvas-wrap");
     var canvas = document.createElement("canvas"); canvas.className = "sh-canvas";
     wrap.appendChild(canvas);
@@ -128,6 +128,12 @@
       var blob = new Blob([JSON.stringify(snapshot(), null, 2)], { type: "application/json" });
       var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = (cfg.title || "demo").toLowerCase().replace(/\s+/g, "-") + ".json"; a.click();
+    };
+    bAE.onclick = function () {
+      var expr = driver.toExpression([0, 1]);
+      if (navigator.clipboard) navigator.clipboard.writeText(expr);
+      bAE.textContent = "Copied ƒ!"; setTimeout(function () { bAE.textContent = "ƒ AE"; }, 1400);
+      console.log(expr);
     };
     bImport.onclick = function () {
       var inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,.wcx";
