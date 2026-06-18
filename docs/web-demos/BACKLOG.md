@@ -35,7 +35,8 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 
 ## Phase 2 — Fill each demo's structure + shaping (breadth first, one slice each)
 - [x] FUI Kit — added Data packets (`fuiPackets`) + Processor die (`fuiCore`) + a widget picker. 4 presets. Headless-verified all three widgets.
-- [ ] Glitch — add block displacement from an imported image (the "retro logo machine"); displacement-scale control.
+- [x] Glitch — added per-band block displacement driven by the raw buffer (datamosh) + Block size/displace controls + Datamosh preset. Image import deferred to a later slice.
+> NOTE: image-upload source for block displacement deferred — needs a file-input affordance in the shared host; tracked for Phase 4 (External-signal/import work).
 - [ ] Transitions — add wipe + radial-fill + text-reveal variants; easing control.
 - [ ] Kinetic Type — add shake-on-peak + RGB-glitch threshold variants.
 - [ ] Meters — add radial gauge + LED ladder; segment count + redline gate.
