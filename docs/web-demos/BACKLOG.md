@@ -40,7 +40,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] Transitions — added wipe + radial-fill + text-reveal variants (variant picker) + easing selector (linear/smooth/in/out). 5 presets. All variants verified.
 - [x] Kinetic Type — added Title pump, RGB glitch, and Shake/impact variants (variant picker) alongside kinetic wave; shared Amount control. 4 presets. All variants verified.
 - [x] Meters — added radial gauge + LED ladder (meter type picker) + segment-count control; peak-hold across all three; γ/redline shared. 4 presets. All variants verified.
-- [ ] Particles — add shock rings (burst threshold) + stream field (density).
+- [x] Particles — added shock rings (burst threshold) + stream field (density) behind an emitter picker; all dt-independent. 4 presets. All variants verified.
 - [ ] Path & Scope — add vectorscope dot + spirograph + rose (turns/radius controls).
 
 ## Phase 3 — Shaping depth (the "subtle" layer) across demos
