@@ -25,7 +25,7 @@ gets a thin MVP slice before any demo gets polish. Build breadth first.
 *Each: scaffold `index.html` + `render.js` + `presets.js` + `README.md`; render
 the structure statically; animate it with the built-in driver through ONE
 shaping mapping; one preset. Port from the named `drawApplied()` cases.*
-- [ ] **FUI Kit** MVP — start with Synapse net (port `fuiSynapse`): seed→node count + connectivity (Structure), activation in background (Signal), `Fire ≥` threshold (Shaping).
+- [x] **FUI Kit** MVP — Synapse net (ported `fuiSynapse`): Nodes/Connectivity/Seed (Structure), source/rate/combine (Signal), `Fire ≥` (Shaping). 3 presets. Headless-render + HTTP verified.
 - [ ] **Glitch / Distortion** MVP — RGB-split + scanline displacement on a built-in test card; signal drives horizontal sync drift + chroma phase. (Port the Cathode/`crt` wiring + Visual cases.)
 - [ ] **Transitions** MVP — loading bar with monotonic signal-shaped pace (port `trLoad`) + sweep playhead.
 - [ ] **Kinetic Type** MVP — per-letter wave/stagger on a word (port `type`/`trText`); signal drives the rise.
