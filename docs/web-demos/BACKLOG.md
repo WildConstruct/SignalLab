@@ -41,7 +41,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] Kinetic Type — added Title pump, RGB glitch, and Shake/impact variants (variant picker) alongside kinetic wave; shared Amount control. 4 presets. All variants verified.
 - [x] Meters — added radial gauge + LED ladder (meter type picker) + segment-count control; peak-hold across all three; γ/redline shared. 4 presets. All variants verified.
 - [x] Particles — added shock rings (burst threshold) + stream field (density) behind an emitter picker; all dt-independent. 4 presets. All variants verified.
-- [ ] Path & Scope — add vectorscope dot + spirograph + rose (turns/radius controls).
+- [x] Path & Scope — added vectorscope, spirograph, and rose curve (path-type picker) + turns/petals + radius controls. 4 presets. All variants verified. **Phase 2 complete.**
 
 ## Phase 3 — Shaping depth (the "subtle" layer) across demos
 - [ ] Add the shared **field-mapping** selector (uniform / sweep / radial / stagger) to `controls.js` and wire it into every demo's render.
