@@ -231,7 +231,85 @@
     ctx.globalAlpha = 1;
   }
 
-  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer, radar: radar, telemetry: telemetry, die3d: die3d, hex: hex, hex3d: hex3d };
+  // Radial Spectrum — circular equalizer; bars radiate from a ring (sweep field ⇒ wave around the ring)
+  function radialSpectrum(ctx, W, H, F) {
+    var S = F.S, cx = W / 2, cy = H / 2, fire = S.fire, seed = Math.round(+S.seed || 0);
+    var bins = Math.max(8, Math.round(S.bins)), rin = Math.min(W, H) * 0.5 * (S.rin != null ? S.rin : 0.4);
+    var maxLen = Math.min(W, H) * 0.5 - rin - 14, lw = Math.max(2, 2 * Math.PI * rin / bins * 0.55);
+    FUI.tickRing(ctx, cx, cy, rin, bins, { len: 5, color: "#16323f" });
+    FUI.arc(ctx, cx, cy, rin - 4, 0, Math.PI * 2, { color: "#1f5e4e", lw: 1 });
+    for (var i = 0; i < bins; i++) {
+      var v = Shaping.fieldValue(F, i, bins, seed), a = i / bins * Math.PI * 2 - Math.PI / 2, hot = v > fire, len = maxLen * v;
+      var x0 = cx + Math.cos(a) * rin, y0 = cy + Math.sin(a) * rin, x1 = cx + Math.cos(a) * (rin + len), y1 = cy + Math.sin(a) * (rin + len);
+      ctx.strokeStyle = hot ? "hsl(" + (150 + v * 120) + ",85%,60%)" : "#1b3a33"; ctx.lineWidth = lw;
+      if (hot) { ctx.shadowColor = FUI.GLOW; ctx.shadowBlur = 8 * v; }
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.shadowBlur = 0;
+    }
+  }
+
+  // Reticle / Lock-on — targeting reticle; brackets snap + colour flips on lock, optional callouts
+  function reticle(ctx, W, H, F) {
+    var S = F.S, cx = W / 2, cy = H / 2, t = F.t, fire = S.fire, e = Math.max(0, Math.min(1, F.n));
+    var R = Math.min(W, H) * 0.36 * (S.rsize != null ? S.rsize : 1), spin = S.spin != null ? S.spin : 0.4, locked = e > fire;
+    var col = locked ? "#e8a838" : FUI.GLOW;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * spin); FUI.tickRing(ctx, 0, 0, R, 36, { len: 8, color: locked ? "#7a5a1e" : "#1f5e4e" }); ctx.restore();
+    FUI.arc(ctx, cx, cy, R * 0.92, t * spin, t * spin + Math.PI * 0.5, { color: col, lw: 2, glow: locked ? 12 : 0 });
+    FUI.arc(ctx, cx, cy, R * 0.92, t * spin + Math.PI, t * spin + Math.PI * 1.5, { color: col, lw: 2, glow: locked ? 12 : 0 });
+    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = 0.7; ctx.beginPath();
+    ctx.moveTo(cx - R, cy); ctx.lineTo(cx - R * 0.2, cy); ctx.moveTo(cx + R * 0.2, cy); ctx.lineTo(cx + R, cy);
+    ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy - R * 0.2); ctx.moveTo(cx, cy + R * 0.2); ctx.lineTo(cx, cy + R); ctx.stroke(); ctx.globalAlpha = 1;
+    var br = (locked ? 0.34 : 0.52) * R; FUI.bracket(ctx, cx - br, cy - br, br * 2, br * 2, R * 0.16, { color: col, lw: 2 });
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy, locked ? 4 + e * 3 : 2, 0, 7); ctx.fill();
+    if (S.callouts) {
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.55; ctx.beginPath();
+      ctx.moveTo(cx + br * 0.9, cy - br * 0.9); ctx.lineTo(cx + R * 0.7, cy - R * 0.7); ctx.lineTo(cx + R * 1.04, cy - R * 0.7); ctx.stroke(); ctx.globalAlpha = 1;
+      FUI.readout(ctx, cx + R * 0.74, cy - R * 0.74, locked ? "● LOCK" : "○ TRACK", { color: col, size: 12 });
+      FUI.readout(ctx, cx + R * 0.74, cy - R * 0.74 + 15, "SIG " + ("" + Math.round(e * 100)).padStart(3, "0") + "%", { color: "#7d7d85", size: 11 });
+    }
+  }
+
+  // Compass / heading strip — scrolling heading tape; bearing from the signal
+  function compass(ctx, W, H, F) {
+    var cx = W / 2, cy = H / 2, e = Math.max(0, Math.min(1, F.n));
+    var range = F.S.crange != null ? F.S.crange : 120, heading = e * 360, stripW = Math.min(W * 0.82, 760), x0 = cx - stripW / 2, y = cy;
+    var dirs = { 0: "N", 45: "NE", 90: "E", 135: "SE", 180: "S", 225: "SW", 270: "W", 315: "NW" };
+    ctx.strokeStyle = "#1f5e4e"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + stripW, y); ctx.stroke();
+    ctx.font = "11px ui-monospace,monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (var d = Math.floor((heading - range / 2) / 10) * 10; d <= heading + range / 2; d += 10) {
+      var dd = ((d % 360) + 360) % 360, fx = x0 + ((d - (heading - range / 2)) / range) * stripW;
+      if (fx < x0 - 1 || fx > x0 + stripW + 1) continue;
+      var major = dd % 30 === 0;
+      ctx.strokeStyle = major ? FUI.GLOW : "#2a4a44"; ctx.beginPath(); ctx.moveTo(fx, y); ctx.lineTo(fx, y - (major ? 14 : 7)); ctx.stroke();
+      if (dirs[dd]) { ctx.fillStyle = "#7df0c2"; ctx.fillText(dirs[dd], fx, y + 5); }
+      else if (major) { ctx.fillStyle = "#56565d"; ctx.fillText("" + dd, fx, y + 5); }
+    }
+    ctx.fillStyle = "#e8a838"; ctx.beginPath(); ctx.moveTo(cx, y - 20); ctx.lineTo(cx - 6, y - 30); ctx.lineTo(cx + 6, y - 30); ctx.closePath(); ctx.fill();
+    ctx.textBaseline = "alphabetic";
+    FUI.readout(ctx, cx, y - 40, ("" + Math.round(heading)).padStart(3, "0") + "°", { color: "#e8a838", size: 16, align: "center" });
+  }
+
+  // Wireframe globe / orbit — rotating wire sphere + signal-driven orbiting blips
+  function globe(ctx, W, H, F) {
+    var S = F.S, cx = W / 2, cy = H / 2, t = F.t, seed = Math.round(+S.seed || 0), fire = S.fire;
+    var R = Math.min(W, H) * 0.36 * (S.gr != null ? S.gr : 1), spin = t * (S.gspin != null ? S.gspin : 0.3);
+    var lon = Math.max(2, Math.round(S.lon != null ? S.lon : 6)), lat = Math.max(1, Math.round(S.lat != null ? S.lat : 4));
+    FUI.arc(ctx, cx, cy, R, 0, Math.PI * 2, { color: "#1f5e4e", lw: 1.5 });
+    ctx.strokeStyle = "#16323f"; ctx.lineWidth = 1;
+    for (var i = 1; i <= lat; i++) { var ph = i / (lat + 1) * Math.PI - Math.PI / 2, ry = Math.cos(ph) * R, yy = cy + Math.sin(ph) * R;
+      ctx.beginPath(); ctx.ellipse(cx, yy, Math.abs(ry), Math.abs(ry) * 0.26, 0, 0, Math.PI * 2); ctx.stroke(); }
+    for (var j = 0; j < lon; j++) { var a = spin + j / lon * Math.PI, rx = Math.abs(Math.cos(a)) * R;
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx, R, 0, 0, Math.PI * 2); ctx.stroke(); }
+    var orbits = Math.max(0, Math.round(S.orbits != null ? S.orbits : 8));
+    for (var k = 0; k < orbits; k++) {
+      var v = Shaping.fieldValue(F, k, orbits, seed); if (v <= fire) continue;
+      var a2 = spin * 1.6 + k / orbits * Math.PI * 2, band = (Math.sin(k * 1.7 + seed) * 0.55);
+      var px = cx + Math.cos(a2) * R * 0.95, py = cy + Math.sin(a2) * R * 0.3 + band * R * 0.6;
+      ctx.fillStyle = "hsl(" + (150 + v * 120) + ",85%,60%)"; ctx.shadowColor = FUI.GLOW; ctx.shadowBlur = 8 * v;
+      ctx.beginPath(); ctx.arc(px, py, 2 + v * 3, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    }
+  }
+
+  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer, radar: radar, telemetry: telemetry, die3d: die3d, hex: hex, hex3d: hex3d, radial: radialSpectrum, reticle: reticle, compass: compass, globe: globe };
   function render(ctx, W, H, F) { (WIDGETS[F.S.widget] || synapse)(ctx, W, H, F); }
 
   var f2 = function (v) { return (+v).toFixed(2); };
@@ -240,7 +318,7 @@
     driver: { x: { src: "sine", rate: 1.5 }, y: { src: "sine", rate: 2, phase: 0.1 }, drive: "mult" },
     structure: [
       { tier: "structure", key: "widget", label: "Widget", type: "select", value: "synapse", options: [
-        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" }, { value: "radar", label: "Radar" }, { value: "telemetry", label: "Telemetry stack" }, { value: "die3d", label: "Processor die (3D)" }, { value: "hex", label: "Hex grid" }, { value: "hex3d", label: "Hex grid (3D)" } ] },
+        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" }, { value: "radar", label: "Radar" }, { value: "telemetry", label: "Telemetry stack" }, { value: "die3d", label: "Processor die (3D)" }, { value: "hex", label: "Hex grid" }, { value: "hex3d", label: "Hex grid (3D)" }, { value: "radial", label: "Radial spectrum" }, { value: "reticle", label: "Reticle / lock-on" }, { value: "compass", label: "Compass strip" }, { value: "globe", label: "Wireframe globe" } ] },
       // bespoke per widget
       { tier: "structure", key: "nodes",   label: "Nodes",        type: "slider", min: 6, max: 28, step: 1, value: 15, when: { widget: "synapse" } },
       { tier: "structure", key: "connect", label: "Connectivity", type: "slider", min: 1, max: 4, step: 1, value: 2, when: { widget: "synapse" } },
@@ -257,6 +335,17 @@
       { tier: "structure", key: "blips",   label: "Blips",        type: "slider", min: 4, max: 32, step: 1, value: 14, when: { widget: "radar" } },
       { tier: "structure", key: "lines",   label: "Lines",        type: "slider", min: 2, max: 16, step: 1, value: 8, when: { widget: "telemetry" } },
       { tier: "structure", key: "lineh",   label: "Row height <span>px</span>", type: "slider", min: 18, max: 48, step: 2, value: 30, when: { widget: "telemetry" } },
+      { tier: "structure", key: "bins",    label: "Bins",         type: "slider", min: 16, max: 96, step: 1, value: 48, when: { widget: "radial" } },
+      { tier: "structure", key: "rin",     label: "Inner radius", type: "slider", min: 0.2, max: 0.6, step: 0.02, value: 0.4, fmt: f2, when: { widget: "radial" } },
+      { tier: "structure", key: "rsize",   label: "Reticle size", type: "slider", min: 0.5, max: 1.3, step: 0.05, value: 1, fmt: f2, when: { widget: "reticle" } },
+      { tier: "structure", key: "spin",    label: "Spin speed",   type: "slider", min: 0, max: 2, step: 0.05, value: 0.4, fmt: f2, when: { widget: "reticle" } },
+      { tier: "structure", key: "callouts", label: "Callouts",    type: "toggle", value: true, when: { widget: "reticle" } },
+      { tier: "structure", key: "crange",  label: "Visible arc <span>°</span>", type: "slider", min: 60, max: 240, step: 10, value: 120, when: { widget: "compass" } },
+      { tier: "structure", key: "gr",      label: "Radius",       type: "slider", min: 0.5, max: 1.2, step: 0.05, value: 1, fmt: f2, when: { widget: "globe" } },
+      { tier: "structure", key: "lon",     label: "Meridians",    type: "slider", min: 3, max: 14, step: 1, value: 6, when: { widget: "globe" } },
+      { tier: "structure", key: "lat",     label: "Parallels",    type: "slider", min: 2, max: 8, step: 1, value: 4, when: { widget: "globe" } },
+      { tier: "structure", key: "orbits",  label: "Orbit blips",  type: "slider", min: 0, max: 16, step: 1, value: 8, when: { widget: "globe" } },
+      { tier: "structure", key: "gspin",   label: "Spin speed",   type: "slider", min: 0, max: 1.5, step: 0.05, value: 0.3, fmt: f2, when: { widget: "globe" } },
       { tier: "structure", key: "seed",    label: "Seed", type: "slider", min: 1, max: 9999, step: 1, value: 1941 }
     ],
     shaping: [

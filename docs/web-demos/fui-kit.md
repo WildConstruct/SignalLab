@@ -81,8 +81,8 @@ left untouched; new ones build on it.
       drawn back-to-front. Opens a 2.5D direction for other widgets.
 - [x] **Hex grid** + **Hex grid (3D)** built on the kit (FUI.hexCell).
 - [x] 3D widgets gained **Depth offset** (dial the 3D-ness) + **Off-cell opacity** (fade/hide off cells so lit cells float — no camera).
-- [ ] Build remaining gaps on the kit: Compass/heading strip,
-      Reticle-with-callouts, Wireframe globe/orbit. (Reticle, Radial spectrum
-      from the earlier roadmap also pending.)
+- [x] Built on the kit: **Radial spectrum**, **Reticle / lock-on** (with
+      callouts toggle), **Compass strip**, **Wireframe globe / orbit**.
+      FUI Kit now ships 13 widgets.
 - Note: 3D/volumetric variants are an interesting direction for several widgets
       (e.g. stacked slices), enabled by the kit.
