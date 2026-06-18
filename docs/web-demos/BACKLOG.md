@@ -37,7 +37,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] FUI Kit — added Data packets (`fuiPackets`) + Processor die (`fuiCore`) + a widget picker. 4 presets. Headless-verified all three widgets.
 - [x] Glitch — added per-band block displacement driven by the raw buffer (datamosh) + Block size/displace controls + Datamosh preset. Image import deferred to a later slice.
 > NOTE: image-upload source for block displacement deferred — needs a file-input affordance in the shared host; tracked for Phase 4 (External-signal/import work).
-- [ ] Transitions — add wipe + radial-fill + text-reveal variants; easing control.
+- [x] Transitions — added wipe + radial-fill + text-reveal variants (variant picker) + easing selector (linear/smooth/in/out). 5 presets. All variants verified.
 - [ ] Kinetic Type — add shake-on-peak + RGB-glitch threshold variants.
 - [ ] Meters — add radial gauge + LED ladder; segment count + redline gate.
 - [ ] Particles — add shock rings (burst threshold) + stream field (density).
