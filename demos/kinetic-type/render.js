@@ -8,16 +8,16 @@
  */
 (function (root) {
   "use strict";
-  var combine = root.SignalEngine.combine;
+  var combine = root.SignalEngine.combine, Shaping = root.SignalShaping;
 
   function wave(ctx, W, H, F, txt, amp, mode) {
-    var bx = F.bufX, by = F.bufY, L = bx.length, cx = W / 2, cy = H / 2;
+    var cx = W / 2, cy = H / 2;
     var fs = Math.max(20, Math.min(54, W / 10));
     ctx.font = "bold " + fs + "px ui-monospace,Menlo,monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    var cw = fs * 0.64, x0 = cx - (txt.length - 1) * cw / 2, stride = Math.max(1, Math.floor(L / (txt.length * 1.4)));
+    var cw = fs * 0.64, x0 = cx - (txt.length - 1) * cw / 2;
     for (var i = 0; i < txt.length; i++) {
       if (txt[i] === " ") continue;
-      var idx = Math.max(0, Math.min(L - 1, L - 1 - i * stride)), v = combine(mode, bx[idx], by[idx]);
+      var v = Shaping.fieldValue(F, i, txt.length);   // field map across the letters
       var yoff = (v * 2 - 1) * H * 0.17 * amp, s = 0.82 + v * 0.5;
       ctx.save(); ctx.translate(x0 + i * cw, cy + yoff); ctx.scale(s, s);
       ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 10 * v; ctx.fillStyle = "hsl(" + (150 + v * 45) + ",85%," + (42 + v * 34) + "%)";
@@ -71,6 +71,7 @@
       { tier: "structure", key: "word", label: "Word", type: "text", value: "SIGNAL RACK" }
     ],
     shaping: [
+      root.SignalShaping.fieldSpec("sweep"),
       { tier: "shaping", key: "amp", label: "Amount", type: "slider", min: 0, max: 2, step: 0.05, value: 1, fmt: function (v) { return (+v).toFixed(2); } }
     ],
     presets: (root.DemoPresets || {}),

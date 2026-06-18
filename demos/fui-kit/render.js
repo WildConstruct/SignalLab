@@ -10,16 +10,17 @@
  */
 (function (root) {
   "use strict";
-  var combine = root.SignalEngine.combine;
+  var combine = root.SignalEngine.combine, Shaping = root.SignalShaping;
 
   function synapse(ctx, W, H, F) {
-    var S = F.S, bx = F.bufX, by = F.bufY, L = bx.length, t = F.t;
+    var S = F.S, t = F.t;
     var cx = W / 2, cy = H / 2, seed = (+S.seed || 1) * 0.137;
     function hx(k) { var s = Math.sin(k * 127.1 + 311.7 + seed) * 43758.5453; return s - Math.floor(s); }
-    var NODES = Math.max(3, Math.round(S.nodes)), deg0 = Math.max(1, Math.round(S.connect)), fire = S.fire, mode = S._drive || "mult";
+    var NODES = Math.max(3, Math.round(S.nodes)), deg0 = Math.max(1, Math.round(S.connect)), fire = S.fire;
     var pos = [];
     for (var i = 0; i < NODES; i++) pos.push([cx + (hx(i) - 0.5) * Math.min(W * 0.84, 820), cy + (hx(i + 50) - 0.5) * Math.min(H * 0.74, 440)]);
-    function act(i) { var k = Math.floor(hx(i + 9) * (L - 1)); return Math.max(0, Math.min(1, combine(mode, bx[k], by[k]))); }
+    // field map decides which point of the signal each node reads (default: stagger)
+    function act(i) { return Shaping.fieldValue(F, i, NODES, Math.round(+S.seed || 0) + 9); }
     var edges = [];
     for (i = 0; i < NODES; i++) for (var d = 0; d < deg0; d++) { var j = Math.floor(hx(i * 5 + d + 617) * NODES); if (j === i) j = (j + 1) % NODES; edges.push([i, j]); }
     for (var ei = 0; ei < edges.length; ei++) {
@@ -83,6 +84,7 @@
       { tier: "structure", key: "seed",    label: "Seed", type: "slider", min: 1, max: 9999, step: 1, value: 1941 }
     ],
     shaping: [
+      root.SignalShaping.fieldSpec("stagger"),
       { tier: "shaping", key: "fire", label: "Fire ≥ <span>threshold</span>", type: "slider", min: 0, max: 1, step: 0.01, value: 0.45, fmt: function (v) { return (+v).toFixed(2); } }
     ],
     presets: (root.DemoPresets || {}),

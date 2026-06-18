@@ -44,7 +44,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] Path & Scope — added vectorscope, spirograph, and rose curve (path-type picker) + turns/petals + radius controls. 4 presets. All variants verified. **Phase 2 complete.**
 
 ## Phase 3 — Shaping depth (the "subtle" layer) across demos
-- [ ] Add the shared **field-mapping** selector (uniform / sweep / radial / stagger) to `controls.js` and wire it into every demo's render.
+- [x] Added shared **field-mapping** (`demos/shared/shaping.js`: `fieldValue`/`fieldIndex` + `fieldSpec`) and a Field-map selector; wired into FUI (node activation, default stagger) + Kinetic Type (per-letter, default sweep). shaping.js now loaded on all 7 pages for the remaining per-demo Phase 3 items.
 - [ ] Add the shared **response** controls (0→100 remap curve, gamma/ease, peak-hold) and apply per demo.
 - [ ] FUI Kit — edge-propagation speed + per-node phase stagger (sequenced firing).
 - [ ] Glitch — dropout-gate + pixel-sort threshold + sort-axis.
