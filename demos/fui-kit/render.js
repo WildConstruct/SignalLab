@@ -88,7 +88,31 @@
     ctx.strokeStyle = "#11242b"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, baseY); ctx.lineTo(x0 + total, baseY); ctx.stroke();
   }
 
-  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer };
+  function radar(ctx, W, H, F) {
+    var S = F.S, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.4, fire = S.fire, speed = S.propag != null ? S.propag : 0.6, t = F.t;
+    var seed = Math.round(+S.seed || 0);
+    // rings + crosshair
+    ctx.strokeStyle = "#16323f"; ctx.lineWidth = 1;
+    for (var r = R; r > R / 4 - 1; r -= R / 4) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+    // sweep arm (signal sets the sweep speed)
+    var sweep = (t * speed) % (Math.PI * 2);
+    ctx.strokeStyle = "#36f09a"; ctx.lineWidth = 2; ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); ctx.stroke(); ctx.shadowBlur = 0;
+    // blips: signal sets each blip's bearing (index) + range (value); fade behind the sweep
+    var blips = Math.max(8, Math.round(S.nodes));
+    for (var i = 0; i < blips; i++) {
+      var v = Shaping.fieldValue(F, i, blips, seed); if (v <= fire) continue;
+      var ang = i / blips * Math.PI * 2, rng = R * (0.18 + 0.8 * v);
+      var da = ((sweep - ang) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2), fade = 1 - da / (Math.PI * 2);
+      ctx.globalAlpha = 0.15 + 0.85 * fade;
+      ctx.fillStyle = "hsl(" + (150 + v * 120) + ",85%,60%)"; ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 8 * fade;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * rng, cy + Math.sin(ang) * rng, 3 + v * 4, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer, radar: radar };
   function render(ctx, W, H, F) { (WIDGETS[F.S.widget] || synapse)(ctx, W, H, F); }
 
   root.Demo = {
@@ -96,7 +120,7 @@
     driver: { x: { src: "sine", rate: 1.5 }, y: { src: "sine", rate: 2, phase: 0.1 }, drive: "mult" },
     structure: [
       { tier: "structure", key: "widget",  label: "Widget", type: "select", value: "synapse", options: [
-        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" } ] },
+        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" }, { value: "radar", label: "Radar" } ] },
       { tier: "structure", key: "nodes",   label: "Nodes <span>(synapse)</span>",        type: "slider", min: 6, max: 24, step: 1, value: 15 },
       { tier: "structure", key: "connect", label: "Connectivity <span>(synapse)</span>", type: "slider", min: 1, max: 3, step: 1, value: 2 },
       { tier: "structure", key: "seed",    label: "Seed", type: "slider", min: 1, max: 9999, step: 1, value: 1941 }

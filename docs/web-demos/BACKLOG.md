@@ -49,7 +49,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] FUI Kit — added Edge speed (pulse propagation) + Sequencing (per-node phase envelope → travelling firing) controls to the synapse net. Verified.
 - [x] Glitch — added Pixel-sort ≥ (stylized smear) + Sort axis (vertical/horizontal) + Dropout gate (energy-gated black bands). Verified across settings.
 - [x] Equalizer (FUI) — new widget: per-band offset via the shared field map → travelling wave across bands (sweep), fire-gated glow. Verified.
-- [ ] Radar (FUI) — signal → blip bearing/range + sweep speed.
+- [x] Radar (FUI) — new widget: signal sets each blip's bearing/range + the sweep speed; blips fade behind the rotating arm. 6 presets total. **Phase 3 complete.**
 
 ## Phase 4 — Suite cohesion & handoff
 - [ ] Every demo: External-signal source — import a recipe/link from Signal Lab; verify round-trip.
