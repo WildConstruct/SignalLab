@@ -73,7 +73,22 @@
     ctx.strokeStyle = "#1f5e4e"; ctx.lineWidth = 1.5; ctx.strokeRect(x0 - 6, y0 - 6, total + 12, gh + 12);
   }
 
-  var WIDGETS = { synapse: synapse, packets: packets, core: core };
+  function equalizer(ctx, W, H, F) {
+    var S = F.S, cx = W / 2, cy = H / 2, bands = Math.max(8, Math.round(S.nodes) * 2), fire = S.fire;
+    var gap = 4, total = Math.min(W * 0.82, 760), bw = (total - gap * (bands - 1)) / bands, x0 = cx - total / 2;
+    var baseY = cy + Math.min(H * 0.32, 220), maxH = Math.min(H * 0.55, 320);
+    for (var b = 0; b < bands; b++) {
+      var v = Shaping.fieldValue(F, b, bands, Math.round(+S.seed || 0));   // per-band offset → travelling wave (field=sweep)
+      var h = maxH * v, lit = v > fire;
+      ctx.fillStyle = lit ? "hsl(" + (150 + v * 120) + ",85%," + (45 + v * 25) + "%)" : "#16242c";
+      if (lit) { ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 8 * v; }
+      ctx.fillRect(x0 + b * (bw + gap), baseY - h, bw, h); ctx.shadowBlur = 0;
+      ctx.fillStyle = "#0e1a1f"; ctx.fillRect(x0 + b * (bw + gap), baseY - h, bw, 2);   // cap
+    }
+    ctx.strokeStyle = "#11242b"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, baseY); ctx.lineTo(x0 + total, baseY); ctx.stroke();
+  }
+
+  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer };
   function render(ctx, W, H, F) { (WIDGETS[F.S.widget] || synapse)(ctx, W, H, F); }
 
   root.Demo = {
@@ -81,7 +96,7 @@
     driver: { x: { src: "sine", rate: 1.5 }, y: { src: "sine", rate: 2, phase: 0.1 }, drive: "mult" },
     structure: [
       { tier: "structure", key: "widget",  label: "Widget", type: "select", value: "synapse", options: [
-        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" } ] },
+        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" } ] },
       { tier: "structure", key: "nodes",   label: "Nodes <span>(synapse)</span>",        type: "slider", min: 6, max: 24, step: 1, value: 15 },
       { tier: "structure", key: "connect", label: "Connectivity <span>(synapse)</span>", type: "slider", min: 1, max: 3, step: 1, value: 2 },
       { tier: "structure", key: "seed",    label: "Seed", type: "slider", min: 1, max: 9999, step: 1, value: 1941 }

@@ -48,7 +48,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] Added shared **response** layer (`shaping.js`: `response(v,{gamma,rlo,rhi})` remap+curve + `PeakHold`) and applied to Meters (replaces ad-hoc gamma/peak), Glitch (energy curve), Particles (all emitters). Response sanity-verified.
 - [x] FUI Kit — added Edge speed (pulse propagation) + Sequencing (per-node phase envelope → travelling firing) controls to the synapse net. Verified.
 - [x] Glitch — added Pixel-sort ≥ (stylized smear) + Sort axis (vertical/horizontal) + Dropout gate (energy-gated black bands). Verified across settings.
-- [ ] Equalizer (FUI/Meters) — per-band offset → travelling wave across bands.
+- [x] Equalizer (FUI) — new widget: per-band offset via the shared field map → travelling wave across bands (sweep), fire-gated glow. Verified.
 - [ ] Radar (FUI) — signal → blip bearing/range + sweep speed.
 
 ## Phase 4 — Suite cohesion & handoff
