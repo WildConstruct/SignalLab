@@ -59,6 +59,8 @@ canvas.sh-canvas{display:block;width:100%;height:100%}
 .sh-card{display:block;background:var(--panel);border:1px solid var(--line);
   border-radius:8px;padding:16px;transition:border-color .15s,transform .15s}
 .sh-card:hover{border-color:var(--accent-dim);transform:translateY(-2px);text-decoration:none}
+.sh-card canvas.sh-thumb{display:block;width:100%;height:64px;border-radius:5px;
+  background:#0b1418;border:1px solid var(--line);margin-bottom:11px}
 .sh-card h2{margin:0 0 6px;font-size:14px;color:var(--accent)}
 .sh-card p{margin:0;color:var(--dim);font-size:11.5px;line-height:1.5}
 .sh-card .tag{display:inline-block;margin-top:10px;font-size:10px;color:var(--muted);

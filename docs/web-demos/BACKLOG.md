@@ -55,7 +55,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] Every demo: External-signal source — host **Import** button accepts a Signal Lab recipe (`fromRecipe`) or a demo export snapshot; recipe round-trip verified. Badge shows the external source.
 - [x] Every demo: 3–6 presets via a host **Presets…** dropdown + `🎲 Surprise` (already present). Done across all 7 demos.
 - [x] Every demo: host **ƒ AE** button copies a self-contained After Effects expression via `driver.toExpression` (channels → combine → remap). Validated to ~1e-8 parity vs. the live driver across all sources + combine modes.
-- [ ] `demos/index.html` gallery polish + per-demo thumbnails.
+- [x] `demos/index.html` gallery polish + live per-demo thumbnails (each card animates its signature driver waveform via the shared engine).
 - [ ] Cross-link demos ↔ `docs/product-breakup.md` and the Notion sub-project.
 
 ---
