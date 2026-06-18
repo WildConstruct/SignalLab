@@ -148,3 +148,61 @@ portrait, waterfall, particle-on-path, parametric curves, strange attractors.*
   Thomas) — worth a focused research pass.
 - Per-category external research (Huds+Guis-style canon checks) can refine each
   table; egress to general web works here, GitHub does not.
+
+---
+
+## Research refinements (2026-06-18)
+
+Deeper per-category passes (general web reachable). Net new specifics + the
+**cross-links** that fall out of them.
+
+### Path & Scope — strange attractors are concrete + signal-perturbable
+Implementable systems (signal perturbs the constants → it *breathes*):
+- **Lorenz (3D, butterfly):** `dx=σ(y−x); dy=x(ρ−z)−y; dz=xy−βz`, classic σ=10, ρ=28, β=8/3.
+- **De Jong (2D):** `x'=sin(a·y)−cos(b·x); y'=sin(c·x)−cos(d·y)`.
+- **Clifford (2D):** `x'=sin(a·y)+c·cos(a·x); y'=sin(b·x)+d·cos(b·y)`.
+- **Aizawa / Thomas (3D)** for `proj3.js` showcases.
+Plan: a `scope` "Attractor" widget with a system picker; signal maps onto a/b/c/d
+or ρ. Sources: [Algosome – de Jong](https://www.algosome.com/articles/strange-attractors-de-jong.html),
+[strange_attractors README](https://github.com/merrypranxter/strange_attractors/blob/main/README.md),
+[Hafeez – strange attractors](https://aymenhafeez.github.io/posts/2025-04-15-strange-attractors/).
+
+### Meters — lock to real metering standards
+Concrete variants: **VU** (needle, ANSI C16.5), **PPM** (IEC 268-10, broadcast
+peak ballistics), **LUFS/RMS** (perceptual, numeric + bar), **true-peak**,
+**goniometer** (Lissajous of stereo phase), **correlation** meter, **spectrogram/
+waterfall** (scrolling colour history). **Cross-link:** a goniometer *is* a
+Lissajous → shares `scope.js` with Path & Scope. Ballistics (attack/decay) become
+signal-shaping params. Sources:
+[Goniometer (Wikipedia)](https://en.wikipedia.org/wiki/Goniometer_(audio)),
+[Digital audio metering guide](https://wearesushimusic.com/2025/12/29/digital-audio-metering-guide/),
+[Loudness meters](https://pluginerds.com/11-loudness-vst-metering-plugin/).
+
+### Particles — curl noise + attractor forces are the upgrade
+Beyond fountain/rings/stream: **flow fields**, **curl noise** (divergence-free →
+fluid feel without sim), and **attractor-driven** motion (pull particles along a
+curve / a strange attractor). **Cross-link:** the same attractor math feeds Path &
+Scope *and* Particles (attractor-driven matter). `particles.js` should expose a
+pluggable force-field (gravity / orbit / curl / attractor). Sources:
+[openFuse – strange attractors & curl noise](https://fusefactory.github.io/openfuse/particle%20system/Strange-Attractors-&-Curl-Noise/),
+[Houdini – directing particle fluids](https://www.sidefx.com/docs/houdini/fluid/directingparticlefluid.html).
+
+### Kinetic Type — principles to bake into `type.js`
+Canon principles: **maintain linearity** (animate in reading order), **sync speed
+to pacing** (our signal *is* the pacing curve), **ease in/out**, and the Disney 12
+as the backbone; per-letter enter/exit/grow/shrink in 2D/3D. So `type.js` wants a
+per-letter **transform stack** + a shared **easing/timing** module (shared with
+`transitions.js`). Sources:
+[Kinetic typography quickstart (Baker)](https://medium.com/hackernoon/kinetic-typography-quickstart-guide-for-devs-designers-d5c6b5545ade),
+[Linearity – kinetic typography](https://www.linearity.io/blog/kinetic-typography/).
+
+### Consolidated cross-links (architecture payoff)
+- **`scope.js`** (plot/polar/parametric/attractor) is shared by **Path & Scope**
+  *and* **Meters** (goniometer/Lissajous).
+- **Attractor math** is shared by **Path & Scope** *and* **Particles**.
+- **Easing/timing** is shared by **Kinetic Type** *and* **Transitions**.
+- **`proj3.js`** powers every 3D variant (die/hex/globe today; Lorenz/Aizawa,
+  extruded type next).
+→ Revised build order: **proj3.js → scope.js (attractors + 3D Lissajous) →
+Meters (reuse fui.js + goniometer via scope.js) → particles.js (curl/attractor)
+→ type.js (+easing) → transitions.js → glitch.js (+image import).**
