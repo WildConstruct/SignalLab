@@ -28,9 +28,12 @@
     ctx.lineWidth = 3; ctx.strokeStyle = "#dff"; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R * 0.9, cy + Math.sin(a) * R * 0.9); ctx.stroke();
     ctx.fillStyle = "#dff"; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 7); ctx.fill(); ctx.lineCap = "butt";
   }
+  // fixed segment size; the ladder grows with the segment count (scales down only to fit)
   function ledLadder(ctx, W, H, f, segs) {
-    var cx = W / 2, cy = H / 2, gap = 4, bw = 54, areaH = Math.min(H * 0.74, 300);
-    var sh = (areaH - gap * (segs - 1)) / segs, x = cx - bw / 2, y0 = cy + areaH / 2, lit = Math.round(f * segs), litPk = Math.round(peak * segs);
+    var cx = W / 2, cy = H / 2, bw = 54, seg0 = 14, gap0 = 4;
+    var ladderH = segs * seg0 + (segs - 1) * gap0, fit = Math.min(1, (H * 0.82) / ladderH);
+    var sh = seg0 * fit, gap = gap0 * fit, areaH = segs * sh + (segs - 1) * gap;
+    var x = cx - bw / 2, y0 = cy + areaH / 2, lit = Math.round(f * segs), litPk = Math.round(peak * segs);
     for (var i = 0; i < segs; i++) {
       var frac = i / segs, col = frac > 0.85 ? "#f0683a" : frac > 0.6 ? "#f0c23a" : "#36f09a";
       ctx.fillStyle = i < lit ? col : "#16242c"; ctx.globalAlpha = i < lit ? 1 : 0.5;

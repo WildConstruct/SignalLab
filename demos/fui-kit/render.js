@@ -130,7 +130,33 @@
     ctx.globalAlpha = 1;
   }
 
-  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer, radar: radar };
+  // Telemetry Stack — labeled horizontal bar-gauges (a status/readout panel).
+  // Fixed row height; Lines grows the stack (designer sizes by count).
+  function telemetry(ctx, W, H, F) {
+    var S = F.S, cx = W / 2, cy = H / 2, seed = Math.round(+S.seed || 0), fire = S.fire;
+    var lines = Math.max(2, Math.round(S.lines)), rh0 = S.lineh != null ? S.lineh : 30, gap0 = Math.max(3, Math.round(rh0 * 0.3));
+    var stackH = lines * rh0 + (lines - 1) * gap0, fit = Math.min(1, (H * 0.86) / stackH);
+    var rh = rh0 * fit, gap = gap0 * fit, totalH = lines * rh + (lines - 1) * gap;
+    var panelW = Math.min(W * 0.72, 560), x0 = cx - panelW / 2, y0 = cy - totalH / 2;
+    var labW = 50, valW = 56, bx0 = x0 + labW, bw = panelW - labW - valW;
+    ctx.font = Math.max(9, Math.min(13, rh * 0.46)) + "px ui-monospace,monospace"; ctx.textBaseline = "middle";
+    for (var i = 0; i < lines; i++) {
+      var y = y0 + i * (rh + gap), v = Shaping.fieldValue(F, i, lines, seed * 5 + 1), hot = v > fire;
+      var bh = rh * 0.62, by = y + (rh - bh) / 2;
+      ctx.fillStyle = hot ? "#e8a838" : "#6a6a70"; ctx.textAlign = "left";
+      ctx.fillText("CH" + (i < 10 ? "0" : "") + i, x0, y + rh / 2);
+      ctx.fillStyle = "#141418"; ctx.fillRect(bx0, by, bw, bh);                     // track
+      ctx.fillStyle = hot ? "#e0683a" : "#7ec77a";                                  // fill (alert past Fire)
+      if (hot) { ctx.shadowColor = "#7ec77a"; ctx.shadowBlur = 8 * v; }
+      ctx.fillRect(bx0, by, bw * v, bh); ctx.shadowBlur = 0;
+      ctx.fillStyle = "#5a2a20"; ctx.fillRect(bx0 + bw * fire, by, 1, bh);          // redline tick
+      ctx.fillStyle = hot ? "#e7e7ea" : "#6a6a70"; ctx.textAlign = "right";
+      ctx.fillText(("" + Math.round(v * 100)).padStart(3, "0") + "%", x0 + panelW, y + rh / 2);
+    }
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  }
+
+  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer, radar: radar, telemetry: telemetry };
   function render(ctx, W, H, F) { (WIDGETS[F.S.widget] || synapse)(ctx, W, H, F); }
 
   var f2 = function (v) { return (+v).toFixed(2); };
@@ -139,7 +165,7 @@
     driver: { x: { src: "sine", rate: 1.5 }, y: { src: "sine", rate: 2, phase: 0.1 }, drive: "mult" },
     structure: [
       { tier: "structure", key: "widget", label: "Widget", type: "select", value: "synapse", options: [
-        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" }, { value: "radar", label: "Radar" } ] },
+        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" }, { value: "radar", label: "Radar" }, { value: "telemetry", label: "Telemetry stack" } ] },
       // bespoke per widget
       { tier: "structure", key: "nodes",   label: "Nodes",        type: "slider", min: 6, max: 28, step: 1, value: 15, when: { widget: "synapse" } },
       { tier: "structure", key: "connect", label: "Connectivity", type: "slider", min: 1, max: 4, step: 1, value: 2, when: { widget: "synapse" } },
@@ -150,6 +176,8 @@
       { tier: "structure", key: "bands",   label: "Bands",        type: "slider", min: 4, max: 64, step: 1, value: 24, when: { widget: "equalizer" } },
       { tier: "structure", key: "barw",    label: "Bar width <span>px</span>", type: "slider", min: 8, max: 40, step: 2, value: 18, when: { widget: "equalizer" } },
       { tier: "structure", key: "blips",   label: "Blips",        type: "slider", min: 4, max: 32, step: 1, value: 14, when: { widget: "radar" } },
+      { tier: "structure", key: "lines",   label: "Lines",        type: "slider", min: 2, max: 16, step: 1, value: 8, when: { widget: "telemetry" } },
+      { tier: "structure", key: "lineh",   label: "Row height <span>px</span>", type: "slider", min: 18, max: 48, step: 2, value: 30, when: { widget: "telemetry" } },
       { tier: "structure", key: "seed",    label: "Seed", type: "slider", min: 1, max: 9999, step: 1, value: 1941 }
     ],
     shaping: [
