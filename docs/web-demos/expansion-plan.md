@@ -9,24 +9,45 @@
 > Grounded in: the tool's existing 59 `drawApplied()` cases (our richest source)
 > + targeted domain research. Status 2026-06-18.
 
-## Cross-cutting architecture (do once, reuse everywhere)
+## Cross-cutting architecture — engine vs. design
 
-1. **Keep building on the shared layer we already have:** `shaping.js`
-   (field map · response · peak-hold) and the host Signal tier (X/Y/combine/
-   smoothing/speed). New widgets inherit "mess with it till happy" for free.
-2. **One primitive kit per category** (mirroring `fui.js`):
-   | Kit file | Provides | Used by |
-   |---|---|---|
-   | `fui.js` ✅ | cell, hexCell, tickRing, arc, bracket, needle, readout, lit | FUI **+ Meters** (ticks/needle/arc/readout) |
-   | `scope.js` | plot, polar, parametric, lissajous, headDot, projector | Path & Scope |
-   | `particles.js` | emitter core (spawn/integrate/draw), gravity, flow-field | Particles |
-   | `type.js` | glyph layout, per-letter field sampling, transform stack | Kinetic Type |
-   | `glitch.js` | rgbSplit, blockDisplace, scanlines, pixelSort, noise, barrel | Glitch |
-   | `transitions.js` | playhead, easing library, reveal masks | Transitions |
-3. **A shared `proj3.js`** (project x,y,z → 2D w/ rotation) so 2.5D is
-   consistent across modules — powers the 3D die/hex (retrofit), 3D Lissajous/
-   attractor, extruded type, wireframe globe. This is the through-line for the
-   "3D versions of tools" direction.
+**Principle (per Brian): the underlying drivers are ENGINE, not widget code.**
+We're building reusable engines; the generator/behaviour math lives in the engine
+and is *surfaced* by the tools. So every new capability splits in two — and the
+real investment is column A.
+
+### A) Engine drivers (reusable — the real work)
+Deterministic, windowable, **parity-disciplined like `signal-engine`** (mirror the
+WGSL/plugin core so a look ports), and `toExpression`-able where it makes sense.
+Consumed by many tools *and* other products (Signal Rack plugin, Entropy):
+
+| Engine driver | Produces | Consumed by |
+|---|---|---|
+| signal driver ✅ (`signal-engine.js`) | `n` / `bufX` / `bufY` + `toExpression` | all |
+| shaping ✅ (`shaping.js`: field / response / peak-hold) | mapped values | all |
+| **attractor** | x/y/z point stream (Lorenz/deJong/Clifford/Aizawa/Thomas) | Path & Scope, Particles |
+| **field** (flow / curl-noise) | vector `f(x,y,t)` | Particles, Glitch (warp) |
+| **easing / timing** | shaped playhead 0..1 | Transitions, Kinetic Type |
+| **proj3** | (x,y,z) → 2D w/ rotation | every 3D variant |
+| **parametric / lissajous** | x(t),y(t)[,z(t)] | Path & Scope, Meters (goniometer) |
+
+Discipline for an engine driver: deterministic given (t, params, seed); windowable
+(sample a span, like `driver.window`); CPU-reference parity with the core; export
+path where meaningful. **Tools only surface params + render.**
+
+### B) Design kits (per-deliverable rendering — independent craft)
+How each surfaces visually. Real work, but separable from the engine.
+
+| Design kit | Draw helpers | For |
+|---|---|---|
+| `fui.js` ✅ | cell/hex/tickRing/arc/bracket/needle/readout | FUI **+ Meters** |
+| scope draw | plot / polar / headDot / trail | Path & Scope, Meters |
+| particles draw | sprite / trail / glow | Particles |
+| type draw | glyph layout / transform stack | Kinetic Type |
+| glitch draw | rgbSplit / scanlines / displace | Glitch |
+
+→ Each demo = **surface an engine driver + a design kit.** The per-category sections
+below list both halves; build the engine driver first, then the design on top.
 
 ---
 
