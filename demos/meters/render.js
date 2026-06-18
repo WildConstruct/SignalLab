@@ -56,7 +56,7 @@
     structure: [
       { tier: "structure", key: "variant", label: "Meter type", type: "select", value: "bar", options: [
         { value: "bar", label: "Bar + gate" }, { value: "radial", label: "Radial gauge" }, { value: "led", label: "LED ladder" } ] },
-      { tier: "structure", key: "segs", label: "Segments <span>(LED)</span>", type: "slider", min: 6, max: 28, step: 1, value: 16 }
+      { tier: "structure", key: "segs", label: "Segments", type: "slider", min: 6, max: 28, step: 1, value: 16, when: { variant: "led" } }
     ],
     shaping: root.SignalShaping.responseSpecs({ gamma: 1 }).concat([
       { tier: "shaping", key: "redline", label: "Redline ≥", type: "slider", min: 0.5, max: 1, step: 0.01, value: 0.85, fmt: function (v) { return (+v).toFixed(2); } }

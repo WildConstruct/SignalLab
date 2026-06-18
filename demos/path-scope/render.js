@@ -57,9 +57,9 @@
     structure: [
       { tier: "structure", key: "variant", label: "Path type", type: "select", value: "wave", options: [
         { value: "wave", label: "Wave runner" }, { value: "vector", label: "Vectorscope" }, { value: "spiro", label: "Spirograph" }, { value: "rose", label: "Rose curve" } ] },
-      { tier: "structure", key: "turns",  label: "Turns / petals", type: "slider", min: 1, max: 10, step: 1, value: 4 },
-      { tier: "structure", key: "radius", label: "Radius", type: "slider", min: 0.4, max: 1.2, step: 0.05, value: 1, fmt: function (v) { return (+v).toFixed(2); } },
-      { tier: "structure", key: "weight", label: "Line weight <span>(wave)</span>", type: "slider", min: 1, max: 5, step: 0.5, value: 2, fmt: function (v) { return (+v).toFixed(1); } }
+      { tier: "structure", key: "turns",  label: "Turns / petals", type: "slider", min: 1, max: 10, step: 1, value: 4, when: { variant: ["spiro", "rose"] } },
+      { tier: "structure", key: "radius", label: "Radius", type: "slider", min: 0.4, max: 1.2, step: 0.05, value: 1, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: ["vector", "spiro", "rose"] } },
+      { tier: "structure", key: "weight", label: "Line weight", type: "slider", min: 1, max: 5, step: 0.5, value: 2, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "wave" } }
     ],
     shaping: [],
     presets: (root.DemoPresets || {}),

@@ -74,7 +74,7 @@
     structure: [
       { tier: "structure", key: "variant", label: "Variant", type: "select", value: "bar", options: [
         { value: "bar", label: "Loading bar" }, { value: "wipe", label: "Wipe reveal" }, { value: "radial", label: "Radial fill" }, { value: "text", label: "Text reveal" } ] },
-      { tier: "structure", key: "width", label: "Bar width <span>(bar)</span>", type: "slider", min: 0.3, max: 0.8, step: 0.02, value: 0.7, fmt: function (v) { return Math.round(v * 100) + "%"; } }
+      { tier: "structure", key: "width", label: "Bar width", type: "slider", min: 0.3, max: 0.8, step: 0.02, value: 0.7, fmt: function (v) { return Math.round(v * 100) + "%"; }, when: { variant: "bar" } }
     ],
     shaping: [
       { tier: "shaping", key: "pace", label: "Signal pace", type: "slider", min: 0, max: 1, step: 0.01, value: 0.6, fmt: function (v) { return (+v).toFixed(2); } },
