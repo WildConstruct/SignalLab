@@ -26,7 +26,7 @@ gets a thin MVP slice before any demo gets polish. Build breadth first.
 the structure statically; animate it with the built-in driver through ONE
 shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] **FUI Kit** MVP — Synapse net (ported `fuiSynapse`): Nodes/Connectivity/Seed (Structure), source/rate/combine (Signal), `Fire ≥` (Shaping). 3 presets. Headless-render + HTTP verified.
-- [ ] **Glitch / Distortion** MVP — RGB-split + scanline displacement on a built-in test card; signal drives horizontal sync drift + chroma phase. (Port the Cathode/`crt` wiring + Visual cases.)
+- [x] **Glitch / Distortion** MVP — procedural NTSC test card with RGB chroma split + sample-and-hold sync jitter + scanlines + peak dropout tear; signal drives chroma phase + sync drift. 3 presets. Headless-render verified.
 - [ ] **Transitions** MVP — loading bar with monotonic signal-shaped pace (port `trLoad`) + sweep playhead.
 - [ ] **Kinetic Type** MVP — per-letter wave/stagger on a word (port `type`/`trText`); signal drives the rise.
 - [ ] **Meters** MVP — bar meter + gate (port `meter`) with a fill response curve.
