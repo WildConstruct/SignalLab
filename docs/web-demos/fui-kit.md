@@ -68,3 +68,19 @@ no aspect distortion (uniform shrink-to-fit only).
 - [ ] Kinetic Type — explicit font-size control (currently auto from width).
 - [ ] Meters bar/radial — expose size (bar length / gauge radius).
 - [ ] Glitch — confirm block size / scan gap behave as fixed-element sizes.
+
+## Architecture: FUI primitive kit (2026-06-18)
+Per direction: a curated, signal-aware draw-helper library (`demos/shared/fui.js`)
+— NOT a drag-and-drop builder — so new widgets compose from shared parts and
+fill the Huds+Guis vocabulary cheaply and consistently. Existing widgets are
+left untouched; new ones build on it.
+- [x] `fui.js`: `lit` (shared glow), `cell`, `hexCell`, `tickRing`, `arc`,
+      `bracket`, `needle`, `readout`.
+- [x] **3D Processor Die** — first widget built on the kit + composition: a
+      depth stack of die layers, each reading a different slice of the wave,
+      drawn back-to-front. Opens a 2.5D direction for other widgets.
+- [ ] Build remaining gaps on the kit: Hex grid, Compass/heading strip,
+      Reticle-with-callouts, Wireframe globe/orbit. (Reticle, Radial spectrum
+      from the earlier roadmap also pending.)
+- Note: 3D/volumetric variants are an interesting direction for several widgets
+      (e.g. stacked slices), enabled by the kit.

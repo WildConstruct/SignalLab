@@ -11,7 +11,7 @@
  */
 (function (root) {
   "use strict";
-  var combine = root.SignalEngine.combine, Shaping = root.SignalShaping;
+  var combine = root.SignalEngine.combine, Shaping = root.SignalShaping, FUI = root.FUI;
 
   function synapse(ctx, W, H, F) {
     var S = F.S, t = F.t;
@@ -156,7 +156,37 @@
     ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   }
 
-  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer, radar: radar, telemetry: telemetry };
+  // 3D Processor Die — a depth stack of die layers, each reading a different
+  // slice of the wave, drawn back-to-front (painter's order). Built on FUI.cell;
+  // composition (a widget made of stacked simpler widgets) is the point.
+  function die3d(ctx, W, H, F) {
+    var S = F.S, bx = F.bufX, L = bx.length, t = F.t, seed = Math.round(+S.seed || 0), fire = S.fire;
+    var cols = Math.max(2, Math.round(S.cols)), rows = Math.max(2, Math.round(S.rows)), layers = Math.max(2, Math.round(S.depth));
+    var cell0 = S.cell != null ? S.cell : 30, gap0 = Math.max(2, Math.round(cell0 * 0.12));
+    var dvx0 = cell0 * 0.6, dvy0 = -cell0 * 0.46;                       // per-layer depth offset (iso-ish)
+    var gridW = cols * cell0 + (cols - 1) * gap0, gridH = rows * cell0 + (rows - 1) * gap0;
+    var spanW = gridW + Math.abs(dvx0) * (layers - 1), spanH = gridH + Math.abs(dvy0) * (layers - 1);
+    var fit = Math.min(1, (W * 0.9) / spanW, (H * 0.84) / spanH);
+    var cell = cell0 * fit, g = gap0 * fit, dx = dvx0 * fit, dy = dvy0 * fit;
+    var gw = cols * cell + (cols - 1) * g, gh = rows * cell + (rows - 1) * g;
+    var ox = W / 2 - gw / 2 - dx * (layers - 1) / 2, oy = H / 2 - gh / 2 - dy * (layers - 1) / 2;
+    var sliceStep = Math.max(1, Math.round(L / layers * 0.5));
+    for (var l = layers - 1; l >= 0; l--) {                            // back → front
+      var lx = ox + dx * l, ly = oy + dy * l;
+      var front = 1 - l / (layers - 1 || 1), fade = 0.32 + 0.68 * front, off = l * sliceStep;
+      ctx.globalAlpha = fade * 0.45; ctx.strokeStyle = "#1f5e4e"; ctx.lineWidth = 1;
+      ctx.strokeRect(lx - 4 * fit, ly - 4 * fit, gw + 8 * fit, gh + 8 * fit);
+      ctx.globalAlpha = fade;
+      for (var r2 = 0; r2 < rows; r2++) for (var c = 0; c < cols; c++) {
+        var i = r2 * cols + c;
+        var v = Math.max(0, Math.min(1, bx[(i * 37 + seed * 13 + off) % L] * (0.6 + 0.4 * Math.sin(t * 3 + i + seed + l * 0.7))));
+        FUI.cell(ctx, lx + c * (cell + g), ly + r2 * (cell + g), cell, cell, v, fire, 9 * fade);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer, radar: radar, telemetry: telemetry, die3d: die3d };
   function render(ctx, W, H, F) { (WIDGETS[F.S.widget] || synapse)(ctx, W, H, F); }
 
   var f2 = function (v) { return (+v).toFixed(2); };
@@ -165,14 +195,15 @@
     driver: { x: { src: "sine", rate: 1.5 }, y: { src: "sine", rate: 2, phase: 0.1 }, drive: "mult" },
     structure: [
       { tier: "structure", key: "widget", label: "Widget", type: "select", value: "synapse", options: [
-        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" }, { value: "radar", label: "Radar" }, { value: "telemetry", label: "Telemetry stack" } ] },
+        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" }, { value: "radar", label: "Radar" }, { value: "telemetry", label: "Telemetry stack" }, { value: "die3d", label: "Processor die (3D)" } ] },
       // bespoke per widget
       { tier: "structure", key: "nodes",   label: "Nodes",        type: "slider", min: 6, max: 28, step: 1, value: 15, when: { widget: "synapse" } },
       { tier: "structure", key: "connect", label: "Connectivity", type: "slider", min: 1, max: 4, step: 1, value: 2, when: { widget: "synapse" } },
       { tier: "structure", key: "lanes",   label: "Lanes",        type: "slider", min: 3, max: 14, step: 1, value: 6, when: { widget: "packets" } },
-      { tier: "structure", key: "cols",    label: "Columns",      type: "slider", min: 2, max: 24, step: 1, value: 10, when: { widget: "core" } },
-      { tier: "structure", key: "rows",    label: "Rows",         type: "slider", min: 2, max: 16, step: 1, value: 7, when: { widget: "core" } },
-      { tier: "structure", key: "cell",    label: "Cell size <span>px</span>", type: "slider", min: 16, max: 56, step: 2, value: 36, when: { widget: "core" } },
+      { tier: "structure", key: "cols",    label: "Columns",      type: "slider", min: 2, max: 24, step: 1, value: 10, when: { widget: ["core", "die3d"] } },
+      { tier: "structure", key: "rows",    label: "Rows",         type: "slider", min: 2, max: 16, step: 1, value: 7, when: { widget: ["core", "die3d"] } },
+      { tier: "structure", key: "cell",    label: "Cell size <span>px</span>", type: "slider", min: 16, max: 56, step: 2, value: 36, when: { widget: ["core", "die3d"] } },
+      { tier: "structure", key: "depth",   label: "Depth <span>layers</span>", type: "slider", min: 2, max: 12, step: 1, value: 6, when: { widget: "die3d" } },
       { tier: "structure", key: "bands",   label: "Bands",        type: "slider", min: 4, max: 64, step: 1, value: 24, when: { widget: "equalizer" } },
       { tier: "structure", key: "barw",    label: "Bar width <span>px</span>", type: "slider", min: 8, max: 40, step: 2, value: 18, when: { widget: "equalizer" } },
       { tier: "structure", key: "blips",   label: "Blips",        type: "slider", min: 4, max: 32, step: 1, value: 14, when: { widget: "radar" } },
