@@ -79,7 +79,9 @@ left untouched; new ones build on it.
 - [x] **3D Processor Die** — first widget built on the kit + composition: a
       depth stack of die layers, each reading a different slice of the wave,
       drawn back-to-front. Opens a 2.5D direction for other widgets.
-- [ ] Build remaining gaps on the kit: Hex grid, Compass/heading strip,
+- [x] **Hex grid** + **Hex grid (3D)** built on the kit (FUI.hexCell).
+- [x] 3D widgets gained **Depth offset** (dial the 3D-ness) + **Off-cell opacity** (fade/hide off cells so lit cells float — no camera).
+- [ ] Build remaining gaps on the kit: Compass/heading strip,
       Reticle-with-callouts, Wireframe globe/orbit. (Reticle, Radial spectrum
       from the earlier roadmap also pending.)
 - Note: 3D/volumetric variants are an interesting direction for several widgets

@@ -163,7 +163,8 @@
     var S = F.S, bx = F.bufX, L = bx.length, t = F.t, seed = Math.round(+S.seed || 0), fire = S.fire;
     var cols = Math.max(2, Math.round(S.cols)), rows = Math.max(2, Math.round(S.rows)), layers = Math.max(2, Math.round(S.depth));
     var cell0 = S.cell != null ? S.cell : 30, gap0 = Math.max(2, Math.round(cell0 * 0.12));
-    var dvx0 = cell0 * 0.6, dvy0 = -cell0 * 0.46;                       // per-layer depth offset (iso-ish)
+    var doff = S.doff != null ? S.doff : 1, offop = S.offop != null ? S.offop : 0.4;
+    var dvx0 = cell0 * 0.6 * doff, dvy0 = -cell0 * 0.46 * doff;        // per-layer depth offset (dialed by Depth offset)
     var gridW = cols * cell0 + (cols - 1) * gap0, gridH = rows * cell0 + (rows - 1) * gap0;
     var spanW = gridW + Math.abs(dvx0) * (layers - 1), spanH = gridH + Math.abs(dvy0) * (layers - 1);
     var fit = Math.min(1, (W * 0.9) / spanW, (H * 0.84) / spanH);
@@ -174,19 +175,63 @@
     for (var l = layers - 1; l >= 0; l--) {                            // back → front
       var lx = ox + dx * l, ly = oy + dy * l;
       var front = 1 - l / (layers - 1 || 1), fade = 0.32 + 0.68 * front, off = l * sliceStep;
-      ctx.globalAlpha = fade * 0.45; ctx.strokeStyle = "#1f5e4e"; ctx.lineWidth = 1;
-      ctx.strokeRect(lx - 4 * fit, ly - 4 * fit, gw + 8 * fit, gh + 8 * fit);
-      ctx.globalAlpha = fade;
+      if (offop > 0.01) { ctx.globalAlpha = fade * offop * 0.6; ctx.strokeStyle = "#1f5e4e"; ctx.lineWidth = 1;
+        ctx.strokeRect(lx - 4 * fit, ly - 4 * fit, gw + 8 * fit, gh + 8 * fit); }
       for (var r2 = 0; r2 < rows; r2++) for (var c = 0; c < cols; c++) {
         var i = r2 * cols + c;
         var v = Math.max(0, Math.min(1, bx[(i * 37 + seed * 13 + off) % L] * (0.6 + 0.4 * Math.sin(t * 3 + i + seed + l * 0.7))));
+        var on = v > fire; if (!on && offop <= 0.01) continue;        // hide off cells entirely at 0
+        ctx.globalAlpha = on ? fade : fade * offop;
         FUI.cell(ctx, lx + c * (cell + g), ly + r2 * (cell + g), cell, cell, v, fire, 9 * fade);
       }
     }
     ctx.globalAlpha = 1;
   }
 
-  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer, radar: radar, telemetry: telemetry, die3d: die3d };
+  // one honeycomb layer (pointy-top hexes, offset rows) at origin ox,oy, radius r
+  function hexLayer(ctx, F, ox, oy, r, fade, off, offop) {
+    var S = F.S, bx = F.bufX, L = bx.length, t = F.t, seed = Math.round(+S.seed || 0), fire = S.fire;
+    var cols = Math.max(2, Math.round(S.cols)), rows = Math.max(2, Math.round(S.rows));
+    var hw = Math.sqrt(3) * r, vstep = 1.5 * r;
+    for (var q = 0; q < rows; q++) for (var c = 0; c < cols; c++) {
+      var i = q * cols + c;
+      var cxp = ox + c * hw + (q & 1) * (hw / 2) + hw / 2, cyp = oy + q * vstep + r;
+      var v = Math.max(0, Math.min(1, bx[(i * 37 + seed * 13 + off) % L] * (0.6 + 0.4 * Math.sin(t * 3 + i + seed + off * 0.02))));
+      var on = v > fire; if (!on && offop <= 0.01) continue;
+      ctx.globalAlpha = on ? fade : fade * offop;
+      FUI.hexCell(ctx, cxp, cyp, r * 0.94, v, fire, 10 * fade);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // Hex grid — honeycomb of cells lit by their field sample. Fixed hex size;
+  // Columns/Rows grow the comb (designer-sized).
+  function hex(ctx, W, H, F) {
+    var S = F.S, cols = Math.max(2, Math.round(S.cols)), rows = Math.max(2, Math.round(S.rows));
+    var r0 = S.hexr != null ? S.hexr : 24, hw0 = Math.sqrt(3) * r0, vs0 = 1.5 * r0;
+    var totalW = cols * hw0 + hw0 / 2, totalH = (rows - 1) * vs0 + 2 * r0;
+    var fit = Math.min(1, (W * 0.86) / totalW, (H * 0.82) / totalH), r = r0 * fit;
+    var gw = cols * Math.sqrt(3) * r + Math.sqrt(3) * r / 2, gh = (rows - 1) * 1.5 * r + 2 * r;
+    hexLayer(ctx, F, W / 2 - gw / 2, H / 2 - gh / 2, r, 1, 0, 1);   // 2D: off cells opaque
+  }
+  // Hex grid (3D) — depth stack of honeycomb layers, each a different wave slice
+  function hex3d(ctx, W, H, F) {
+    var S = F.S, cols = Math.max(2, Math.round(S.cols)), rows = Math.max(2, Math.round(S.rows)), layers = Math.max(2, Math.round(S.depth));
+    var r0 = S.hexr != null ? S.hexr : 20, hw0 = Math.sqrt(3) * r0, vs0 = 1.5 * r0;
+    var doff = S.doff != null ? S.doff : 1, offop = S.offop != null ? S.offop : 0.4;
+    var baseW = cols * hw0 + hw0 / 2, baseH = (rows - 1) * vs0 + 2 * r0, dvx0 = r0 * 1.05 * doff, dvy0 = -r0 * 0.85 * doff;
+    var spanW = baseW + Math.abs(dvx0) * (layers - 1), spanH = baseH + Math.abs(dvy0) * (layers - 1);
+    var fit = Math.min(1, (W * 0.9) / spanW, (H * 0.84) / spanH), r = r0 * fit, dx = dvx0 * fit, dy = dvy0 * fit;
+    var gw = cols * Math.sqrt(3) * r + Math.sqrt(3) * r / 2, gh = (rows - 1) * 1.5 * r + 2 * r;
+    var L = F.bufX.length, sliceStep = Math.max(1, Math.round(L / layers * 0.5));
+    var ox0 = W / 2 - gw / 2 - dx * (layers - 1) / 2, oy0 = H / 2 - gh / 2 - dy * (layers - 1) / 2;
+    for (var l = layers - 1; l >= 0; l--) {
+      var front = 1 - l / (layers - 1 || 1), fade = 0.32 + 0.68 * front;
+      hexLayer(ctx, F, ox0 + dx * l, oy0 + dy * l, r, fade, l * sliceStep, offop);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  var WIDGETS = { synapse: synapse, packets: packets, core: core, equalizer: equalizer, radar: radar, telemetry: telemetry, die3d: die3d, hex: hex, hex3d: hex3d };
   function render(ctx, W, H, F) { (WIDGETS[F.S.widget] || synapse)(ctx, W, H, F); }
 
   var f2 = function (v) { return (+v).toFixed(2); };
@@ -195,15 +240,18 @@
     driver: { x: { src: "sine", rate: 1.5 }, y: { src: "sine", rate: 2, phase: 0.1 }, drive: "mult" },
     structure: [
       { tier: "structure", key: "widget", label: "Widget", type: "select", value: "synapse", options: [
-        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" }, { value: "radar", label: "Radar" }, { value: "telemetry", label: "Telemetry stack" }, { value: "die3d", label: "Processor die (3D)" } ] },
+        { value: "synapse", label: "Synapse net" }, { value: "packets", label: "Data packets" }, { value: "core", label: "Processor die" }, { value: "equalizer", label: "Equalizer" }, { value: "radar", label: "Radar" }, { value: "telemetry", label: "Telemetry stack" }, { value: "die3d", label: "Processor die (3D)" }, { value: "hex", label: "Hex grid" }, { value: "hex3d", label: "Hex grid (3D)" } ] },
       // bespoke per widget
       { tier: "structure", key: "nodes",   label: "Nodes",        type: "slider", min: 6, max: 28, step: 1, value: 15, when: { widget: "synapse" } },
       { tier: "structure", key: "connect", label: "Connectivity", type: "slider", min: 1, max: 4, step: 1, value: 2, when: { widget: "synapse" } },
       { tier: "structure", key: "lanes",   label: "Lanes",        type: "slider", min: 3, max: 14, step: 1, value: 6, when: { widget: "packets" } },
-      { tier: "structure", key: "cols",    label: "Columns",      type: "slider", min: 2, max: 24, step: 1, value: 10, when: { widget: ["core", "die3d"] } },
-      { tier: "structure", key: "rows",    label: "Rows",         type: "slider", min: 2, max: 16, step: 1, value: 7, when: { widget: ["core", "die3d"] } },
+      { tier: "structure", key: "cols",    label: "Columns",      type: "slider", min: 2, max: 24, step: 1, value: 10, when: { widget: ["core", "die3d", "hex", "hex3d"] } },
+      { tier: "structure", key: "rows",    label: "Rows",         type: "slider", min: 2, max: 16, step: 1, value: 7, when: { widget: ["core", "die3d", "hex", "hex3d"] } },
       { tier: "structure", key: "cell",    label: "Cell size <span>px</span>", type: "slider", min: 16, max: 56, step: 2, value: 36, when: { widget: ["core", "die3d"] } },
-      { tier: "structure", key: "depth",   label: "Depth <span>layers</span>", type: "slider", min: 2, max: 12, step: 1, value: 6, when: { widget: "die3d" } },
+      { tier: "structure", key: "hexr",    label: "Hex size <span>px</span>", type: "slider", min: 12, max: 44, step: 1, value: 24, when: { widget: ["hex", "hex3d"] } },
+      { tier: "structure", key: "depth",   label: "Depth <span>layers</span>", type: "slider", min: 2, max: 12, step: 1, value: 6, when: { widget: ["die3d", "hex3d"] } },
+      { tier: "structure", key: "doff",    label: "Depth offset <span>3D-ness</span>", type: "slider", min: 0, max: 2.5, step: 0.05, value: 1, fmt: f2, when: { widget: ["die3d", "hex3d"] } },
+      { tier: "structure", key: "offop",   label: "Off-cell opacity", type: "slider", min: 0, max: 1, step: 0.01, value: 0.4, fmt: f2, when: { widget: ["die3d", "hex3d"] } },
       { tier: "structure", key: "bands",   label: "Bands",        type: "slider", min: 4, max: 64, step: 1, value: 24, when: { widget: "equalizer" } },
       { tier: "structure", key: "barw",    label: "Bar width <span>px</span>", type: "slider", min: 8, max: 40, step: 2, value: 18, when: { widget: "equalizer" } },
       { tier: "structure", key: "blips",   label: "Blips",        type: "slider", min: 4, max: 32, step: 1, value: 14, when: { widget: "radar" } },
