@@ -39,7 +39,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 > NOTE: image-upload source for block displacement deferred — needs a file-input affordance in the shared host; tracked for Phase 4 (External-signal/import work).
 - [x] Transitions — added wipe + radial-fill + text-reveal variants (variant picker) + easing selector (linear/smooth/in/out). 5 presets. All variants verified.
 - [x] Kinetic Type — added Title pump, RGB glitch, and Shake/impact variants (variant picker) alongside kinetic wave; shared Amount control. 4 presets. All variants verified.
-- [ ] Meters — add radial gauge + LED ladder; segment count + redline gate.
+- [x] Meters — added radial gauge + LED ladder (meter type picker) + segment-count control; peak-hold across all three; γ/redline shared. 4 presets. All variants verified.
 - [ ] Particles — add shock rings (burst threshold) + stream field (density).
 - [ ] Path & Scope — add vectorscope dot + spirograph + rose (turns/radius controls).
 
