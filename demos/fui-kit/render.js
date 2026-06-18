@@ -70,25 +70,33 @@
     ctx.textBaseline = "alphabetic";
   }
 
-  // Processor die — Columns/Rows now drive the actual square count.
+  // Processor die — fixed-size SQUARE cells; Columns/Rows grow the grid extent
+  // (a designer sizes the artwork by cell count). Only scales down uniformly if
+  // the grid would overflow the canvas, so the aspect never distorts.
   function core(ctx, W, H, F) {
     var S = F.S, bx = F.bufX, L = bx.length, t = F.t;
     var cx = W / 2, cy = H / 2, seed = Math.round(+S.seed || 0), fire = S.fire;
-    var cols = Math.max(2, Math.round(S.cols)), rows = Math.max(2, Math.round(S.rows)), gap = 4;
-    var total = Math.min(W * 0.8, 560), cw = (total - gap * (cols - 1)) / cols;
-    var gh = Math.min(H * 0.7, 380), chh = (gh - gap * (rows - 1)) / rows, x0 = cx - total / 2, y0 = cy - gh / 2;
+    var cols = Math.max(2, Math.round(S.cols)), rows = Math.max(2, Math.round(S.rows));
+    var cell0 = S.cell != null ? S.cell : 36, gap0 = Math.max(2, Math.round(cell0 * 0.12));
+    var gridW = cols * cell0 + (cols - 1) * gap0, gridH = rows * cell0 + (rows - 1) * gap0;
+    var fit = Math.min(1, (W * 0.92) / gridW, (H * 0.86) / gridH);   // shrink-to-fit only, uniform → square preserved
+    var cell = cell0 * fit, g = gap0 * fit, m = 6 * fit;
+    var total = cols * cell + (cols - 1) * g, gh = rows * cell + (rows - 1) * g, x0 = cx - total / 2, y0 = cy - gh / 2;
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
       var i = r * cols + c, v = Math.max(0, Math.min(1, bx[(i * 37 + seed * 13) % L] * (0.6 + 0.4 * Math.sin(t * 3 + i + seed)))), on = v > fire;
       ctx.fillStyle = on ? "hsl(" + (150 + v * 120) + ",85%," + (28 + v * 42) + "%)" : "#0e1a1f";
       if (on) { ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 10 * v; }
-      ctx.fillRect(x0 + c * (cw + gap), y0 + r * (chh + gap), cw, chh); ctx.shadowBlur = 0;
+      ctx.fillRect(x0 + c * (cell + g), y0 + r * (cell + g), cell, cell); ctx.shadowBlur = 0;
     }
-    ctx.strokeStyle = "#1f5e4e"; ctx.lineWidth = 1.5; ctx.strokeRect(x0 - 6, y0 - 6, total + 12, gh + 12);
+    ctx.strokeStyle = "#1f5e4e"; ctx.lineWidth = 1.5; ctx.strokeRect(x0 - m, y0 - m, total + 2 * m, gh + 2 * m);
   }
 
+  // fixed-width bars; Bands grows the total width (shrinks uniformly only to fit)
   function equalizer(ctx, W, H, F) {
     var S = F.S, cx = W / 2, cy = H / 2, bands = Math.max(4, Math.round(S.bands)), fire = S.fire;
-    var gap = 4, total = Math.min(W * 0.82, 760), bw = (total - gap * (bands - 1)) / bands, x0 = cx - total / 2;
+    var bw0 = S.barw != null ? S.barw : 18, gap0 = Math.max(2, Math.round(bw0 * 0.33));
+    var gridW = bands * bw0 + (bands - 1) * gap0, fit = Math.min(1, (W * 0.9) / gridW);
+    var bw = bw0 * fit, gap = gap0 * fit, total = bands * bw + (bands - 1) * gap, x0 = cx - total / 2;
     var baseY = cy + Math.min(H * 0.32, 220), maxH = Math.min(H * 0.55, 320);
     for (var b = 0; b < bands; b++) {
       var v = Shaping.fieldValue(F, b, bands, Math.round(+S.seed || 0));
@@ -136,9 +144,11 @@
       { tier: "structure", key: "nodes",   label: "Nodes",        type: "slider", min: 6, max: 28, step: 1, value: 15, when: { widget: "synapse" } },
       { tier: "structure", key: "connect", label: "Connectivity", type: "slider", min: 1, max: 4, step: 1, value: 2, when: { widget: "synapse" } },
       { tier: "structure", key: "lanes",   label: "Lanes",        type: "slider", min: 3, max: 14, step: 1, value: 6, when: { widget: "packets" } },
-      { tier: "structure", key: "cols",    label: "Columns",      type: "slider", min: 4, max: 18, step: 1, value: 10, when: { widget: "core" } },
-      { tier: "structure", key: "rows",    label: "Rows",         type: "slider", min: 3, max: 12, step: 1, value: 7, when: { widget: "core" } },
-      { tier: "structure", key: "bands",   label: "Bands",        type: "slider", min: 8, max: 48, step: 1, value: 28, when: { widget: "equalizer" } },
+      { tier: "structure", key: "cols",    label: "Columns",      type: "slider", min: 2, max: 24, step: 1, value: 10, when: { widget: "core" } },
+      { tier: "structure", key: "rows",    label: "Rows",         type: "slider", min: 2, max: 16, step: 1, value: 7, when: { widget: "core" } },
+      { tier: "structure", key: "cell",    label: "Cell size <span>px</span>", type: "slider", min: 16, max: 56, step: 2, value: 36, when: { widget: "core" } },
+      { tier: "structure", key: "bands",   label: "Bands",        type: "slider", min: 4, max: 64, step: 1, value: 24, when: { widget: "equalizer" } },
+      { tier: "structure", key: "barw",    label: "Bar width <span>px</span>", type: "slider", min: 8, max: 40, step: 2, value: 18, when: { widget: "equalizer" } },
       { tier: "structure", key: "blips",   label: "Blips",        type: "slider", min: 4, max: 32, step: 1, value: 14, when: { widget: "radar" } },
       { tier: "structure", key: "seed",    label: "Seed", type: "slider", min: 1, max: 9999, step: 1, value: 1941 }
     ],
