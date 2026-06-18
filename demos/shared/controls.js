@@ -45,11 +45,14 @@
       var inTier = specs.filter(function (s) { return (s.tier || "shaping") === tier.key; });
       if (!inTier.length) return;
       var sec = el("div", "sh-section");
-      var h = el("h3"); h.textContent = tier.title;
+      var h = el("h3"); h.appendChild(document.createTextNode(tier.title));
       var hint = el("span", "sh-hint"); hint.textContent = tier.hint; h.appendChild(hint);
+      h.onclick = function () { sec.classList.toggle("collapsed"); };   // collapsible section
       sec.appendChild(h);
+      var body = el("div", "sh-sec-body");
       var secSpecs = [];
-      inTier.forEach(function (s) { var node = ctl(s); sec.appendChild(node); entries.push({ node: node, spec: s }); secSpecs.push(s); });
+      inTier.forEach(function (s) { var node = ctl(s); body.appendChild(node); entries.push({ node: node, spec: s }); secSpecs.push(s); });
+      sec.appendChild(body);
       mount.appendChild(sec);
       sections.push({ el: sec, specs: secSpecs });
     });

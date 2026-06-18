@@ -34,11 +34,16 @@
   ];
 
   function defaultSignalSpecs(d) {
+    var YWHEN = { _drive: ["mult", "mix", "diff", "min", "max"] };   // Y only matters when a combine uses it
+    var hz = function (v) { return (+v).toFixed(1); };
     return [
-      { tier: "signal", key: "_src",   label: "Source",     type: "select", value: srcName(d.x.src), options: SRC_OPTS },
-      { tier: "signal", key: "_rate",  label: "Rate <span>Hz</span>", type: "slider", min: 0.1, max: 6, step: 0.1, value: d.x.rate, fmt: function (v) { return (+v).toFixed(1); } },
-      { tier: "signal", key: "_drive", label: "Combine",    type: "select", value: d.drive, options: DRIVE_OPTS },
-      { tier: "signal", key: "_speed", label: "Speed",      type: "slider", min: 0.1, max: 3, step: 0.1, value: 1, fmt: function (v) { return (+v).toFixed(1) + "×"; } }
+      { tier: "signal", key: "_src",    label: "Source X",     type: "select", value: srcName(d.x.src), options: SRC_OPTS },
+      { tier: "signal", key: "_rate",   label: "Rate X <span>Hz</span>", type: "slider", min: 0.1, max: 6, step: 0.1, value: d.x.rate, fmt: hz },
+      { tier: "signal", key: "_drive",  label: "Combine",      type: "select", value: d.drive, options: DRIVE_OPTS },
+      { tier: "signal", key: "_ysrc",   label: "Source Y",     type: "select", value: srcName(d.y.src), options: SRC_OPTS, when: YWHEN },
+      { tier: "signal", key: "_yrate",  label: "Rate Y <span>Hz</span>", type: "slider", min: 0.1, max: 6, step: 0.1, value: d.y.rate, fmt: hz, when: YWHEN },
+      { tier: "signal", key: "_smooth", label: "Smoothing",    type: "slider", min: 0, max: 1, step: 0.01, value: d.x.smooth || 0, fmt: function (v) { return (+v).toFixed(2); } },
+      { tier: "signal", key: "_speed",  label: "Speed",        type: "slider", min: 0.1, max: 3, step: 0.1, value: 1, fmt: function (v) { return (+v).toFixed(1) + "×"; } }
     ];
   }
   var SRCNAMES = { 1: "sine", 2: "square", 3: "saw", 4: "noise", 5: "randomWalk", 8: "triangle", 9: "pulse" };
@@ -48,20 +53,21 @@
     var driver = SignalEngine.create(cfg.driver || {});
     var mount = document.getElementById(cfg.mount || "app");
 
-    // layout
+    // layout: [ module rail | stage | inspector ]
     var app = div("sh-app");
+    app.appendChild(buildRail(cfg.title));
     var stage = div("sh-stage");
     var bar = div("sh-topbar");
-    var back = document.createElement("a"); back.className = "sh-btn"; back.href = "../"; back.textContent = "← Lab"; back.title = "Back to the demo gallery";
     var title = div("sh-title"); title.textContent = cfg.title || "Signal Demo";
-    var badge = div("sh-badge live"); badge.textContent = "engine: CPU parity";
+    var badge = div("sh-badge live"); badge.textContent = "CPU parity";
     var spacer = div("sh-spacer");
     // preset picker (named) — populated below once applyPreset exists
     var presetSel = document.createElement("select"); presetSel.className = "sh-btn"; presetSel.title = "Presets";
     var optDef = document.createElement("option"); optDef.textContent = "Presets…"; optDef.value = ""; presetSel.appendChild(optDef);
     Object.keys(cfg.presets || {}).forEach(function (name) { var o = document.createElement("option"); o.value = name; o.textContent = name; presetSel.appendChild(o); });
     var bLink = btn("Copy link"), bExport = btn("Export JSON"), bImport = btn("Import"), bAE = btn("ƒ AE"), bSurprise = btn("🎲");
-    bar.append(back, title, badge, spacer, presetSel, bSurprise, bLink, bExport, bImport, bAE);
+    bAE.className = "sh-btn primary"; bAE.title = "Copy the self-contained After Effects expression";
+    bar.append(title, badge, spacer, presetSel, bSurprise, bLink, bImport, bExport, bAE);
     var wrap = div("sh-canvas-wrap");
     var canvas = document.createElement("canvas"); canvas.className = "sh-canvas";
     wrap.appendChild(canvas);
@@ -80,7 +86,10 @@
     function applySignal(s) {
       var patch = {};
       if ("_src" in s) patch.x = { src: s._src };
-      if ("_rate" in s) { patch.x = Object.assign(patch.x || {}, { rate: +s._rate }); }
+      if ("_rate" in s) patch.x = Object.assign(patch.x || {}, { rate: +s._rate });
+      if ("_ysrc" in s) patch.y = { src: s._ysrc };
+      if ("_yrate" in s) patch.y = Object.assign(patch.y || {}, { rate: +s._yrate });
+      if ("_smooth" in s) { patch.x = Object.assign(patch.x || {}, { smooth: +s._smooth }); patch.y = Object.assign(patch.y || {}, { smooth: +s._smooth }); }
       if ("_drive" in s) patch.drive = s._drive;
       if (Object.keys(patch).length) driver.set(patch);
       if ("_speed" in s) speed = +s._speed;
@@ -170,6 +179,27 @@
 
     loadHash();
     return { driver: driver, ui: ui, applyPreset: applyPreset };
+  }
+
+  var MODULES = [
+    { dir: "fui-kit", name: "FUI Kit" }, { dir: "glitch-distortion", name: "Glitch / Distortion" },
+    { dir: "transitions", name: "Transitions" }, { dir: "kinetic-type", name: "Kinetic Type" },
+    { dir: "meters", name: "Meters" }, { dir: "particles", name: "Particles" },
+    { dir: "path-scope", name: "Path & Scope" }
+  ];
+  // left rail: brand (→ gallery) + module switcher; active module highlighted
+  function buildRail() {
+    var rail = div("sh-rail");
+    var brand = document.createElement("a"); brand.className = "sh-rail-brand"; brand.href = "../";
+    brand.innerHTML = '<span class="mk">◢</span> Signal Rack';
+    rail.appendChild(brand);
+    var sec = div("sh-rail-sec"); sec.textContent = "Modules"; rail.appendChild(sec);
+    var here = location.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "").split("/").pop();
+    MODULES.forEach(function (m) {
+      var a = document.createElement("a"); a.className = "sh-rail-item" + (m.dir === here ? " active" : "");
+      a.href = "../" + m.dir + "/"; a.textContent = m.name; rail.appendChild(a);
+    });
+    return rail;
   }
 
   function div(cls) { var e = document.createElement("div"); e.className = cls; return e; }
