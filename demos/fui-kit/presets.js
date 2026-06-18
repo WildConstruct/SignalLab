@@ -15,6 +15,8 @@
     "Radar":       { driver: { x: { src: "randomWalk", rate: 1 }, y: { src: "noise", rate: 2 }, drive: "max" },
                      S: { widget: "radar", blips: 14, seed: 23, fire: 0.4, sweep: 0.8, field: "stagger", _src: "randomWalk", _rate: 1, _drive: "max" } },
     "Telemetry":   { driver: { x: { src: "sine", rate: 1 }, y: { src: "noise", rate: 2.5 }, drive: "max" },
-                     S: { widget: "telemetry", lines: 8, lineh: 30, seed: 51, fire: 0.6, field: "sweep", _src: "sine", _rate: 1, _drive: "max" } }
+                     S: { widget: "telemetry", lines: 8, lineh: 30, seed: 51, fire: 0.6, field: "sweep", _src: "sine", _rate: 1, _drive: "max" } },
+    "Die (3D)":    { driver: { x: { src: "sine", rate: 1.4 }, y: { src: "sine", rate: 2, phase: 0.15 }, drive: "mult" },
+                     S: { widget: "die3d", cols: 8, rows: 6, cell: 30, depth: 6, seed: 1337, fire: 0.45, field: "stagger", _src: "sine", _rate: 1.4, _drive: "mult" } }
   };
 })(typeof self !== "undefined" ? self : this);
