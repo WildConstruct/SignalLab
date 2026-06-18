@@ -52,6 +52,7 @@
     var app = div("sh-app");
     var stage = div("sh-stage");
     var bar = div("sh-topbar");
+    var back = document.createElement("a"); back.className = "sh-btn"; back.href = "../"; back.textContent = "← Lab"; back.title = "Back to the demo gallery";
     var title = div("sh-title"); title.textContent = cfg.title || "Signal Demo";
     var badge = div("sh-badge live"); badge.textContent = "engine: CPU parity";
     var spacer = div("sh-spacer");
@@ -60,7 +61,7 @@
     var optDef = document.createElement("option"); optDef.textContent = "Presets…"; optDef.value = ""; presetSel.appendChild(optDef);
     Object.keys(cfg.presets || {}).forEach(function (name) { var o = document.createElement("option"); o.value = name; o.textContent = name; presetSel.appendChild(o); });
     var bLink = btn("Copy link"), bExport = btn("Export JSON"), bImport = btn("Import"), bAE = btn("ƒ AE"), bSurprise = btn("🎲");
-    bar.append(title, badge, spacer, presetSel, bSurprise, bLink, bExport, bImport, bAE);
+    bar.append(back, title, badge, spacer, presetSel, bSurprise, bLink, bExport, bImport, bAE);
     var wrap = div("sh-canvas-wrap");
     var canvas = document.createElement("canvas"); canvas.className = "sh-canvas";
     wrap.appendChild(canvas);
