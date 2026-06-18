@@ -17,6 +17,10 @@
     "Telemetry":   { driver: { x: { src: "sine", rate: 1 }, y: { src: "noise", rate: 2.5 }, drive: "max" },
                      S: { widget: "telemetry", lines: 8, lineh: 30, seed: 51, fire: 0.6, field: "sweep", _src: "sine", _rate: 1, _drive: "max" } },
     "Die (3D)":    { driver: { x: { src: "sine", rate: 1.4 }, y: { src: "sine", rate: 2, phase: 0.15 }, drive: "mult" },
-                     S: { widget: "die3d", cols: 8, rows: 6, cell: 30, depth: 6, seed: 1337, fire: 0.45, field: "stagger", _src: "sine", _rate: 1.4, _drive: "mult" } }
+                     S: { widget: "die3d", cols: 8, rows: 6, cell: 30, depth: 6, seed: 1337, fire: 0.45, field: "stagger", _src: "sine", _rate: 1.4, _drive: "mult" } },
+    "Hex Grid":    { driver: { x: { src: "sine", rate: 1.2 }, y: { src: "sine", rate: 1.8, phase: 0.2 }, drive: "mult" },
+                     S: { widget: "hex", cols: 9, rows: 7, hexr: 24, seed: 404, fire: 0.4, field: "stagger", _src: "sine", _rate: 1.2, _drive: "mult" } },
+    "Hex (3D)":    { driver: { x: { src: "sine", rate: 1.4 }, y: { src: "noise", rate: 2.5 }, drive: "max" },
+                     S: { widget: "hex3d", cols: 7, rows: 6, hexr: 20, depth: 6, seed: 99, fire: 0.4, field: "stagger", _src: "sine", _rate: 1.4, _drive: "max" } }
   };
 })(typeof self !== "undefined" ? self : this);
