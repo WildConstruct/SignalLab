@@ -55,8 +55,12 @@
     var title = div("sh-title"); title.textContent = cfg.title || "Signal Demo";
     var badge = div("sh-badge live"); badge.textContent = "engine: CPU parity";
     var spacer = div("sh-spacer");
-    var bLink = btn("Copy link"), bExport = btn("Export JSON"), bSurprise = btn("🎲");
-    bar.append(title, badge, spacer, bSurprise, bLink, bExport);
+    // preset picker (named) — populated below once applyPreset exists
+    var presetSel = document.createElement("select"); presetSel.className = "sh-btn"; presetSel.title = "Presets";
+    var optDef = document.createElement("option"); optDef.textContent = "Presets…"; optDef.value = ""; presetSel.appendChild(optDef);
+    Object.keys(cfg.presets || {}).forEach(function (name) { var o = document.createElement("option"); o.value = name; o.textContent = name; presetSel.appendChild(o); });
+    var bLink = btn("Copy link"), bExport = btn("Export JSON"), bImport = btn("Import"), bSurprise = btn("🎲");
+    bar.append(title, badge, spacer, presetSel, bSurprise, bLink, bExport, bImport);
     var wrap = div("sh-canvas-wrap");
     var canvas = document.createElement("canvas"); canvas.className = "sh-canvas";
     wrap.appendChild(canvas);
@@ -125,6 +129,27 @@
       var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = (cfg.title || "demo").toLowerCase().replace(/\s+/g, "-") + ".json"; a.click();
     };
+    bImport.onclick = function () {
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,.wcx";
+      inp.onchange = function () {
+        var f = inp.files && inp.files[0]; if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function () {
+          try {
+            var obj = JSON.parse(rd.result);
+            if (obj.source || obj.type === "wildconstruct.signalRecipe") {   // a Signal Lab recipe → external signal source
+              driver.fromRecipe(obj);
+              ui.set("_src", srcName(driver.x.src)); ui.set("_rate", driver.x.rate); ui.set("_drive", driver.drive);
+              badge.textContent = "external signal: " + (obj.name || "recipe"); badge.classList.add("live");
+            } else if (obj.S) {                                              // a demo export snapshot
+              applyPreset(obj);
+            }
+          } catch (e) { badge.textContent = "import failed: " + e.message; badge.classList.remove("live"); }
+        };
+        rd.readAsText(f);
+      };
+      inp.click();
+    };
     bSurprise.onclick = function () {
       if (cfg.presets) { var ks = Object.keys(cfg.presets); applyPreset(cfg.presets[ks[(Math.random() * ks.length) | 0]]); }
       else { ui.set("_src", SRC_OPTS[(Math.random() * SRC_OPTS.length) | 0].value); ui.set("_rate", (0.5 + Math.random() * 4).toFixed(1)); }
@@ -134,6 +159,7 @@
       if (p.driver) driver.set(p.driver);
       if (p.S) for (var k in p.S) if (ui.refs[k]) ui.set(k, p.S[k]);
     }
+    presetSel.onchange = function () { if (presetSel.value && cfg.presets) applyPreset(cfg.presets[presetSel.value]); };
 
     loadHash();
     return { driver: driver, ui: ui, applyPreset: applyPreset };

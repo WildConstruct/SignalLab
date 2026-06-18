@@ -52,8 +52,8 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] Radar (FUI) — new widget: signal sets each blip's bearing/range + the sweep speed; blips fade behind the rotating arm. 6 presets total. **Phase 3 complete.**
 
 ## Phase 4 — Suite cohesion & handoff
-- [ ] Every demo: External-signal source — import a recipe/link from Signal Lab; verify round-trip.
-- [ ] Every demo: 3–5 tasteful presets + `🎲 Surprise`.
+- [x] Every demo: External-signal source — host **Import** button accepts a Signal Lab recipe (`fromRecipe`) or a demo export snapshot; recipe round-trip verified. Badge shows the external source.
+- [x] Every demo: 3–6 presets via a host **Presets…** dropdown + `🎲 Surprise` (already present). Done across all 7 demos.
 - [ ] Every demo: copy the self-contained AE expression for its primary mapping (reuse `driver.toExpression`).
 - [ ] `demos/index.html` gallery polish + per-demo thumbnails.
 - [ ] Cross-link demos ↔ `docs/product-breakup.md` and the Notion sub-project.
