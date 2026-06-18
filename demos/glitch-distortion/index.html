@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glitch / Distortion — Signal Rack</title>
+<link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="../../prototypes/webgpu-lab/signal-core-reference.js"></script>
+<script src="../shared/signal-engine.js"></script>
+<script src="../shared/controls.js"></script>
+<script src="../shared/shaping.js"></script>
+<script src="../shared/host.js"></script>
+<script src="./presets.js"></script>
+<script src="./render.js"></script>
+<script>
+  SignalHost.boot({
+    title: Demo.title, driver: Demo.driver,
+    structure: Demo.structure, shaping: Demo.shaping,
+    presets: Demo.presets, render: Demo.render
+  });
+</script>
+</body>
+</html>

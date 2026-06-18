@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signal Rack — Demo Lab</title>
+<link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+<div class="sh-gallery">
+  <h1>Signal Rack — Demo Lab</h1>
+  <p class="lead">One signal engine, many instruments. Each demo is a standalone
+  renderer driven by the same parity engine the After-Effects bridge uses — built
+  on the shared <b>Structure / Signal / Shaping</b> control language. Pick one.</p>
+
+  <div class="sh-grid" id="grid"></div>
+
+  <p class="lead" style="margin-top:32px;font-size:11.5px">
+    Background: <a href="../docs/product-breakup.md">product breakup</a> ·
+    plans in <a href="../docs/web-demos/README.md">docs/web-demos</a> ·
+    progress in <a href="../docs/web-demos/BACKLOG.md">the build backlog</a> ·
+    <a href="https://app.notion.com/p/383b77d6cd4f81699963d80c643576a5">Notion sub-project</a>.
+  </p>
+</div>
+
+<!-- the shared engine powers the live thumbnails -->
+<script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
+<script src="shared/signal-engine.js"></script>
+<script>
+// Keep in sync with docs/web-demos/*.md. Each demo's `sig` is the signature
+// driver used to animate its thumbnail sparkline.
+var DEMOS = [
+  { dir:"fui-kit", name:"FUI Kit", ready:true, tag:"lead generator",
+    desc:"HUD widgets where the signal decides which elements fire and in what sequence.",
+    sig:{ x:{src:"sine",rate:1.5}, y:{src:"sine",rate:2,phase:0.1}, drive:"mult" } },
+  { dir:"glitch-distortion", name:"Glitch / Distortion", ready:true, tag:"signal in background",
+    desc:"An image in the foreground; the signal subtly warps it — sync drift, chroma, dropout, pixel-sort.",
+    sig:{ x:{src:"randomWalk",rate:1.2}, y:{src:"sine",rate:0.6}, drive:"max" } },
+  { dir:"transitions", name:"Transitions", ready:true, tag:"load-in",
+    desc:"Signal-shaped animate-ins: bar, wipe, radial, text-reveal — the signal shapes the pace.",
+    sig:{ x:{src:"sine",rate:1.2}, drive:"x" } },
+  { dir:"kinetic-type", name:"Kinetic Type", ready:true, tag:"type",
+    desc:"Per-letter motion driven by the signal — wave, pump, RGB glitch, shake.",
+    sig:{ x:{src:"sine",rate:1.4}, y:{src:"sine",rate:2,phase:0.25}, drive:"mult" } },
+  { dir:"meters", name:"Meters", ready:true, tag:"readout",
+    desc:"Calibrated readouts: bar, radial gauge, LED ladder — response curve, peak-hold, redline.",
+    sig:{ x:{src:"sine",rate:1}, y:{src:"noise",rate:2}, drive:"max" } },
+  { dir:"particles", name:"Particles", ready:true, tag:"emitter",
+    desc:"Emitters whose birth-rate spikes with the signal — fountain, shock rings, stream. Bridge to Entropy.",
+    sig:{ x:{src:"sine",rate:1.5}, y:{src:"noise",rate:3}, drive:"max" } },
+  { dir:"path-scope", name:"Path & Scope", ready:true, tag:"scope",
+    desc:"The raw signal as geometry — wave runner, vectorscope, spirograph, rose.",
+    sig:{ x:{src:"sine",rate:2}, y:{src:"triangle",rate:3,phase:0.1}, drive:"mult" } }
+];
+
+var grid = document.getElementById("grid");
+var thumbs = [];
+DEMOS.forEach(function (d) {
+  var a = document.createElement("a");
+  a.className = "sh-card" + (d.ready ? "" : " sh-soon");
+  a.href = d.ready ? (d.dir + "/") : "#";
+  var cv = document.createElement("canvas"); cv.className = "sh-thumb"; cv.width = 320; cv.height = 64;
+  a.appendChild(cv);
+  var h = document.createElement("h2"); h.textContent = d.name; a.appendChild(h);
+  var p = document.createElement("p"); p.textContent = d.desc; a.appendChild(p);
+  var t = document.createElement("span"); t.className = "tag"; t.textContent = d.ready ? d.tag : "planned"; a.appendChild(t);
+  grid.appendChild(a);
+  if (d.ready && window.SignalEngine) thumbs.push({ ctx: cv.getContext("2d"), drv: SignalEngine.create(d.sig), W: cv.width, H: cv.height });
+});
+
+// one shared loop animates every thumbnail's driver waveform
+var t0 = performance.now();
+(function tick() {
+  var tt = (performance.now() - t0) / 1000;
+  thumbs.forEach(function (th) {
+    var w = th.drv.window(tt, 160), ctx = th.ctx, W = th.W, H = th.H;
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = "#16323f"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+    ctx.strokeStyle = "#36f09a"; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (var i = 0; i < w.bufX.length; i++) {
+      var dv = SignalEngine.combine(th.drv.drive, w.bufX[i], w.bufY[i]);
+      var x = i / (w.bufX.length - 1) * W, y = (1 - dv) * (H - 8) + 4;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+    var n = w.n, px = W - 4, py = (1 - n) * (H - 8) + 4;
+    ctx.fillStyle = "#36f09a"; ctx.beginPath(); ctx.arc(px, py, 2.5, 0, 7); ctx.fill();
+  });
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
