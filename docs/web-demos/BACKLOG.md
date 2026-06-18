@@ -47,7 +47,7 @@ shaping mapping; one preset. Port from the named `drawApplied()` cases.*
 - [x] Added shared **field-mapping** (`demos/shared/shaping.js`: `fieldValue`/`fieldIndex` + `fieldSpec`) and a Field-map selector; wired into FUI (node activation, default stagger) + Kinetic Type (per-letter, default sweep). shaping.js now loaded on all 7 pages for the remaining per-demo Phase 3 items.
 - [x] Added shared **response** layer (`shaping.js`: `response(v,{gamma,rlo,rhi})` remap+curve + `PeakHold`) and applied to Meters (replaces ad-hoc gamma/peak), Glitch (energy curve), Particles (all emitters). Response sanity-verified.
 - [x] FUI Kit — added Edge speed (pulse propagation) + Sequencing (per-node phase envelope → travelling firing) controls to the synapse net. Verified.
-- [ ] Glitch — dropout-gate + pixel-sort threshold + sort-axis.
+- [x] Glitch — added Pixel-sort ≥ (stylized smear) + Sort axis (vertical/horizontal) + Dropout gate (energy-gated black bands). Verified across settings.
 - [ ] Equalizer (FUI/Meters) — per-band offset → travelling wave across bands.
 - [ ] Radar (FUI) — signal → blip bearing/range + sweep speed.
 

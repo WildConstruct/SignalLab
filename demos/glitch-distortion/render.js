@@ -65,9 +65,28 @@
       drawRGB(ctx, W, H, sync, chroma);
     }
 
-    if (e > 0.78) { var ty = (t * 0.35 % 1) * H, th = H * 0.05;
-      ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(0, ty, W, th);
-      ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(0, ty + th * 0.4, W, 1); }
+    // pixel-sort (stylized): bright samples smear along the sort axis
+    if (S.psort > 0.01) {
+      var axis = S.psaxis || "vertical";
+      if (axis === "vertical") {
+        for (var sx = 0; sx < W; sx += 6) { var vv = bx[Math.floor(sx / W * (L - 1))]; if (vv <= S.psort) continue;
+          var len = vv * H * 0.5 * e, sy0 = (Math.sin(sx * 12.9 + t) * 0.5 + 0.5) * (H - len);
+          ctx.fillStyle = "hsla(" + (150 + vv * 60) + ",80%,60%,0.5)"; ctx.fillRect(sx, sy0, 5, len); }
+      } else {
+        for (var ry = 0; ry < H; ry += 6) { var vh = bx[Math.floor(ry / H * (L - 1))]; if (vh <= S.psort) continue;
+          var lw = vh * W * 0.5 * e, rx0 = (Math.sin(ry * 12.9 + t) * 0.5 + 0.5) * (W - lw);
+          ctx.fillStyle = "hsla(" + (150 + vh * 60) + ",80%,60%,0.5)"; ctx.fillRect(rx0, ry, lw, 5); }
+      }
+    }
+
+    // dropout gate: when energy passes the gate, black bands drop out
+    if (S.dropgate < 1 && e > S.dropgate) {
+      var bands = 1 + Math.floor((e - S.dropgate) * 8);
+      for (var db = 0; db < bands; db++) { var dh = Math.sin((db * 71.3 + Math.floor(t * 9)) * 12.9) * 43758.5; dh -= Math.floor(dh);
+        var dy = dh * H, dth = H * (0.02 + 0.05 * e);
+        ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(0, dy, W, dth);
+        ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(0, dy + dth * 0.4, W, 1); }
+    }
 
     var d = Math.max(2, Math.round(S.scan));
     ctx.fillStyle = "rgba(0,0,0,0.28)";
@@ -84,7 +103,10 @@
     shaping: [
       { tier: "shaping", key: "chroma", label: "Chroma phase <span>px</span>",  type: "slider", min: 0, max: 40, step: 1, value: 14 },
       { tier: "shaping", key: "drift",  label: "Sync drift <span>px</span>",     type: "slider", min: 0, max: 120, step: 1, value: 48 },
-      { tier: "shaping", key: "block",  label: "Block displace <span>px</span>", type: "slider", min: 0, max: 200, step: 2, value: 0, fmt: function (v) { return v > 0.5 ? v : "off"; } }
+      { tier: "shaping", key: "block",  label: "Block displace <span>px</span>", type: "slider", min: 0, max: 200, step: 2, value: 0, fmt: function (v) { return v > 0.5 ? v : "off"; } },
+      { tier: "shaping", key: "psort",  label: "Pixel-sort ≥", type: "slider", min: 0, max: 1, step: 0.01, value: 0, fmt: function (v) { return v > 0.01 ? (+v).toFixed(2) : "off"; } },
+      { tier: "shaping", key: "psaxis", label: "Sort axis", type: "select", value: "vertical", options: [ { value: "vertical", label: "Vertical" }, { value: "horizontal", label: "Horizontal" } ] },
+      { tier: "shaping", key: "dropgate", label: "Dropout gate", type: "slider", min: 0.3, max: 1, step: 0.01, value: 1, fmt: function (v) { return v >= 1 ? "off" : (+v).toFixed(2); } }
     ].concat(root.SignalShaping.responseSpecs({ gamma: 1 })),
     presets: (root.DemoPresets || {}),
     render: render
