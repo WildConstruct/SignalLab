@@ -227,3 +227,8 @@ per-letter **transform stack** + a shared **easing/timing** module (shared with
 → Revised build order: **proj3.js → scope.js (attractors + 3D Lissajous) →
 Meters (reuse fui.js + goniometer via scope.js) → particles.js (curl/attractor)
 → type.js (+easing) → transitions.js → glitch.js (+image import).**
+
+
+## Build log
+- [x] **Engine:** `proj3.js` (projection) + `attractor.js` (Lorenz/Aizawa/Thomas/de Jong/Clifford) — deterministic, normalized, parity-verified.
+- [x] **Surfaced:** Path & Scope gains a **Strange attractor** path type (system picker, Signal→shape morph, 3D rotate); presets Lorenz + De Jong. First proof of the engine-vs-design split.
