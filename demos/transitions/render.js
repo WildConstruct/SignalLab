@@ -9,14 +9,8 @@
  */
 (function (root) {
   "use strict";
+  var Easing = root.Easing;          // shared easing/timing engine driver
   var prog = 0, last = null;
-
-  var EASE = {
-    linear: function (p) { return p; },
-    smooth: function (p) { return p * p * (3 - 2 * p); },
-    in: function (p) { return p * p; },
-    out: function (p) { return 1 - (1 - p) * (1 - p); }
-  };
 
   function bar(ctx, W, H, p, S) {
     var cx = W / 2, cy = H / 2, bw = Math.min(W * S.width, 560), bh = Math.min(H * 0.12, 52), x = cx - bw / 2, y = cy - bh / 2;
@@ -59,7 +53,7 @@
     var dt = last == null ? 0 : Math.max(0, Math.min(0.1, t - last)); last = t;
     prog += dt * (0.12 + e * S.pace * 1.6);
     if (prog >= 1.12) prog = 0;
-    var raw = Math.min(1, prog), p = (EASE[S.ease] || EASE.smooth)(raw);
+    var raw = Math.min(1, prog), p = Easing.apply(S.ease, raw);
     switch (S.variant) {
       case "wipe":   wipe(ctx, W, H, p); break;
       case "radial": radial(ctx, W, H, p); break;
@@ -78,8 +72,7 @@
     ],
     shaping: [
       { tier: "shaping", key: "pace", label: "Signal pace", type: "slider", min: 0, max: 1, step: 0.01, value: 0.6, fmt: function (v) { return (+v).toFixed(2); } },
-      { tier: "shaping", key: "ease", label: "Easing", type: "select", value: "smooth", options: [
-        { value: "linear", label: "Linear" }, { value: "smooth", label: "Smooth" }, { value: "in", label: "Ease in" }, { value: "out", label: "Ease out" } ] }
+      { tier: "shaping", key: "ease", label: "Easing", type: "select", value: "smooth", options: root.Easing.OPTIONS }
     ],
     presets: (root.DemoPresets || {}),
     render: render

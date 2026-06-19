@@ -8,7 +8,7 @@
  */
 (function (root) {
   "use strict";
-  var combine = root.SignalEngine.combine, Shaping = root.SignalShaping;
+  var combine = root.SignalEngine.combine, Shaping = root.SignalShaping, Easing = root.Easing;
 
   function wave(ctx, W, H, F, txt, amp, mode) {
     var cx = W / 2, cy = H / 2;
@@ -52,13 +52,30 @@
     ctx.fillStyle = "#eaf6f5"; ctx.fillText(txt, cx + dx, cy + dy); ctx.textBaseline = "alphabetic";
   }
 
+  // Cascade — per-letter reveal in reading order, timed by the easing driver
+  // (looping playhead). Surfaces Easing; signal lifts the entrance height.
+  function cascade(ctx, W, H, F, txt, amp) {
+    var t = F.t, e = Math.max(0, Math.min(1, F.n)), cx = W / 2, cy = H / 2, ease = F.S.ease || "out", p = (t * 0.4) % 1.4;
+    var fs = Math.max(22, Math.min(58, W / 9));
+    ctx.font = "800 " + fs + "px ui-monospace,monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    var cw = fs * 0.62, x0 = cx - (txt.length - 1) * cw / 2;
+    for (var i = 0; i < txt.length; i++) {
+      if (txt[i] === " ") continue;
+      var lp = i / Math.max(1, txt.length - 1), local = Math.max(0, Math.min(1, (p - lp * 0.6) / 0.4)), pr = Easing.apply(ease, local);
+      ctx.globalAlpha = pr; ctx.fillStyle = "#36f09a"; ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 10 * pr;
+      ctx.fillText(txt[i], x0 + i * cw, cy + (1 - pr) * fs * 0.9 * (0.5 + e * amp));
+    }
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.textBaseline = "alphabetic";
+  }
+
   function render(ctx, W, H, F) {
     var S = F.S, txt = (S.word || "SIGNAL RACK").toString(), amp = S.amp, mode = S._drive || "x";
     switch (S.variant) {
-      case "pump":   pump(ctx, W, H, F, txt, amp); break;
-      case "glitch": glitch(ctx, W, H, F, txt, amp, mode); break;
-      case "shake":  shake(ctx, W, H, F, txt, amp); break;
-      default:       wave(ctx, W, H, F, txt, amp, mode);
+      case "pump":    pump(ctx, W, H, F, txt, amp); break;
+      case "glitch":  glitch(ctx, W, H, F, txt, amp, mode); break;
+      case "shake":   shake(ctx, W, H, F, txt, amp); break;
+      case "cascade": cascade(ctx, W, H, F, txt, amp); break;
+      default:        wave(ctx, W, H, F, txt, amp, mode);
     }
   }
 
@@ -67,12 +84,13 @@
     driver: { x: { src: "sine", rate: 1.4 }, y: { src: "sine", rate: 2, phase: 0.25 }, drive: "mult" },
     structure: [
       { tier: "structure", key: "variant", label: "Variant", type: "select", value: "wave", options: [
-        { value: "wave", label: "Kinetic wave" }, { value: "pump", label: "Title pump" }, { value: "glitch", label: "RGB glitch" }, { value: "shake", label: "Shake / impact" } ] },
+        { value: "wave", label: "Kinetic wave" }, { value: "pump", label: "Title pump" }, { value: "glitch", label: "RGB glitch" }, { value: "shake", label: "Shake / impact" }, { value: "cascade", label: "Cascade reveal" } ] },
       { tier: "structure", key: "word", label: "Word", type: "text", value: "SIGNAL RACK" }
     ],
     shaping: [
       root.SignalShaping.fieldSpec("sweep"),
-      { tier: "shaping", key: "amp", label: "Amount", type: "slider", min: 0, max: 2, step: 0.05, value: 1, fmt: function (v) { return (+v).toFixed(2); } }
+      { tier: "shaping", key: "amp", label: "Amount", type: "slider", min: 0, max: 2, step: 0.05, value: 1, fmt: function (v) { return (+v).toFixed(2); } },
+      { tier: "shaping", key: "ease", label: "Easing <span>(cascade)</span>", type: "select", value: "out", options: root.Easing.OPTIONS, when: { variant: "cascade" } }
     ],
     presets: (root.DemoPresets || {}),
     render: render

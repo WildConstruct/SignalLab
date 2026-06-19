@@ -230,6 +230,8 @@ Meters (reuse fui.js + goniometer via scope.js) → particles.js (curl/attractor
 
 
 ## Build log
+- [x] **Engine:** `easing.js` (10 timing curves) — pure/deterministic.
+- [x] **Surfaced:** Transitions easing dropdown now full curve set; Kinetic Type **Cascade reveal** (per-letter, easing-timed). Easing feeds two tools.
 - [x] **Engine:** `lissajous.js` (parametric x/y[/z] from freq ratios + phase) — deterministic, normalized.
 - [x] **Surfaced:** Path & Scope **Lissajous** (2D/3D via proj3; signal→phase). Meters **VU dial** + **Goniometer** (reuse `fui.js`; goniometer plots the live L/R channels). Engine drivers now feed multiple tools each.
 - [x] **Engine:** `field.js` (vector field: curl/flow, vortex, radial) — deterministic, unit vectors.
