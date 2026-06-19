@@ -77,6 +77,28 @@ manifest only *selects and polishes* — the Substance "expose a subset" move.
 - **Later (compiler):** OTIS `wc-compiler` emits this manifest + an AE adapter /
   OGraf wrapper / ComfyUI node from the authored graph (per the component doc).
 
+## Alignment to the Etheros recipe contract
+
+Etheros (`core/etheros_recipe.h`) already ships the typed, JSON-serialized,
+schema-backed recipe we're sketching. To make a Signal Rack plugin-let a **sibling
+recipe** in one WC Component family, adopt its block names. A Signal Rack manifest
+shares `metadata / variation / shape / output` verbatim and specializes
+`structure / motion` for the time domain:
+
+| Etheros recipe block | Signal Rack equivalent | Shared? |
+|---|---|---|
+| `variation{seed,variation,coherence,phaseOffset}` | driver seed / timebase | ✅ verbatim |
+| `structure{primitive,fractalMode,baseScale,bands}` | instrument (widget/variant) + structure params | domain-specific |
+| `motion{mode,flowDirection,flowStrength…}` | the **signal** (`signals[]` + driver) | domain-specific |
+| `shape{bias,contrast,gain,thresholdLow/High,clamp,invert,absolute}` | shaping (`response`/threshold) | ✅ **share the module** |
+| `warp{warpType,amount,scale}` | `field.js` warp | ✅ same idea |
+| `output{outputType,normalize,rangeMin,rangeMax}` | output remap + derived-signal type | ✅ **share** (Temporal outputs) |
+
+Concretely, `params[]` keys should map to dotted recipe paths (`shape.thresholdLow`,
+`motion.flowStrength`, `warp.amount`) so the same exposed control means the same
+thing in a field recipe and a signal manifest — and a future `wc-compiler` can emit
+either. `visibleIf` stays our `when:`; field names use the Etheros camelCase.
+
 ## v0 decisions
 - **Exposed-by-omission:** anything not in `params[]` is internal/locked. (Substance.)
 - **Signals are explicit and opt-in.** Single-signal is the default shape; declare
