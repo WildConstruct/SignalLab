@@ -24,21 +24,24 @@
     var S = F.S, n = Math.max(0, Math.min(1, F.n)), d = S.depth, route = S.route, ft = fieldTime(F);
     var angleDeg = S.angle + (route === "flowAngle" ? (n - 0.5) * d * 180 : 0);
     var ang = angleDeg * Math.PI / 180;
-    var flow = route === "flowStrength" ? Math.min(1.0, S.flow + n * d * 0.6) : S.flow;
+    // The engine squares flow (engineFlowStrength = v^2 * 0.34), so low/mid
+    // slider values produce ~no drift. Pre-compensate (sqrt) so the slider maps
+    // to roughly-linear, visible drift speed without scrolling to garbage.
+    var flowSlider = route === "flowStrength" ? Math.min(1.0, S.flow + n * d * 0.5) : S.flow;
+    var flowEng = Math.sqrt(Math.max(0, flowSlider) * 1.6);
     var warpAmt = S.warp + (route === "warp.amount" ? n * d * 1.6 : 0);
     var recipe = {
       // phaseOffset advances with time -> the slice morphs IN PLACE. This is the
       // real "evolve": in the slice shader params.time only drives flow
       // translation, so without this the field is frozen unless it's drifting.
-      variation: { seed: Math.round(S.seed) || 7, phaseOffset: ft * S.evolve * 5 },
+      variation: { seed: Math.round(S.seed) || 7, phaseOffset: ft * S.evolve * 10 },
       structure: { primitive: "simplex", fractalMode: S.fractal || "fbm", baseScale: S.baseScale,
         octaveCount: Math.round(S.octaves), roughness: S.detail, lacunarity: 2.0, detailScale: 1.6 },
       shape: { bias: 0, contrast: S.contrast, gain: 1, thresholdLow: S.tlo, thresholdHigh: 1, clampLow: 0, clampHigh: 1 },
-      // evolutionRate also drives the CPU mirror's in-place morph; flow stays
-      // moderate so it drifts (with a steerable angle) rather than scrolling to
-      // garbage. Curl == the shader's directional domain-warp swirl.
-      motion: { mode: (flow > 0.01 ? "flow" : "evolve"), evolutionRate: S.evolve,
-        flowDirection: [Math.cos(ang), Math.sin(ang)], flowStrength: flow },
+      // evolutionRate also drives the CPU mirror's in-place morph; flow drifts
+      // (with a steerable angle). Curl == the shader's directional domain-warp swirl.
+      motion: { mode: (flowSlider > 0.01 ? "flow" : "evolve"), evolutionRate: S.evolve,
+        flowDirection: [Math.cos(ang), Math.sin(ang)], flowStrength: flowEng },
       warp: { enabled: warpAmt > 0.001, warpType: (S.warpStyle === "curl" ? "directional" : "noiseOffset"), amount: warpAmt, scale: 1.0 },
       output: { outputType: "scalar", normalize: true, rangeMin: 0, rangeMax: 1 }
     };
@@ -119,8 +122,8 @@
       { tier: "shaping", key: "gain", label: "Intensity", type: "slider", min: 1, max: 5, step: 0.1, value: 2.6, fmt: f2 },
       { tier: "shaping", key: "contrast", label: "Shape · contrast", type: "slider", min: 0.4, max: 2.2, step: 0.05, value: 1.2, fmt: f2 },
       { tier: "shaping", key: "tlo", label: "Shape · threshold", type: "slider", min: 0, max: 0.8, step: 0.01, value: 0.25, fmt: f2 },
-      { tier: "shaping", key: "evolve", label: "Evolve <span>morph</span>", type: "slider", min: 0, max: 1.5, step: 0.05, value: 0.5, fmt: f2 },
-      { tier: "shaping", key: "flow", label: "Flow <span>drift</span>", type: "slider", min: 0, max: 0.6, step: 0.02, value: 0.12, fmt: f2 },
+      { tier: "shaping", key: "evolve", label: "Evolve <span>morph</span>", type: "slider", min: 0, max: 1.5, step: 0.05, value: 0.6, fmt: f2 },
+      { tier: "shaping", key: "flow", label: "Flow <span>drift</span>", type: "slider", min: 0, max: 1, step: 0.02, value: 0.35, fmt: f2 },
       { tier: "shaping", key: "angle", label: "Flow angle <span>°</span>", type: "slider", min: 0, max: 360, step: 5, value: 90, fmt: function (v) { return Math.round(v) + "°"; } },
       { tier: "shaping", key: "warpStyle", label: "Warp style", type: "select", value: "curl", options: [
         { value: "curl", label: "Curl (swirl)" }, { value: "organic", label: "Organic" } ] },
