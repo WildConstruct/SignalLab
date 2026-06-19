@@ -11,6 +11,11 @@ if(NOT AE_SDK)
     return()
 endif()
 
+if(NOT TARGET signalrack_runtime)
+    message(STATUS "SignalRackPlugin: signalrack_runtime target not present - skipping plugin target.")
+    return()
+endif()
+
 add_library(SignalRackPlugin MODULE
     SignalRackPlugin.cpp
     src/backend/WebGpuBackend.cpp)

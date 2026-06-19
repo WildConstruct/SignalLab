@@ -12,8 +12,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(IAN_BUILD_SIGNALRACK_AE_SURFACE "Build the thin Signal Rack After Effects-facing surface" ON)
 option(IAN_USE_EXTERNAL_DAWN           "Use an external Dawn installation"                        OFF)
+option(IAN_BUILD_SIGNALRACK_DAWN_RUNTIME "Build the Dawn-backed Signal Rack runtime and signal_smoke" OFF)
 option(IAN_EMBED_WGSL                  "Embed WGSL shaders in the binary"                         ON)
 set(IAN_DAWN_SOURCE_DIR "" CACHE PATH "Path to a Dawn source tree (vendored or external)")
+
+include(CTest)
 
 # --- embed shaders/signal_core.wgsl -> generated/signal_core_wgsl.h ----------
 # Mirrors Etheros IAN_EMBED_WGSL: modular WGSL is the canonical product source;
@@ -40,31 +43,51 @@ target_include_directories(signalrack_core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}")
 
-# --- dawn runtime (requires a Dawn target named dawn::webgpu_dawn) ------------
-add_library(signalrack_runtime STATIC
-    runtime/dawn/signal_runtime.cpp
-    runtime/dawn/signal_dawn_bridge.cpp
-    "${_wgsl_hdr}")
-target_include_directories(signalrack_runtime PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${_gen_dir}")
-target_link_libraries(signalrack_runtime PUBLIC signalrack_core)
+add_executable(core_contract_test examples/core_contract_test.cpp)
+target_link_libraries(core_contract_test PRIVATE signalrack_core)
+add_test(NAME core_contract_test COMMAND core_contract_test)
 
-if(IAN_DAWN_SOURCE_DIR)
-    message(STATUS "SignalRack: using Dawn source tree at ${IAN_DAWN_SOURCE_DIR}")
-    add_subdirectory("${IAN_DAWN_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/dawn" EXCLUDE_FROM_ALL)
-    target_link_libraries(signalrack_runtime PUBLIC dawn::webgpu_dawn)
-elseif(IAN_USE_EXTERNAL_DAWN)
-    find_package(Dawn REQUIRED)
-    target_link_libraries(signalrack_runtime PUBLIC dawn::webgpu_dawn)
+add_executable(value_codec_test examples/value_codec_test.cpp)
+target_link_libraries(value_codec_test PRIVATE signalrack_core)
+add_test(NAME value_codec_test COMMAND value_codec_test)
+
+# --- dawn runtime (requires a Dawn target named dawn::webgpu_dawn) ------------
+if(IAN_BUILD_SIGNALRACK_DAWN_RUNTIME)
+    if(NOT IAN_DAWN_SOURCE_DIR AND NOT IAN_USE_EXTERNAL_DAWN)
+        message(FATAL_ERROR
+            "IAN_BUILD_SIGNALRACK_DAWN_RUNTIME=ON requires IAN_DAWN_SOURCE_DIR "
+            "or IAN_USE_EXTERNAL_DAWN=ON. Signal Rack native runtime has no CPU fallback.")
+    endif()
+
+    add_library(signalrack_runtime STATIC
+        runtime/dawn/signal_runtime.cpp
+        runtime/dawn/signal_dawn_bridge.cpp
+        "${_wgsl_hdr}")
+    target_include_directories(signalrack_runtime PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${_gen_dir}")
+    target_link_libraries(signalrack_runtime PUBLIC signalrack_core)
+
+    if(IAN_DAWN_SOURCE_DIR)
+        message(STATUS "SignalRack: using Dawn source tree at ${IAN_DAWN_SOURCE_DIR}")
+        add_subdirectory("${IAN_DAWN_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/dawn" EXCLUDE_FROM_ALL)
+        target_link_libraries(signalrack_runtime PUBLIC dawn::webgpu_dawn)
+    elseif(IAN_USE_EXTERNAL_DAWN)
+        find_package(Dawn REQUIRED)
+        target_link_libraries(signalrack_runtime PUBLIC dawn::webgpu_dawn)
+    endif()
+
+    # --- examples / smoke ----------------------------------------------------
+    add_executable(signal_smoke examples/signal_smoke.cpp)
+    target_link_libraries(signal_smoke PRIVATE signalrack_runtime)
+    add_test(NAME signal_smoke COMMAND signal_smoke)
 else()
-    message(WARNING
-        "No Dawn source configured. Set IAN_DAWN_SOURCE_DIR or IAN_USE_EXTERNAL_DAWN, "
-        "or vendor third_party/dawn before building signalrack_runtime. WebGPU/Dawn is "
-        "the only supported backend; there is no CPU fallback.")
+    message(STATUS
+        "SignalRack: skipping Dawn runtime. Set IAN_BUILD_SIGNALRACK_DAWN_RUNTIME=ON "
+        "with IAN_DAWN_SOURCE_DIR or IAN_USE_EXTERNAL_DAWN to build signal_smoke.")
 endif()
 
-# --- examples / smoke --------------------------------------------------------
-add_executable(signal_smoke examples/signal_smoke.cpp)
-target_link_libraries(signal_smoke PRIVATE signalrack_runtime)
+if(IAN_BUILD_SIGNALRACK_AE_SURFACE)
+    add_subdirectory(plugin/SignalRackPlugin)
+endif()
