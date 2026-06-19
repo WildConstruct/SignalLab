@@ -28,13 +28,16 @@
         octaveCount: Math.round(S.octaves), roughness: S.detail, lacunarity: 2.0,
         detailScale: 1.6 },
       shape: { bias: 0, contrast: S.contrast, gain: 1, thresholdLow: S.tlo, thresholdHigh: 1, clampLow: 0, clampHigh: 1 },
-      motion: { mode: (S.flow > 0 ? "flow" : "evolve"), evolutionRate: 0.15, flowDirection: [0.2, 1], flowStrength: S.flow },
+      // gentle, steady evolution; flow is the volatile control so we keep its
+      // base low and let the engine's pow-curve do the rest (see clamps below).
+      motion: { mode: (S.flow > 0.01 ? "flow" : "evolve"), evolutionRate: 0.09, flowDirection: [0.2, 1], flowStrength: S.flow },
       warp: { enabled: true, amount: S.warp, scale: 1.0 },
       output: { outputType: "scalar", normalize: true, rangeMin: 0, rangeMax: 1 }
     };
     var d = S.depth, route = S.route;
     if (route === "warp.amount") recipe.warp.amount = S.warp + n * d * 2;
-    else if (route === "flowStrength") { recipe.motion.mode = "flow"; recipe.motion.flowStrength = S.flow + n * d * 1.6; }
+    // flow saturates the field fast, so route shallowly and clamp into the coherent zone.
+    else if (route === "flowStrength") { recipe.motion.mode = "flow"; recipe.motion.flowStrength = Math.min(1.0, S.flow + n * d * 0.6); }
     else if (route === "thresholdLow") recipe.shape.thresholdLow = Math.max(0, Math.min(0.92, S.tlo + (n - 0.5) * d * 1.4));
     else if (route === "baseScale") recipe.structure.baseScale = S.baseScale * (1 + (n - 0.5) * d);
     return recipe;
@@ -53,7 +56,7 @@
   // scaled up with smoothing so it reads as a smooth field (not a mosaic).
   var off = null, octx = null;
   function render2D(ctx, W, H, F) {
-    var S = F.S, recipe = buildRecipe(F), t = F.t;
+    var S = F.S, recipe = buildRecipe(F), t = F.t * 0.45;   // match GPU tempo
     var stops = RAMPS[S.palette] || RAMPS.ember, gain = S.gain, bias = 0.04;
     var cols = Math.min(220, Math.max(80, Math.round(W / 4))), rows = Math.round(cols * (H / W));
     if (!off) { off = document.createElement("canvas"); octx = off.getContext("2d"); }
@@ -92,7 +95,9 @@
         if (!GPU) return null;
         return GPU.createSliceRenderer(canvas, { shaderBase: "../shared/etheros/" }).then(function (eng) {
           if (!eng) return null;
-          return { label: "Etheros WebGPU", render: function (F) { eng.render(buildRecipe(F), F.t, display(F.S)); } };
+          // field tempo runs at ~0.45× wall time: slow, organic motion reads
+          // far better than the fast churn that turned to garbage.
+          return { label: "Etheros WebGPU", render: function (F) { eng.render(buildRecipe(F), F.t * 0.45, display(F.S)); } };
         });
       }
     },
@@ -111,7 +116,7 @@
       { tier: "shaping", key: "contrast", label: "Shape · contrast", type: "slider", min: 0.4, max: 2.2, step: 0.05, value: 1.2, fmt: f2 },
       { tier: "shaping", key: "tlo", label: "Shape · threshold", type: "slider", min: 0, max: 0.8, step: 0.01, value: 0.25, fmt: f2 },
       { tier: "shaping", key: "warp", label: "Warp amount", type: "slider", min: 0, max: 1.2, step: 0.02, value: 0.25, fmt: f2 },
-      { tier: "shaping", key: "flow", label: "Flow strength", type: "slider", min: 0, max: 1.5, step: 0.05, value: 0.2, fmt: f2 },
+      { tier: "shaping", key: "flow", label: "Flow strength", type: "slider", min: 0, max: 1, step: 0.04, value: 0.2, fmt: f2 },
       { tier: "shaping", key: "route", label: "Signal → param", type: "select", value: "warp.amount", options: [
         { value: "warp.amount", label: "warp.amount" }, { value: "flowStrength", label: "motion.flowStrength" }, { value: "thresholdLow", label: "shape.thresholdLow" }, { value: "baseScale", label: "structure.baseScale" } ] },
       { tier: "shaping", key: "depth", label: "Route depth", type: "slider", min: 0, max: 1.5, step: 0.05, value: 0.7, fmt: f2 }
