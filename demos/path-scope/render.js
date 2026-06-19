@@ -8,7 +8,7 @@
  */
 (function (root) {
   "use strict";
-  var combine = root.SignalEngine.combine, Attractor = root.Attractor, Proj3 = root.Proj3;
+  var combine = root.SignalEngine.combine, Attractor = root.Attractor, Proj3 = root.Proj3, Lissajous = root.Lissajous;
 
   function waveRunner(ctx, W, H, F, mode) {
     var bx = F.bufX, by = F.bufY, L = bx.length;
@@ -66,6 +66,21 @@
     }
   }
 
+  // Surfaces the lissajous engine driver; the signal morphs the phase, 3D via proj3.
+  function lissajous(ctx, W, H, F) {
+    var S = F.S, t = F.t, e = Math.max(0, Math.min(1, F.n)), is3d = !!S.l3d;
+    var delta = (S.lphase || 0) * Math.PI + e * (S.lmorph != null ? S.lmorph : 0.5) * Math.PI + t * 0.2;
+    var r = Lissajous.trace({ a: Math.round(S.lra || 3), b: Math.round(S.lrb || 2), c: Math.round(S.lrc || 4), delta: delta, dim: is3d ? 3 : 2 }, { n: 1400 });
+    var pts = r.pts, L = pts.length, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.42 * (S.radius != null ? S.radius : 1);
+    var cam = { yaw: t * (S.spin != null ? S.spin : 0.3), pitch: 0.5, dist: 3.2 };
+    ctx.strokeStyle = "#36f09a"; ctx.lineWidth = 1.5; ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 8; ctx.beginPath();
+    for (var i = 0; i < L; i++) { var p = pts[i], sx, sy;
+      if (is3d) { var pr = Proj3.project({ x: p[0], y: p[1], z: p[2] }, cam); sx = cx + pr.x * R; sy = cy + pr.y * R; }
+      else { sx = cx + p[0] * R; sy = cy + p[1] * R; }
+      if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); }
+    ctx.stroke(); ctx.shadowBlur = 0;
+  }
+
   function render(ctx, W, H, F) {
     var mode = F.S._drive || "x";
     switch (F.S.variant) {
@@ -73,6 +88,7 @@
       case "spiro":     spirograph(ctx, W, H, F); break;
       case "rose":      rose(ctx, W, H, F); break;
       case "attractor": attractor(ctx, W, H, F); break;
+      case "lissajous": lissajous(ctx, W, H, F); break;
       default:          waveRunner(ctx, W, H, F, mode);
     }
   }
@@ -82,16 +98,21 @@
     driver: { x: { src: "sine", rate: 2 }, y: { src: "triangle", rate: 3, phase: 0.1 }, drive: "mult" },
     structure: [
       { tier: "structure", key: "variant", label: "Path type", type: "select", value: "wave", options: [
-        { value: "wave", label: "Wave runner" }, { value: "vector", label: "Vectorscope" }, { value: "spiro", label: "Spirograph" }, { value: "rose", label: "Rose curve" }, { value: "attractor", label: "Strange attractor" } ] },
+        { value: "wave", label: "Wave runner" }, { value: "vector", label: "Vectorscope" }, { value: "spiro", label: "Spirograph" }, { value: "rose", label: "Rose curve" }, { value: "attractor", label: "Strange attractor" }, { value: "lissajous", label: "Lissajous" } ] },
       { tier: "structure", key: "system", label: "System", type: "select", value: "lorenz", options: [
         { value: "lorenz", label: "Lorenz (3D)" }, { value: "aizawa", label: "Aizawa (3D)" }, { value: "thomas", label: "Thomas (3D)" }, { value: "dejong", label: "De Jong (2D)" }, { value: "clifford", label: "Clifford (2D)" } ], when: { variant: "attractor" } },
-      { tier: "structure", key: "spin",   label: "Rotate <span>3D</span>", type: "slider", min: 0, max: 1, step: 0.02, value: 0.25, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: "attractor" } },
+      { tier: "structure", key: "lra",    label: "Ratio X", type: "slider", min: 1, max: 8, step: 1, value: 3, when: { variant: "lissajous" } },
+      { tier: "structure", key: "lrb",    label: "Ratio Y", type: "slider", min: 1, max: 8, step: 1, value: 2, when: { variant: "lissajous" } },
+      { tier: "structure", key: "l3d",    label: "3D", type: "toggle", value: false, when: { variant: "lissajous" } },
+      { tier: "structure", key: "lrc",    label: "Ratio Z", type: "slider", min: 1, max: 8, step: 1, value: 4, when: { variant: "lissajous", l3d: true } },
+      { tier: "structure", key: "spin",   label: "Rotate <span>3D</span>", type: "slider", min: 0, max: 1, step: 0.02, value: 0.25, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: ["attractor", "lissajous"] } },
       { tier: "structure", key: "turns",  label: "Turns / petals", type: "slider", min: 1, max: 10, step: 1, value: 4, when: { variant: ["spiro", "rose"] } },
-      { tier: "structure", key: "radius", label: "Radius", type: "slider", min: 0.4, max: 1.2, step: 0.05, value: 1, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: ["vector", "spiro", "rose", "attractor"] } },
+      { tier: "structure", key: "radius", label: "Radius", type: "slider", min: 0.4, max: 1.2, step: 0.05, value: 1, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: ["vector", "spiro", "rose", "attractor", "lissajous"] } },
       { tier: "structure", key: "weight", label: "Line weight", type: "slider", min: 1, max: 5, step: 0.5, value: 2, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "wave" } }
     ],
     shaping: [
-      { tier: "shaping", key: "morph", label: "Signal → shape", type: "slider", min: 0, max: 1, step: 0.01, value: 0.5, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: "attractor" } }
+      { tier: "shaping", key: "morph",  label: "Signal → shape", type: "slider", min: 0, max: 1, step: 0.01, value: 0.5, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: "attractor" } },
+      { tier: "shaping", key: "lmorph", label: "Signal → phase", type: "slider", min: 0, max: 1, step: 0.01, value: 0.5, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: "lissajous" } }
     ],
     presets: (root.DemoPresets || {}),
     render: render
