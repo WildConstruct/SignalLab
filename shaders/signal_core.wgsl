@@ -10,8 +10,8 @@
 //  UNIFORM LAYOUT NOTE: params are packed as vec4<f32> rows (NOT a struct of
 //  bare scalars). This matches the Wild Construct convention (cf. Cathode's
 //  vec-padded uniform blocks) and is required for correct reads on WebKit/Metal
-//  (Safari/iOS) — a struct of 36 scalars there read back as zero. The byte
-//  layout is identical to the host's flat float[36] (CompiledSignalConfig), so
+//  (Safari/iOS) — a struct of bare scalars there read back as zero. The byte
+//  layout is identical to the host's flat float[44] (CompiledSignalConfig), so
 //  the JS packer and C++ Compile() are unchanged.
 // =============================================================================
 

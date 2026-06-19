@@ -20,8 +20,9 @@ namespace ItsAllNoise {
 namespace SignalRack {
 namespace ae {
 
-// AE effect parameter order. The three Output sliders are OUTPUT params (read
-// by other properties via pick-whip); everything else is an input control.
+// AE effect parameter order. The three Output sliders are the public values users
+// pick-whip FROM after bake or live-courier setup; Render() itself does not
+// directly write freshly computed scalar params during AE's evaluation pass.
 enum ParamID : std::int32_t {
     kInput = 0,         // AE reserves index 0
     kSourceType,        // popup 1..7
@@ -31,7 +32,7 @@ enum ParamID : std::int32_t {
     kOutAMode, kOutAMin, kOutAMax,
     kOutBMode, kOutBMin, kOutBMax,
     kOutCMode, kOutCMin, kOutCMax,
-    kOutputA, kOutputB, kOutputC,              // exposed (driven) output sliders
+    kOutputA, kOutputB, kOutputC,              // exposed output sliders (bake/courier)
     kNumParams,
 };
 

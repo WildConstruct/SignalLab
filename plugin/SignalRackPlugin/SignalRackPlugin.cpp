@@ -10,9 +10,9 @@
 //  An AE effect's params are INPUTS. Render() cannot reliably publish a live,
 //  pick-whippable computed scalar back onto its own Output sliders during the
 //  evaluation pass. The supported v1 coupling is therefore:
-//    * LIVE  : a one-line expression on each Output slider bridges to the engine
-//              (the AEGP companion evaluates and the expression reads a cached
-//              value), OR the user previews via the guide layer the effect draws.
+//    * LIVE  : Render() draws a 3x1 value strip and a generated sampleImage
+//              courier expression decodes it on the target, OR the user previews
+//              via the guide layer the effect draws.
 //    * BAKE  : the AEGP side writes engine values as keyframes onto the Output
 //              sliders (fully supported, deterministic) — this is the robust path.
 //  The WGSL/Dawn engine remains the single source of truth for computation
