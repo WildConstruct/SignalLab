@@ -30,7 +30,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["sine", "pulse", "ramp", "noise", "randomWalk", "linked", "lumaProbe", "audioPlaceholder"]
+          "enum": ["sine", "square", "pulse", "pulseNarrow", "ramp", "saw", "noise", "randomWalk", "linked", "lumaProbe", "triangle", "audioPlaceholder"]
         },
         "rate": { "type": "number", "description": "Hz (cycles per second)." },
         "amount": { "type": "number" },
@@ -44,13 +44,29 @@
     },
     "process": {
       "type": "object",
-      "description": "Optional shaping applied before output mapping.",
+      "description": "Optional shaping applied before output mapping. These fields mirror the current WGSL/CPU-reference process stage and Signal Lab export shape.",
       "properties": {
         "smooth": { "type": "number", "description": "0..1 box-average lag amount." },
+        "gain": { "type": "number", "description": "Contrast gain around 0.5 before output mapping." },
+        "bias": { "type": "number", "description": "Offset applied after gain." },
+        "quantize": { "type": "number", "description": "0 disables quantization; values > 1 select the number of quantization steps." },
+        "quantizeSteps": { "type": "integer", "description": "Legacy alias for quantize." },
+        "gate": { "type": "number", "description": "0 disables pointwise gate; otherwise threshold in normalized units." },
+        "lag": { "type": "number", "description": "0..1 finite-window lag approximation." },
+        "warp": { "type": "number", "description": "-1..1 contrast S-curve." },
+        "fold": { "type": "number", "description": "0..1 triangle-wave fold amount." },
+        "sat": { "type": "number", "description": "0..1 soft saturation amount." },
         "threshold": { "type": "number" },
         "hysteresis": { "type": "number" },
         "invert": { "type": "boolean" },
-        "quantizeSteps": { "type": "integer" }
+        "rectify": { "type": "boolean" },
+        "winLeft": { "type": "number", "description": "Left edge of the feathered region window, 0..1 across the evaluated span." },
+        "winRight": { "type": "number", "description": "Right edge of the feathered region window, 0..1 across the evaluated span." },
+        "winFeatherL": { "type": "number", "description": "Left feather size as a normalized span fraction." },
+        "winFeatherR": { "type": "number", "description": "Right feather size as a normalized span fraction." },
+        "modTarget": { "type": ["string", "integer"], "description": "Sidechain modulation target: off/amp/rate/phase or the matching engine code." },
+        "modDepth": { "type": "number", "description": "Sidechain modulation depth." },
+        "zDepth": { "type": "number", "description": "Third-signal phase-bend depth." }
       }
     },
     "outputs": {
@@ -69,10 +85,44 @@
         "seed": { "type": "integer", "description": "Deterministic seed. Random behaviour MUST be reproducible unless explicitly randomized." }
       }
     },
+    "_channelY": {
+      "$ref": "#/definitions/channelDef",
+      "description": "Signal Lab authoring metadata for the second browser channel. Native v1 still publishes Output A/B/C from a single recipe."
+    },
+    "_drive": {
+      "type": "string",
+      "enum": ["x", "y", "mult", "mix", "diff", "min", "max"],
+      "description": "Signal Lab authoring metadata for how Channel X/Y combine into the displayed driver."
+    },
+    "_tool": {
+      "type": "object",
+      "description": "Signal Lab private round-trip state for UI, link, sidechain, lfo, CRT, applied target, and other authoring controls. Hosts may preserve it but should not treat it as the native plugin contract.",
+      "additionalProperties": true,
+      "properties": {
+        "x": { "$ref": "#/definitions/channelDef" },
+        "y": { "$ref": "#/definitions/channelDef" },
+        "proc": { "type": "object" },
+        "win": { "type": "object" },
+        "drive": { "type": "string", "enum": ["x", "y", "mult", "mix", "diff", "min", "max"] },
+        "side": {
+          "type": "object",
+          "properties": {
+            "target": { "type": "string", "enum": ["off", "amp", "rate", "phase"] },
+            "depth": { "type": "number" }
+          }
+        },
+        "z": { "type": "object" },
+        "lfo": { "type": "object" },
+        "view": { "type": "string" },
+        "crt": { "type": "boolean" },
+        "speed": { "type": "number" },
+        "applied": { "type": "object" }
+      }
+    },
     "visualization": {
       "type": "object",
       "properties": {
-        "mode": { "type": "string", "enum": ["none", "guide_waveform", "bar_meter", "gate_blocks", "value_readout"] },
+        "mode": { "type": "string", "enum": ["none", "guide_waveform", "bar_meter", "gate_blocks", "value_readout", "waveform", "bars", "vectorscope", "polar", "heat", "applied"] },
         "showProbe": { "type": "boolean" },
         "showOutputLabels": { "type": "boolean" }
       }
@@ -105,6 +155,19 @@
     }
   },
   "definitions": {
+    "channelDef": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["sine", "square", "pulse", "pulseNarrow", "ramp", "saw", "noise", "randomWalk", "linked", "lumaProbe", "triangle", "audioPlaceholder"] },
+        "src": { "type": ["string", "number"], "description": "Signal Lab internal source id or source name." },
+        "rate": { "type": "number" },
+        "amount": { "type": "number" },
+        "phase": { "type": "number" },
+        "offset": { "type": "number" },
+        "smooth": { "type": "number" },
+        "seed": { "type": "integer" }
+      }
+    },
     "outputDef": {
       "type": "object",
       "required": ["name", "profile"],

@@ -13,6 +13,7 @@
   },
   "timebase": { "mode": "compTime", "seed": 962 },
   "_channelY": { "type": "sine", "rate": 1.7, "phase": 0.915, "offset": -0.22 },
+  "_drive": "mult",
   "visualization": { "mode": "vectorscope" },
   "compatibilityTags": ["engine:wgsl", "tool:signal-lab"],
   "notes": "Quantized+gated X against a smooth detuned Y -> a stepped, undulating ray figure on the vectorscope (with persistence). Opens on the vectorscope in the Signal Lab."
