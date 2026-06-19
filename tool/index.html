@@ -590,7 +590,7 @@
 <script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
 <script src="cathode-crt.js"></script>
 <script>
-const BUILD = "2026-06-16a";   // bump on deploy → check console / brand tooltip to spot a stale cache
+const BUILD = "2026-06-16b";   // bump on deploy → check console / brand tooltip to spot a stale cache
 console.info("Signal Rack — build " + BUILD);
 try{ const b=document.querySelector(".brand"); if(b) b.title="build "+BUILD; }catch(e){}
 const { Rack, SOURCE, MODE } = SignalCore;
@@ -606,7 +606,7 @@ const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied 
 const side = { target:"off", depth:0.5 };
 const link = { sync:false, invert:false };   // Channel Y relationship to X (sync = copy, invert = mirror)
 const fire = { thresh:0.45 };   // firing threshold for the synapse / packets / die widgets
-const FIRE = new Set(["fuiSynapse","fuiPackets","fuiCore"]);
+const FIRE = new Set(["fuiSynapse","fuiPackets","fuiCore","fuiCoreStack"]);
 const z = { shape:1, rate:1, amount:0 };   // third signal — gently distorts X & Y (phase bend)
 const zBuffer = new Float32Array(N).fill(0.5);   // third-signal (distort) per-sample
 const crt = { on:true, pass:null, failed:false };
@@ -789,7 +789,7 @@ $("tabs").onclick=e=>{ const m=e.target.dataset.mode; if(!m)return; MODE_CUR=m;
 const defaults={ scale:[80,120], rotation:[-30,30], position:[-200,200], opacity:[0,100], glow:[0,100], color:[0,1], meter:[0,100],
   positionY:[-200,200], skew:[-30,30], scaleX:[80,120], scaleY:[80,120], strobe:[0,1], ringPulse:[0,1], blur:[0,1], gradientSweep:[0,1],
   meterRadial:[0,1], meterLED:[0,1], meterStereo:[0,1], meterHistogram:[0,1], meterDial:[0,1],
-  fuiRadar:[0,1], fuiScope:[0,1], fuiArc:[0,1], fuiBars:[0,1], fuiReticle:[0,1], fuiWaveRing:[0,1], fuiGyro:[0,1], fuiStream:[0,1], fuiSynapse:[0,1], fuiPackets:[0,1], fuiCore:[0,1],
+  fuiRadar:[0,1], fuiScope:[0,1], fuiArc:[0,1], fuiBars:[0,1], fuiReticle:[0,1], fuiWaveRing:[0,1], fuiGyro:[0,1], fuiStream:[0,1], fuiSynapse:[0,1], fuiPackets:[0,1], fuiCore:[0,1], fuiCoreStack:[0,1],
   particles:[0,1], partRings:[0,1], partStream:[0,1], partOrbit:[0,1], partFall:[0,1], partStars:[0,1],
   type:[0,1], textOpacity:[0,1], textPump:[0,1], textGlitch:[0,1], textType:[0,1], textCounter:[0,1], textShake:[0,1],
   trLoad:[0,1], trWipe:[0,1], trText:[0,1], trRadial:[0,1], trMeter:[0,1],
@@ -802,7 +802,7 @@ const APP_CATS=[
   ["Visual",    [["glow","Glow"],["color","Color (hue)"],["strobe","Strobe"],["ringPulse","Ring pulse"],["blur","Defocus blur"],["gradientSweep","Gradient sweep"]]],
   ["Meter",     [["meter","Bar meter + gate"],["meterRadial","Radial gauge"],["meterLED","LED ladder"],["meterStereo","Stereo bars"],["meterHistogram","Histogram"],["meterDial","Rotary dial"]]],
   ["Transitions",[["trLoad","Loading bar"],["trWipe","Wipe reveal"],["trText","Text reveal"],["trRadial","Radial fill"],["trMeter","Sweep meter"]]],
-  ["FUI",       [["fuiRadar","Radar sweep"],["fuiScope","Oscilloscope"],["fuiArc","Progress arc"],["fuiBars","Equalizer"],["fuiReticle","Targeting reticle"],["fuiWaveRing","Waveform ring"],["fuiGyro","Gyro rings"],["fuiStream","Data stream"],["fuiSynapse","Synapse net"],["fuiPackets","Data packets"],["fuiCore","Processor die"]]],
+  ["FUI",       [["fuiRadar","Radar sweep"],["fuiScope","Oscilloscope"],["fuiArc","Progress arc"],["fuiBars","Equalizer"],["fuiReticle","Targeting reticle"],["fuiWaveRing","Waveform ring"],["fuiGyro","Gyro rings"],["fuiStream","Data stream"],["fuiSynapse","Synapse net"],["fuiPackets","Data packets"],["fuiCore","Processor die"],["fuiCoreStack","Processor stack (3D)"]]],
   ["Particles", [["particles","Fountain"],["partRings","Shock rings"],["partStream","Stream field"],["partOrbit","Orbit swarm"],["partFall","Confetti fall"],["partStars","Starfield warp"]]],
   ["Text",      [["type","Kinetic wave"],["textOpacity","Word opacity"],["textPump","Title pump"],["textGlitch","RGB glitch"],["textType","Typewriter"],["textCounter","Counter readout"],["textShake","Shake / impact"]]],
   ["Path",      [["trace","Wave-runner"],["orbitPath","Vectorscope dot"],["spiro","Spirograph"],["rose","Rose curve"]]],
@@ -1491,6 +1491,21 @@ function drawApplied(W,H){
         ctx.fillStyle=on?`hsl(${150+v*120},85%,${28+v*42}%)`:"#0e1a1f"; if(on){ ctx.shadowColor="#36f09a"; ctx.shadowBlur=10*v; }
         ctx.fillRect(x0+c*(cw+gap), y0+r*(chh+gap), cw, chh); ctx.shadowBlur=0; }
       ctx.strokeStyle="#1f5e4e"; ctx.lineWidth=1.5; ctx.strokeRect(x0-6,y0-6,total+12,gh+12); break; }
+    case "fuiCoreStack":{ const cols=8, rows=6, layers=6, t=lfoClock, sd=state.x.seed, base=Math.min(W,H)*0.46;
+      // a stack of dies receding into depth (up-right parallax); each layer reads
+      // a different slice of the wave, so the signal propagates through Z. Drawn
+      // back-to-front so nearer layers overlap the farther ones.
+      const stepX=base*0.40/(layers-1), stepY=-base*0.30/(layers-1);
+      for(let Lr=layers-1; Lr>=0; Lr--){ const dep=Lr/(layers-1), s=1-dep*0.34, a=1-dep*0.62;
+        const lw=base*s, lh=base*0.72*s, x0=cx-lw/2+Lr*stepX, y0=cy-lh/2+Lr*stepY;
+        const cw=(lw-(cols-1)*3)/cols, chh=(lh-(rows-1)*3)/rows;
+        ctx.globalAlpha=a*0.55; ctx.strokeStyle="#1f5e4e"; ctx.lineWidth=1; ctx.strokeRect(x0-4,y0-4,lw+8,lh+8);
+        for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){ const i=r*cols+c;
+          const v=Math.max(0,Math.min(1, bufX[(i*37 + sd*13 + Lr*113)%N]*(0.6+0.4*Math.sin(t*3+i+Lr+sd)))), on=v>fire.thresh;
+          ctx.globalAlpha=on?a:a*0.5; ctx.fillStyle=on?`hsl(${150+v*120},85%,${28+v*42}%)`:"#0e1a1f";
+          if(on){ ctx.shadowColor="#36f09a"; ctx.shadowBlur=10*v*a; }
+          ctx.fillRect(x0+c*(cw+3), y0+r*(chh+3), cw, chh); ctx.shadowBlur=0; } }
+      ctx.globalAlpha=1; break; }
     case "partStars":{ const e=Math.max(0,Math.min(1,n)), birth=Math.round(1+e*5);
       for(let i=0;i<birth;i++){ const a=Math.random()*Math.PI*2; parts.push({x:cx,y:cy, vx:Math.cos(a)*(0.5+Math.random()), vy:Math.sin(a)*(0.5+Math.random()), l:1, sz:1+e*2, h:150+e*120, sp:1+e*6}); }
       parts=parts.filter(p=>p.l>0 && p.x>-20&&p.x<W+20&&p.y>-20&&p.y<H+20);
@@ -1544,7 +1559,7 @@ function drawApplied(W,H){
     }
   }
 }
-const NOPIP=new Set(["trace","fuiRadar","fuiScope","fuiArc","fuiBars","fuiReticle","fuiWaveRing","fuiGyro","fuiStream","fuiSynapse","fuiPackets","fuiCore","meterHistogram"]);
+const NOPIP=new Set(["trace","fuiRadar","fuiScope","fuiArc","fuiBars","fuiReticle","fuiWaveRing","fuiGyro","fuiStream","fuiSynapse","fuiPackets","fuiCore","fuiCoreStack","meterHistogram"]);
 const TRANS=new Set(["trLoad","trWipe","trText","trRadial","trMeter"]);
 // Monotonic "loading" progress at playhead tp: cumulative signal energy so the
 // fill always climbs 0→1 but at a signal-shaped (non-linear) pace.
