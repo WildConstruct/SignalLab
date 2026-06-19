@@ -230,5 +230,7 @@ Meters (reuse fui.js + goniometer via scope.js) → particles.js (curl/attractor
 
 
 ## Build log
+- [x] **Engine:** `field.js` (vector field: curl/flow, vortex, radial) — deterministic, unit vectors.
+- [x] **Surfaced:** Particles gains a **Flow field** emitter (field type/scale/strength); presets Flow Field + Vortex. `field.js` also earmarked for Glitch warp.
 - [x] **Engine:** `proj3.js` (projection) + `attractor.js` (Lorenz/Aizawa/Thomas/de Jong/Clifford) — deterministic, normalized, parity-verified.
 - [x] **Surfaced:** Path & Scope gains a **Strange attractor** path type (system picker, Signal→shape morph, 3D rotate); presets Lorenz + De Jong. First proof of the engine-vs-design split.
