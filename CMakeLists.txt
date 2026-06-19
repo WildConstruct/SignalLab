@@ -51,6 +51,14 @@ add_executable(value_codec_test examples/value_codec_test.cpp)
 target_link_libraries(value_codec_test PRIVATE signalrack_core)
 add_test(NAME value_codec_test COMMAND value_codec_test)
 
+add_executable(ae_bake_contract_test examples/ae_bake_contract_test.cpp)
+target_link_libraries(ae_bake_contract_test PRIVATE signalrack_core)
+add_test(NAME ae_bake_contract_test COMMAND ae_bake_contract_test)
+
+add_executable(live_courier_strip_test examples/live_courier_strip_test.cpp)
+target_link_libraries(live_courier_strip_test PRIVATE signalrack_core)
+add_test(NAME live_courier_strip_test COMMAND live_courier_strip_test)
+
 # --- dawn runtime (requires a Dawn target named dawn::webgpu_dawn) ------------
 if(IAN_BUILD_SIGNALRACK_DAWN_RUNTIME)
     if(NOT IAN_DAWN_SOURCE_DIR AND NOT IAN_USE_EXTERNAL_DAWN)

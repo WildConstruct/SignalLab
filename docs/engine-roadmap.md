@@ -78,6 +78,13 @@ Goal: one rack reliably drives one AE property.
 - Guide scope/readout as visual confidence.
 - Three outputs remain scalar sliders for v1.
 
+Current implementation order:
+
+1. Host-free native contract proof.
+2. Dawn runtime proof.
+3. AE bake proof.
+4. Live courier proof.
+
 ### Lane 2: First Consumer Proof
 
 Goal: show reusable building blocks across Wild Construct tools.

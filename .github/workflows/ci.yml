@@ -41,6 +41,18 @@ jobs:
           g++ -std=c++17 -I include examples/value_codec_test.cpp -o value_codec_test
           ./value_codec_test
 
+      # 2c. AE bake contract: interpreted outputs -> deterministic keyframes
+      - name: AE bake contract (C++)
+        run: |
+          g++ -std=c++17 -I include examples/ae_bake_contract_test.cpp -o ae_bake_contract_test
+          ./ae_bake_contract_test
+
+      # 2d. Live-courier 3x1 value strip packing
+      - name: live courier strip contract (C++)
+        run: |
+          g++ -std=c++17 -I include examples/live_courier_strip_test.cpp -o live_courier_strip_test
+          ./live_courier_strip_test
+
       # 3. WGSL embed codegen produces a valid header
       - name: wgsl embed codegen
         run: |

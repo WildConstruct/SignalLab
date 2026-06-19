@@ -239,7 +239,7 @@ try {
 Run:
 
 ```powershell
-.\scripts\verify-native-contract.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-native-contract.ps1
 ```
 
 Expected:
@@ -255,7 +255,7 @@ Expected:
 Run:
 
 ```powershell
-.\scripts\verify-dawn-runtime.ps1 -DawnSourceDir C:\does-not-exist
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-dawn-runtime.ps1 -DawnSourceDir C:\does-not-exist
 ```
 
 Expected:
@@ -403,7 +403,7 @@ In `.github/workflows/ci.yml`, add:
 Run:
 
 ```powershell
-.\scripts\verify-native-contract.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-native-contract.ps1
 ```
 
 Expected:
@@ -437,7 +437,6 @@ git commit -m "feat: add AE bake output contract"
 #define SIGNALRACK_LIVE_COURIER_STRIP_H
 
 #include <array>
-#include <cstdint>
 
 #include "signalrack/signal_output.h"
 #include "signalrack/signal_recipe.h"
@@ -447,9 +446,9 @@ namespace ItsAllNoise {
 namespace SignalRack {
 
 struct CourierPixel {
-    std::uint8_t r = 0;
-    std::uint8_t g = 0;
-    std::uint8_t b = 0;
+    float r = 0.0f;
+    float g = 0.0f;
+    float b = 0.0f;
 };
 
 struct CourierStrip3 {
@@ -459,7 +458,7 @@ struct CourierStrip3 {
 };
 
 inline CourierPixel PackCourierValue(float value, const OutputChannel& channel) {
-    const std::array<std::uint8_t, 3> packed =
+    const std::array<float, 3> packed =
         Pack24(NormalizeForStrip(value, channel.min, channel.max));
     return CourierPixel{packed[0], packed[1], packed[2]};
 }
@@ -546,7 +545,7 @@ In `.github/workflows/ci.yml`, add:
 Run:
 
 ```powershell
-.\scripts\verify-native-contract.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-native-contract.ps1
 ```
 
 Expected:
@@ -587,7 +586,7 @@ machines. The Dawn and After Effects tiers require external SDKs.
 Run:
 
 ```powershell
-.\scripts\verify-native-contract.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-native-contract.ps1
 ```
 
 Expected:
@@ -605,7 +604,7 @@ behavior.
 Run:
 
 ```powershell
-.\scripts\verify-dawn-runtime.ps1 -DawnSourceDir C:\path\to\dawn
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-dawn-runtime.ps1 -DawnSourceDir C:\path\to\dawn
 ```
 
 Expected:
@@ -703,8 +702,8 @@ Branch: `claude/signal-lab-product-analysis-8x6oxk`
 
 ## Verification
 
-- `.\scripts\verify-native-contract.ps1` -> pass
-- `.\scripts\verify-dawn-runtime.ps1 -DawnSourceDir C:\does-not-exist` -> clear prerequisite error
+- `powershell -ExecutionPolicy Bypass -File .\scripts\verify-native-contract.ps1` -> pass
+- `powershell -ExecutionPolicy Bypass -File .\scripts\verify-dawn-runtime.ps1 -DawnSourceDir C:\does-not-exist` -> clear prerequisite error
 
 ## Remaining External Proof
 
@@ -743,7 +742,7 @@ checkout and AE SDK in-app one-property bake.
 - [ ] **Step 1: Run final host-free verification**
 
 ```powershell
-.\scripts\verify-native-contract.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-native-contract.ps1
 ```
 
 Expected:
@@ -757,7 +756,7 @@ Expected:
 - [ ] **Step 2: Verify Dawn prerequisite guard**
 
 ```powershell
-.\scripts\verify-dawn-runtime.ps1 -DawnSourceDir C:\does-not-exist
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-dawn-runtime.ps1 -DawnSourceDir C:\does-not-exist
 ```
 
 Expected:
