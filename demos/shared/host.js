@@ -302,7 +302,8 @@
     { dir: "fui-kit", name: "FUI Kit" }, { dir: "glitch-distortion", name: "Glitch / Distortion" },
     { dir: "transitions", name: "Transitions" }, { dir: "kinetic-type", name: "Kinetic Type" },
     { dir: "meters", name: "Meters" }, { dir: "particles", name: "Particles" },
-    { dir: "path-scope", name: "Path & Scope" }
+    { dir: "path-scope", name: "Path & Scope" },
+    { dir: "field-bridge", name: "Field Bridge" }, { dir: "field-distort", name: "Field Distort" }
   ];
   // left rail: brand (→ gallery) + module switcher; active module highlighted
   function buildRail() {
