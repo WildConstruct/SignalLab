@@ -230,6 +230,7 @@ Meters (reuse fui.js + goniometer via scope.js) → particles.js (curl/attractor
 
 
 ## Build log
+- [x] **Multi-signal routing (new pattern):** a demo can consume the host driver PLUS aux engine drivers, each mapped to a different transform channel. First proof: Kinetic Type **3D multi-signal** — A→transition-in, B→Z fly-in, C→character rotation (via proj3). This is the multi-output (A/B/C) product direction, realized in a tool.
 - [x] **Engine:** `easing.js` (10 timing curves) — pure/deterministic.
 - [x] **Surfaced:** Transitions easing dropdown now full curve set; Kinetic Type **Cascade reveal** (per-letter, easing-timed). Easing feeds two tools.
 - [x] **Engine:** `lissajous.js` (parametric x/y[/z] from freq ratios + phase) — deterministic, normalized.
