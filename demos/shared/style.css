@@ -72,6 +72,16 @@ select.sh-btn{padding-right:6px}
   letter-spacing:.01em;text-transform:none;font-weight:400}
 .sh-sec-body{padding:2px 0 8px}
 
+/* plugin-let publish view: hide section chrome, show a curated header */
+.sh-panel.sh-publish .sh-section>h3{display:none}
+.sh-panel.sh-publish .sh-section{border-bottom:none}
+.sh-pluginlet-head{padding:14px 16px 12px;border-bottom:1px solid var(--line);
+  color:var(--ink);font-weight:650;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sh-pluginlet-head .mk{color:var(--accent)}
+.sh-pluginlet-head .tag{font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);border:1px solid var(--accent-dim);border-radius:3px;padding:1px 6px}
+.sh-pluginlet-head .d{flex-basis:100%;color:var(--muted);font-weight:400;font-size:11px;margin-top:4px}
+
 /* signal scope (collapsible graph at the bottom of the inspector) */
 .sh-scope-cv{display:block;width:100%;height:128px;background:#0c0c0e;
   border:1px solid var(--line);border-radius:6px}

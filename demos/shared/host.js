@@ -82,6 +82,8 @@
       .concat(cfg.shaping || []);
     var ui = SignalControls.build(panel, specs, onChange);
     var speed = 1;
+    // plugin-let header (shown only in a curated publish view)
+    var plHead = div("sh-pluginlet-head"); plHead.style.display = "none"; panel.insertBefore(plHead, panel.firstChild);
 
     function applySignal(s) {
       var patch = {};
@@ -218,6 +220,24 @@
       if (p.S) for (var k in p.S) if (ui.refs[k]) ui.set(k, p.S[k]);
     }
     presetSel.onchange = function () { if (presetSel.value && cfg.presets) applyPreset(cfg.presets[presetSel.value]); };
+
+    // ---- plugin-let publish view: a curated subset of controls + a default ----
+    function applyPluginlet(pl) {
+      if (!pl) { ui.setPublic(null); plHead.style.display = "none"; return; }
+      var pre = typeof pl.preset === "string" ? (cfg.presets && cfg.presets[pl.preset]) : pl.preset;
+      if (pre) applyPreset(pre);
+      ui.setPublic(pl.controls || []);
+      plHead.innerHTML = '<span class="mk">◢</span> ' + (pl.name || "Plugin-let") + '<span class="tag">plugin-let</span>'
+        + (pl.desc ? '<div class="d">' + pl.desc + '</div>' : '');
+      plHead.style.display = "";
+    }
+    if (cfg.pluginlets && cfg.pluginlets.length) {
+      var viewSel = document.createElement("select"); viewSel.className = "sh-btn"; viewSel.title = "View";
+      var oe = document.createElement("option"); oe.value = ""; oe.textContent = "✎ Edit (full)"; viewSel.appendChild(oe);
+      cfg.pluginlets.forEach(function (pl, i) { var o = document.createElement("option"); o.value = String(i); o.textContent = "◢ " + pl.name; viewSel.appendChild(o); });
+      viewSel.onchange = function () { applyPluginlet(viewSel.value === "" ? null : cfg.pluginlets[+viewSel.value]); };
+      bar.insertBefore(viewSel, presetSel);
+    }
 
     loadHash();
     return { driver: driver, ui: ui, applyPreset: applyPreset };
