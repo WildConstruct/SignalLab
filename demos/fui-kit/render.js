@@ -109,23 +109,42 @@
     ctx.strokeStyle = "#11242b"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, baseY); ctx.lineTo(x0 + total, baseY); ctx.stroke();
   }
 
+  // Radar — sweep-latched contacts: a blip refreshes only when the sweep line
+  // crosses its bearing (sampling the signal at that instant), then fades over
+  // one revolution. The set of dots is sampled AS the sweep goes around.
+  var radarS = { n: 0, val: [], rng: [], at: [], prev: 0 };
   function radar(ctx, W, H, F) {
-    var S = F.S, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.4, fire = S.fire, speed = S.sweep != null ? S.sweep : 0.8, t = F.t;
-    var seed = Math.round(+S.seed || 0);
+    var S = F.S, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.4, fire = S.fire, speed = S.sweep != null ? S.sweep : 0.8, t = F.t, seed = Math.round(+S.seed || 0);
+    var blips = Math.max(4, Math.round(S.blips)), TAU = Math.PI * 2;
+    if (radarS.n !== blips) { radarS.n = blips; radarS.val = []; radarS.rng = []; radarS.at = []; for (var z = 0; z < blips; z++) { radarS.val.push(0); radarS.rng.push(0); radarS.at.push(-1e9); } radarS.prev = 0; }
+    // rings + crosshair
     ctx.strokeStyle = "#16323f"; ctx.lineWidth = 1;
     for (var r = R; r > R / 4 - 1; r -= R / 4) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke(); }
     ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
-    var sweep = (t * speed) % (Math.PI * 2);
-    ctx.strokeStyle = "#36f09a"; ctx.lineWidth = 2; ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 10;
+    var sweep = (t * speed) % TAU;
+    // latch: any bearing the sweep crossed since last frame samples the signal now
+    var s0 = radarS.prev, fwd = ((sweep - s0) % TAU + TAU) % TAU;
+    if (fwd > 0) for (var i = 0; i < blips; i++) {
+      var b = i / blips * TAU, db = ((b - s0) % TAU + TAU) % TAU;
+      if (db <= fwd) { var v = Shaping.fieldValue(F, i, blips, seed);
+        if (v > fire) { radarS.val[i] = v; radarS.rng[i] = R * (0.18 + 0.8 * v); radarS.at[i] = t; } else radarS.val[i] = 0; }
+    }
+    radarS.prev = sweep;
+    // sweep arm + trailing afterglow wedge
+    for (var k = 1; k <= 6; k++) { ctx.globalAlpha = 0.06 * (7 - k); var aa = sweep - k * 0.12;
+      ctx.strokeStyle = FUI.GLOW; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(aa) * R, cy + Math.sin(aa) * R); ctx.stroke(); }
+    ctx.globalAlpha = 1; ctx.strokeStyle = FUI.GLOW; ctx.lineWidth = 2; ctx.shadowColor = FUI.GLOW; ctx.shadowBlur = 10;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); ctx.stroke(); ctx.shadowBlur = 0;
-    var blips = Math.max(4, Math.round(S.blips));
-    for (var i = 0; i < blips; i++) {
-      var v = Shaping.fieldValue(F, i, blips, seed); if (v <= fire) continue;
-      var ang = i / blips * Math.PI * 2, rng = R * (0.18 + 0.8 * v);
-      var da = ((sweep - ang) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2), fade = 1 - da / (Math.PI * 2);
-      ctx.globalAlpha = 0.15 + 0.85 * fade;
-      ctx.fillStyle = "hsl(" + (150 + v * 120) + ",85%,60%)"; ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 8 * fade;
-      ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * rng, cy + Math.sin(ang) * rng, 3 + v * 4, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    // contacts: fade over one revolution since last refresh; ping ring on fresh contact
+    var revT = TAU / Math.max(0.0001, speed);
+    for (var j = 0; j < blips; j++) {
+      var vv = radarS.val[j]; if (vv <= 0) continue;
+      var age = t - radarS.at[j], inten = vv * Math.max(0, 1 - age / revT); if (inten <= 0.01) continue;
+      var ang = j / blips * TAU, px = cx + Math.cos(ang) * radarS.rng[j], py = cy + Math.sin(ang) * radarS.rng[j];
+      ctx.globalAlpha = 0.2 + 0.8 * inten; ctx.fillStyle = "hsl(" + (150 + vv * 120) + ",85%,60%)"; ctx.shadowColor = FUI.GLOW; ctx.shadowBlur = 10 * inten;
+      ctx.beginPath(); ctx.arc(px, py, 2 + vv * 4, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+      var pingT = revT * 0.18; if (age < pingT) { ctx.globalAlpha = (1 - age / pingT) * 0.5; ctx.strokeStyle = "#7df0c2"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(px, py, 4 + (age / pingT) * 16, 0, 7); ctx.stroke(); }
     }
     ctx.globalAlpha = 1;
   }
