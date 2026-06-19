@@ -65,9 +65,10 @@
     var presetSel = document.createElement("select"); presetSel.className = "sh-btn"; presetSel.title = "Presets";
     var optDef = document.createElement("option"); optDef.textContent = "Presets…"; optDef.value = ""; presetSel.appendChild(optDef);
     Object.keys(cfg.presets || {}).forEach(function (name) { var o = document.createElement("option"); o.value = name; o.textContent = name; presetSel.appendChild(o); });
-    var bLink = btn("Copy link"), bExport = btn("Export JSON"), bImport = btn("Import"), bAE = btn("ƒ AE"), bSurprise = btn("🎲");
+    var bLink = btn("Copy link"), bExport = btn("Export JSON"), bImport = btn("Import"), bPng = btn("PNG"), bAE = btn("ƒ AE"), bSurprise = btn("🎲");
     bAE.className = "sh-btn primary"; bAE.title = "Copy the self-contained After Effects expression";
-    bar.append(title, badge, spacer, presetSel, bSurprise, bLink, bImport, bExport, bAE);
+    bPng.title = "Export current frame (beauty + alpha)";
+    bar.append(title, badge, spacer, presetSel, bSurprise, bLink, bImport, bExport, bPng, bAE);
     var wrap = div("sh-canvas-wrap");
     var canvas = document.createElement("canvas"); canvas.className = "sh-canvas";
     wrap.appendChild(canvas);
@@ -84,6 +85,21 @@
     var speed = 1;
     // plugin-let header (shown only in a curated publish view)
     var plHead = div("sh-pluginlet-head"); plHead.style.display = "none"; panel.insertBefore(plHead, panel.firstChild);
+
+    // ---- named auxiliary signals (declarative multi-signal) ----
+    var auxSig = {};
+    (cfg.signals || []).forEach(function (s) { auxSig[s.id] = SignalEngine.create(s.driver || {}); });
+    function sig(id, tOffset) { var d = auxSig[id]; return d ? d.sample((clockT || 0) + (tOffset || 0)).n : 0; }
+
+    // ---- actions (triggers): envelope + one-shot ----
+    var actEnv = {}, actQueue = {}, clockT = 0, firedNow = {};
+    function fireAction(id) { actEnv[id] = clockT; actQueue[id] = (actQueue[id] || 0) + 1; }
+    function actEnvelope(id, decay) { var at = actEnv[id]; if (at == null) return 0; var a = clockT - at; return a < 0 ? 0 : Math.max(0, 1 - a / (decay || 0.6)); }
+    if (cfg.actions && cfg.actions.length) {
+      var actBar = div("sh-actions");
+      cfg.actions.forEach(function (a) { var b = btn(a.label || a.id); b.onclick = function () { fireAction(a.id); }; actBar.appendChild(b); });
+      panel.insertBefore(actBar, plHead.nextSibling);
+    }
 
     function applySignal(s) {
       var patch = {};
@@ -153,12 +169,14 @@
     // render loop
     var t0 = performance.now();
     function frame() {
-      var t = (performance.now() - t0) / 1000 * speed;
+      var t = (performance.now() - t0) / 1000 * speed; clockT = t;
       var w = driver.window(t, 512);
+      firedNow = {}; for (var aid in actQueue) { if (actQueue[aid] > 0) { firedNow[aid] = true; actQueue[aid] = 0; } }
       ctx.clearRect(0, 0, W, H);
       try {
         cfg.render(ctx, W, H, { t: t, n: w.n, x: w.bufX[511], y: w.bufY[511],
-          bufX: w.bufX, bufY: w.bufY, S: ui.state });
+          bufX: w.bufX, bufY: w.bufY, S: ui.state,
+          act: actEnvelope, fired: function (id) { return !!firedNow[id]; }, sig: sig });
       } catch (e) { badge.textContent = "render error: " + e.message; badge.classList.remove("live"); }
       drawScope(w);
       requestAnimationFrame(frame);
@@ -188,6 +206,10 @@
       if (navigator.clipboard) navigator.clipboard.writeText(expr);
       bAE.textContent = "Copied ƒ!"; setTimeout(function () { bAE.textContent = "ƒ AE"; }, 1400);
       console.log(expr);
+    };
+    bPng.onclick = function () {   // output pass: beauty + alpha (canvas keeps transparency)
+      canvas.toBlob(function (blob) { if (!blob) return; var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+        a.download = (cfg.title || "frame").toLowerCase().replace(/\s+/g, "-") + ".png"; a.click(); });
     };
     bImport.onclick = function () {
       var inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,.wcx";

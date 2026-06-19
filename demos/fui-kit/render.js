@@ -32,8 +32,9 @@
       if (aa > Math.max(0.05, fire - 0.1)) { var ph = (t * prop + hx(ei * 3)) % 1, x = A[0] + (B[0] - A[0]) * ph, y = A[1] + (B[1] - A[1]) * ph;
         ctx.globalAlpha = aa; ctx.fillStyle = "#7df0c2"; ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(x, y, 2 + aa * 2, 0, 7); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
     }
+    var pulse = F.act ? F.act("pulse", 0.8) : 0;   // action: momentary firing boost
     for (i = 0; i < NODES; i++) {
-      var av = act(i), P = pos[i], fired = av > fire;
+      var av = Math.min(1, act(i) + pulse * 0.6), P = pos[i], fired = av > fire;
       ctx.fillStyle = fired ? "hsl(" + (150 + av * 120) + ",90%," + (55 + av * 20) + "%)" : "#1b2a30";
       ctx.shadowColor = "#36f09a"; ctx.shadowBlur = fired ? 14 * av : 0;
       ctx.beginPath(); ctx.arc(P[0], P[1], 4 + av * 8, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
@@ -376,6 +377,7 @@
       { tier: "shaping", key: "sweep",   label: "Sweep speed", type: "slider", min: 0.1, max: 3, step: 0.05, value: 0.8, fmt: f2, when: { widget: "radar" } }
     ],
     presets: (root.DemoPresets || {}),
+    actions: [{ id: "pulse", label: "⚡ Pulse" }],
     // curated plugin-lets, loaded as portable manifest JSON (host builds the view)
     manifests: ["manifests/neural-net.json", "manifests/radar.json", "manifests/processor-die.json"],
     render: render
