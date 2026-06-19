@@ -64,12 +64,23 @@ Etheros already takes `timeSeconds` per request, so:
   *signal-driven field*.
 - **Field → signal:** an Etheros field sampled at a probe point *is* a Signal Rack
   source.
-Prototype: `demos/field-bridge/` with `etheros-lite.js` (a CPU field mirroring the
-recipe blocks) where the host driver routes `n` onto a recipe param. This is the
-Capsule/rig composition from the WC Components doc — two engines, one look.
+Built: `demos/field-bridge/` routes the host driver's `n` onto a recipe param and
+renders the field with the **real Etheros engine running in the browser via
+WebGPU** — the canonical `primary_slice.wgsl` (vendored to `demos/shared/etheros/`,
+the same WGSL the native/plugin runtime uses), driven through `etheros-gpu.js`. The
+recipe→`NoiseParams` uniform mapping is ported verbatim from the Etheros web lab's
+`engine-bridge.mjs` (`BuildFieldShaderParams`); the std140 layout is parsed straight
+from the WGSL struct. When WebGPU is absent the host falls back to the
+`etheros-lite.js` CPU mirror — same recipe, identical composition. This is the
+Capsule/rig composition from the WC Components doc — two engines, one look, now on
+the actual shader.
 
 ## Honest caveats
-Point-in-time snapshot; read core/include/examples/docs, not the WGSL field shader
-(`shaders/`) or every runtime path. Describes the *contract*, not pixel-level shader
-behavior. The bridge prototype is an **Etheros-lite CPU mirror** for the web demos,
-not the real Dawn engine — it proves the composition shape, not parity.
+Point-in-time snapshot. The **field render is the real engine** (the canonical
+`primary_slice.wgsl` compute shader, verified to compile + execute in-browser with
+no validation errors, producing a deterministic structured field). What is *not*
+yet ported: the multi-stage volume assembly (`engine-bridge.mjs` `VOLUME_ASSEMBLY`),
+`CompileFieldRecipe`'s native recipe→config pass (we use the lab's JS mapping), and
+golden-hash pixel parity against the native runtime. The slice path trims
+octaves/detail vs. the volume path (matching the native slice config), so it is a
+faithful *slice*, not the full volumetric look.
