@@ -67,6 +67,11 @@
 
   function render(ctx, W, H, F) {
     var sp = step(F);
+    if (F.fired && F.fired("burst")) {   // action: one-shot shockwave + ember spray from centre
+      rings.push({ r: 8, l: 1, h: 170, w: 5 });
+      for (var b = 0; b < 60; b++) { var a = Math.random() * Math.PI * 2, v = 3 + Math.random() * 9;
+        parts.push({ x: W / 2, y: H / 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v, l: 1, sz: 2 + Math.random() * 3, h: 150 + Math.random() * 120 }); }
+    }
     switch (F.S.variant) {
       case "rings":  shockRings(ctx, W, H, F, sp); break;
       case "stream": stream(ctx, W, H, F, sp); break;
@@ -92,6 +97,7 @@
       { tier: "shaping", key: "fstr",   label: "Flow strength <span>(flow)</span>", type: "slider", min: 0.4, max: 4, step: 0.1, value: 1.6, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "flow" } }
     ].concat(root.SignalShaping.responseSpecs({ gamma: 1 })),
     presets: (root.DemoPresets || {}),
+    actions: [{ id: "burst", label: "💥 Burst" }],
     render: render
   };
 })(typeof self !== "undefined" ? self : this);

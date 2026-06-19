@@ -9,10 +9,7 @@
 (function (root) {
   "use strict";
   var combine = root.SignalEngine.combine, Shaping = root.SignalShaping, Easing = root.Easing, Proj3 = root.Proj3;
-  // auxiliary engine drivers — independent signals for Z and rotation (multi-signal)
-  var zDrv = root.SignalEngine.create({ x: { src: "sine", rate: 0.6 } });
-  var rotDrv = root.SignalEngine.create({ x: { src: "triangle", rate: 0.4 } });
-  var prog3 = 0, last3 = null;
+  var prog3 = 0, last3 = null;   // Z + rotation signals are now host-declared (cfg.signals), read via F.sig
 
   function wave(ctx, W, H, F, txt, amp, mode) {
     var cx = W / 2, cy = H / 2;
@@ -81,15 +78,13 @@
     var S = F.S, t = F.t, cx = W / 2, cy = H / 2, e = Math.max(0, Math.min(1, F.n));
     var dt = last3 == null ? 0 : Math.max(0, Math.min(0.1, t - last3)); last3 = t;
     prog3 += dt * (0.12 + e * (S.pace != null ? S.pace : 0.6) * 1.4); if (prog3 >= 1.6) prog3 = 0;
-    zDrv.set({ x: { rate: S.zrate != null ? S.zrate : 0.6 } });
-    rotDrv.set({ x: { rate: S.rotrate != null ? S.rotrate : 0.4 } });
     var fs = Math.max(28, Math.min(84, W / 8)); ctx.font = "800 " + fs + "px ui-monospace,monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     var R = Math.min(W, H) * 0.42, cam = { yaw: 0, pitch: 0, dist: 3.6 }, n = txt.length, spanXn = (n - 1) * (fs * 0.72) / R;
     for (var i = 0; i < n; i++) {
       if (txt[i] === " ") continue; var lp = i / Math.max(1, n - 1);
-      var reveal = Easing.apply("out", Math.max(0, Math.min(1, (prog3 - lp * 0.55) / 0.45)));   // signal A
-      var zsig = zDrv.sample(t - i * 0.12).n;                                                    // signal B
-      var rot = (rotDrv.sample(t - i * 0.15).n * 2 - 1) * Math.PI * (S.rotamt != null ? S.rotamt : 0.5); // signal C
+      var reveal = Easing.apply("out", Math.max(0, Math.min(1, (prog3 - lp * 0.55) / 0.45)));   // signal A (host driver)
+      var zsig = F.sig ? F.sig("z", -i * 0.12) : 0.5;                                            // signal B (declared)
+      var rot = ((F.sig ? F.sig("rot", -i * 0.15) : 0.5) * 2 - 1) * Math.PI * (S.rotamt != null ? S.rotamt : 0.5); // signal C (declared)
       var z = (1 - reveal) * -3.2 + (zsig * 2 - 1) * (S.zamt != null ? S.zamt : 1.2);
       var pr = Proj3.project({ x: (lp - 0.5) * spanXn, y: 0, z: z }, cam), sc = Math.max(0.05, pr.scale);
       ctx.save(); ctx.translate(cx + pr.x * R, cy + pr.y * R); ctx.rotate(rot); ctx.scale(sc, sc);
@@ -125,12 +120,15 @@
       { tier: "shaping", key: "ease", label: "Easing <span>(cascade)</span>", type: "select", value: "out", options: root.Easing.OPTIONS, when: { variant: "cascade" } },
       // multi-signal 3D routing (signal A = host driver; B/C below)
       { tier: "shaping", key: "pace",    label: "A · transition pace", type: "slider", min: 0, max: 1, step: 0.01, value: 0.6, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: "text3d" } },
-      { tier: "shaping", key: "zrate",   label: "B · Z signal rate", type: "slider", min: 0.1, max: 3, step: 0.1, value: 0.6, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "text3d" } },
       { tier: "shaping", key: "zamt",    label: "B · Z fly amount", type: "slider", min: 0, max: 3, step: 0.1, value: 1.2, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "text3d" } },
-      { tier: "shaping", key: "rotrate", label: "C · rotate signal rate", type: "slider", min: 0.1, max: 3, step: 0.1, value: 0.4, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "text3d" } },
       { tier: "shaping", key: "rotamt",  label: "C · rotate amount", type: "slider", min: 0, max: 1, step: 0.02, value: 0.5, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: "text3d" } }
     ],
     presets: (root.DemoPresets || {}),
+    // declared auxiliary signals (multi-signal): B → Z, C → rotation (3D text)
+    signals: [
+      { id: "z", role: "z-position", driver: { x: { src: "sine", rate: 0.7 } } },
+      { id: "rot", role: "rotation", driver: { x: { src: "triangle", rate: 0.5 } } }
+    ],
     render: render
   };
 })(typeof self !== "undefined" ? self : this);

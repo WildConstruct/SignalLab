@@ -86,9 +86,19 @@ manifest only *selects and polishes* — the Substance "expose a subset" move.
 - **Procedural-first**, with `bake` reserved for the compiler's reduced/baked modes.
 - Keep it **above** `plugin.params.json`, sharing param semantics so AE + web agree.
 
+## Resolved (2026-06-19)
+- **Actions** ✅ — `actions:[{id,label}]` → host action bar; render reads `F.fired(id)`
+  (one-shot) / `F.act(id,decay)` (envelope). Wired: FUI ⚡Pulse, Particles 💥Burst.
+- **Declarative signals** ✅ — `signals:[{id,driver}]` → host builds aux drivers,
+  render reads `F.sig(id, tOffset)`. 3D-text now flies from declared signals; rates
+  are declarative, the panel exposes only curated *amounts* (B·Z, C·rotate). The
+  signal→channel mapping stays in the renderer (it owns geometry), which is the
+  right seam; only scalar-param routing remains a possible future generic layer.
+- **Output passes** ✅ (v0) — host **PNG** export = beauty + alpha (canvas keeps
+  transparency). Multi-pass (luma/motion) still future.
+
 ## Open questions
-- Actions model (triggers + scheduling) — smallest useful version?
-- Declarative signal **routing** (signal → target param/channel) vs. code in the
-  renderer. The 3D-text wires routing in code today; a manifest should be able to
-  express "signal B → Z position, signal C → rotation."
-- Output passes for a canvas tool (alpha at least) — needed for AE/conditioning.
+- Scalar-param **auto-routing** (signal → a control value, declaratively) as an
+  optional generic layer beyond per-renderer use of `F.sig`.
+- Multi-pass output (luma / motion-vector) for richer AE / conditioning handoff.
+- Action **scheduling** (timed/seeking) per the OGraf lifecycle.
