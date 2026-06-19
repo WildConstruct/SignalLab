@@ -8,7 +8,11 @@
  */
 (function (root) {
   "use strict";
-  var combine = root.SignalEngine.combine, Shaping = root.SignalShaping, Easing = root.Easing;
+  var combine = root.SignalEngine.combine, Shaping = root.SignalShaping, Easing = root.Easing, Proj3 = root.Proj3;
+  // auxiliary engine drivers — independent signals for Z and rotation (multi-signal)
+  var zDrv = root.SignalEngine.create({ x: { src: "sine", rate: 0.6 } });
+  var rotDrv = root.SignalEngine.create({ x: { src: "triangle", rate: 0.4 } });
+  var prog3 = 0, last3 = null;
 
   function wave(ctx, W, H, F, txt, amp, mode) {
     var cx = W / 2, cy = H / 2;
@@ -68,6 +72,33 @@
     ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.textBaseline = "alphabetic";
   }
 
+  // 3D multi-signal — THREE independent signals drive one title:
+  //   A (host driver)  → per-letter transition-in (reveal playhead, signal-paced)
+  //   B (zDrv)         → Z fly-in position (per-letter, staggered)
+  //   C (rotDrv)       → per-character rotation
+  // Composited through proj3. The clearest demonstration of multi-output routing.
+  function text3d(ctx, W, H, F, txt) {
+    var S = F.S, t = F.t, cx = W / 2, cy = H / 2, e = Math.max(0, Math.min(1, F.n));
+    var dt = last3 == null ? 0 : Math.max(0, Math.min(0.1, t - last3)); last3 = t;
+    prog3 += dt * (0.12 + e * (S.pace != null ? S.pace : 0.6) * 1.4); if (prog3 >= 1.6) prog3 = 0;
+    zDrv.set({ x: { rate: S.zrate != null ? S.zrate : 0.6 } });
+    rotDrv.set({ x: { rate: S.rotrate != null ? S.rotrate : 0.4 } });
+    var fs = Math.max(28, Math.min(84, W / 8)); ctx.font = "800 " + fs + "px ui-monospace,monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    var R = Math.min(W, H) * 0.42, cam = { yaw: 0, pitch: 0, dist: 3.6 }, n = txt.length, spanXn = (n - 1) * (fs * 0.72) / R;
+    for (var i = 0; i < n; i++) {
+      if (txt[i] === " ") continue; var lp = i / Math.max(1, n - 1);
+      var reveal = Easing.apply("out", Math.max(0, Math.min(1, (prog3 - lp * 0.55) / 0.45)));   // signal A
+      var zsig = zDrv.sample(t - i * 0.12).n;                                                    // signal B
+      var rot = (rotDrv.sample(t - i * 0.15).n * 2 - 1) * Math.PI * (S.rotamt != null ? S.rotamt : 0.5); // signal C
+      var z = (1 - reveal) * -3.2 + (zsig * 2 - 1) * (S.zamt != null ? S.zamt : 1.2);
+      var pr = Proj3.project({ x: (lp - 0.5) * spanXn, y: 0, z: z }, cam), sc = Math.max(0.05, pr.scale);
+      ctx.save(); ctx.translate(cx + pr.x * R, cy + pr.y * R); ctx.rotate(rot); ctx.scale(sc, sc);
+      ctx.globalAlpha = Math.max(0, Math.min(1, reveal)); ctx.shadowColor = "#36f09a"; ctx.shadowBlur = 12 * reveal;
+      ctx.fillStyle = "hsl(" + (150 + zsig * 70) + ",85%," + (45 + zsig * 25) + "%)"; ctx.fillText(txt[i], 0, 0); ctx.restore();
+    }
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.textBaseline = "alphabetic";
+  }
+
   function render(ctx, W, H, F) {
     var S = F.S, txt = (S.word || "SIGNAL RACK").toString(), amp = S.amp, mode = S._drive || "x";
     switch (S.variant) {
@@ -75,6 +106,7 @@
       case "glitch":  glitch(ctx, W, H, F, txt, amp, mode); break;
       case "shake":   shake(ctx, W, H, F, txt, amp); break;
       case "cascade": cascade(ctx, W, H, F, txt, amp); break;
+      case "text3d":  text3d(ctx, W, H, F, txt); break;
       default:        wave(ctx, W, H, F, txt, amp, mode);
     }
   }
@@ -84,13 +116,19 @@
     driver: { x: { src: "sine", rate: 1.4 }, y: { src: "sine", rate: 2, phase: 0.25 }, drive: "mult" },
     structure: [
       { tier: "structure", key: "variant", label: "Variant", type: "select", value: "wave", options: [
-        { value: "wave", label: "Kinetic wave" }, { value: "pump", label: "Title pump" }, { value: "glitch", label: "RGB glitch" }, { value: "shake", label: "Shake / impact" }, { value: "cascade", label: "Cascade reveal" } ] },
+        { value: "wave", label: "Kinetic wave" }, { value: "pump", label: "Title pump" }, { value: "glitch", label: "RGB glitch" }, { value: "shake", label: "Shake / impact" }, { value: "cascade", label: "Cascade reveal" }, { value: "text3d", label: "3D multi-signal" } ] },
       { tier: "structure", key: "word", label: "Word", type: "text", value: "SIGNAL RACK" }
     ],
     shaping: [
       root.SignalShaping.fieldSpec("sweep"),
       { tier: "shaping", key: "amp", label: "Amount", type: "slider", min: 0, max: 2, step: 0.05, value: 1, fmt: function (v) { return (+v).toFixed(2); } },
-      { tier: "shaping", key: "ease", label: "Easing <span>(cascade)</span>", type: "select", value: "out", options: root.Easing.OPTIONS, when: { variant: "cascade" } }
+      { tier: "shaping", key: "ease", label: "Easing <span>(cascade)</span>", type: "select", value: "out", options: root.Easing.OPTIONS, when: { variant: "cascade" } },
+      // multi-signal 3D routing (signal A = host driver; B/C below)
+      { tier: "shaping", key: "pace",    label: "A · transition pace", type: "slider", min: 0, max: 1, step: 0.01, value: 0.6, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: "text3d" } },
+      { tier: "shaping", key: "zrate",   label: "B · Z signal rate", type: "slider", min: 0.1, max: 3, step: 0.1, value: 0.6, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "text3d" } },
+      { tier: "shaping", key: "zamt",    label: "B · Z fly amount", type: "slider", min: 0, max: 3, step: 0.1, value: 1.2, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "text3d" } },
+      { tier: "shaping", key: "rotrate", label: "C · rotate signal rate", type: "slider", min: 0.1, max: 3, step: 0.1, value: 0.4, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "text3d" } },
+      { tier: "shaping", key: "rotamt",  label: "C · rotate amount", type: "slider", min: 0, max: 1, step: 0.02, value: 0.5, fmt: function (v) { return (+v).toFixed(2); }, when: { variant: "text3d" } }
     ],
     presets: (root.DemoPresets || {}),
     render: render
