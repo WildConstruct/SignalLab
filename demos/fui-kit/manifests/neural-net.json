@@ -1,0 +1,7 @@
+{
+  "id": "fui.neural-net", "name": "Neural Net", "version": "0.1.0", "module": "fui-kit",
+  "desc": "A living network. Dial the source and how readily nodes fire.",
+  "controls": ["_src", "_rate", "nodes", "fire"],
+  "driver": { "x": { "src": "sine", "rate": 1.5 }, "y": { "src": "sine", "rate": 2, "phase": 0.1 }, "drive": "mult" },
+  "values": { "widget": "synapse", "nodes": 15, "connect": 2, "seed": 1941, "fire": 0.45, "field": "stagger", "_src": "sine", "_rate": 1.5, "_drive": "mult" }
+}

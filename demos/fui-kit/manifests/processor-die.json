@@ -1,0 +1,7 @@
+{
+  "id": "fui.processor-die", "name": "Processor Die", "version": "0.1.0", "module": "fui-kit",
+  "desc": "A chip lighting up. Size the grid; set the activity threshold.",
+  "controls": ["_src", "_rate", "cols", "rows", "fire"],
+  "driver": { "x": { "src": "noise", "rate": 3 }, "y": { "src": "sine", "rate": 2 }, "drive": "mix" },
+  "values": { "widget": "core", "cols": 10, "rows": 7, "cell": 36, "seed": 1337, "fire": 0.5, "field": "stagger", "_src": "noise", "_rate": 3, "_drive": "mix" }
+}

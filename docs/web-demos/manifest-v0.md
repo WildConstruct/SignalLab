@@ -69,10 +69,11 @@ manifest only *selects and polishes* — the Substance "expose a subset" move.
 - **Today (prototype):** `pluginlets: [...]` inline in a demo == an inline
   manifest. `controls.setPublic(controls)` renders the exposed surface; the
   preset supplies the default + locks `variant`.
-- **Next:** load a manifest JSON (`/demos/<module>/manifests/<id>.json`) and have
-  the host build the curated view from it directly — the demo becomes a *host*
-  for any manifest, not a hand-wired view. This is the small step that turns
-  "curated view" into "loads a portable component."
+- **Now (done):** the host loads manifest JSON. A demo declares `manifests:[urls]`;
+  the View picker resolves names from the files and applies on select. `?component=<url>`
+  loads ANY portable component directly (host-for-any-component). Self-contained
+  manifests (driver + values + controls) — no preset-name dependency. FUI Kit ships
+  3 (`demos/fui-kit/manifests/*.json`). Browser-verified both paths.
 - **Later (compiler):** OTIS `wc-compiler` emits this manifest + an AE adapter /
   OGraf wrapper / ComfyUI node from the authored graph (per the component doc).
 
