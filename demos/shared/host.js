@@ -156,15 +156,24 @@
       sctx.stroke();
     }
 
-    // canvas sizing
-    var ctx = canvas.getContext("2d"), W = 0, H = 0;
+    // canvas sizing — the context type (2D vs WebGPU) is decided below: a demo
+    // with cfg.gpu tries to claim a WebGPU context first and falls back to 2D.
+    var ctx = null, gpuRenderer = null, lastFrame = null, W = 0, H = 0;
     function resize() {
       var dpr = Math.min(window.devicePixelRatio || 1, 2);
       W = wrap.clientWidth; H = wrap.clientHeight;
       canvas.width = W * dpr; canvas.height = H * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // GPU renderer reads canvas.width/height itself
     }
-    window.addEventListener("resize", resize); resize();
+    window.addEventListener("resize", resize);
+    function startCPU() { if (!ctx && !gpuRenderer) { ctx = canvas.getContext("2d"); resize(); } }
+    if (cfg.gpu && cfg.gpu.init) {
+      resize();   // size the canvas (device px) before the engine configures its context
+      Promise.resolve().then(function () { return cfg.gpu.init(canvas); }).then(function (r) {
+        if (r) { gpuRenderer = r; badge.textContent = r.label || "WebGPU engine"; badge.classList.add("live"); }
+        else { startCPU(); badge.textContent = "CPU fallback"; }
+      }).catch(function (e) { console.warn("GPU init failed, CPU fallback:", e); startCPU(); badge.textContent = "CPU fallback"; });
+    } else { startCPU(); }
 
     // render loop
     var t0 = performance.now();
@@ -172,11 +181,12 @@
       var t = (performance.now() - t0) / 1000 * speed; clockT = t;
       var w = driver.window(t, 512);
       firedNow = {}; for (var aid in actQueue) { if (actQueue[aid] > 0) { firedNow[aid] = true; actQueue[aid] = 0; } }
-      ctx.clearRect(0, 0, W, H);
+      var F = { t: t, n: w.n, x: w.bufX[511], y: w.bufY[511], bufX: w.bufX, bufY: w.bufY, S: ui.state,
+        act: actEnvelope, fired: function (id) { return !!firedNow[id]; }, sig: sig };
+      lastFrame = F;
       try {
-        cfg.render(ctx, W, H, { t: t, n: w.n, x: w.bufX[511], y: w.bufY[511],
-          bufX: w.bufX, bufY: w.bufY, S: ui.state,
-          act: actEnvelope, fired: function (id) { return !!firedNow[id]; }, sig: sig });
+        if (gpuRenderer) { gpuRenderer.render(F, canvas.width, canvas.height); }
+        else if (ctx) { ctx.clearRect(0, 0, W, H); cfg.render(ctx, W, H, F); }
       } catch (e) { badge.textContent = "render error: " + e.message; badge.classList.remove("live"); }
       drawScope(w);
       requestAnimationFrame(frame);
@@ -208,6 +218,8 @@
       console.log(expr);
     };
     bPng.onclick = function () {   // output pass: beauty + alpha (canvas keeps transparency)
+      // WebGPU canvases don't preserve the drawing buffer; re-render the last frame first.
+      if (gpuRenderer && lastFrame) { try { gpuRenderer.render(lastFrame, canvas.width, canvas.height); } catch (e) {} }
       canvas.toBlob(function (blob) { if (!blob) return; var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
         a.download = (cfg.title || "frame").toLowerCase().replace(/\s+/g, "-") + ".png"; a.click(); });
     };
