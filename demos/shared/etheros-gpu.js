@@ -271,11 +271,14 @@
     };
   }
 
-  // ---- palette blit: scalar field [0,1] -> green→amber heat (presentation) -
-  // Mirrors the demo's CPU look hsl(150+v*120, 80%, 4+v*v*56%).
+  // ---- palette blit: scalar field [0,1] -> a vivid multi-stop colormap -----
+  // disp = vec4(paletteIndex, gain, bias, _). The field comes out of the slice
+  // path low + narrow, so we stretch (gain/bias) then run a 6-stop ramp so it
+  // pops instead of sitting dark. Palettes: 0 ember, 1 signal, 2 ice.
   var BLIT_WGSL = [
     "@group(0) @binding(0) var samp: sampler;",
     "@group(0) @binding(1) var tex: texture_2d<f32>;",
+    "@group(0) @binding(2) var<uniform> disp: vec4<f32>;",
     "struct VOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };",
     "@vertex fn vs(@builtin(vertex_index) i: u32) -> VOut {",
     "  var ps = array<vec2<f32>, 3>(vec2<f32>(-1.0,-1.0), vec2<f32>(3.0,-1.0), vec2<f32>(-1.0,3.0));",
@@ -284,23 +287,34 @@
     "  o.uv = vec2<f32>(p.x*0.5+0.5, 0.5-p.y*0.5);",
     "  return o;",
     "}",
-    "fn hsl2rgb(h: f32, s: f32, l: f32) -> vec3<f32> {",
-    "  let c = (1.0 - abs(2.0*l - 1.0)) * s;",
-    "  let hp = h / 60.0;",
-    "  let x = c * (1.0 - abs(hp % 2.0 - 1.0));",
-    "  var rgb = vec3<f32>(0.0);",
-    "  if (hp < 1.0) { rgb = vec3<f32>(c, x, 0.0); }",
-    "  else if (hp < 2.0) { rgb = vec3<f32>(x, c, 0.0); }",
-    "  else if (hp < 3.0) { rgb = vec3<f32>(0.0, c, x); }",
-    "  else if (hp < 4.0) { rgb = vec3<f32>(0.0, x, c); }",
-    "  else if (hp < 5.0) { rgb = vec3<f32>(x, 0.0, c); }",
-    "  else { rgb = vec3<f32>(c, 0.0, x); }",
-    "  return rgb + (l - 0.5*c);",
+    // piecewise ramp helper over 6 evenly-spaced stops
+    "fn ramp6(v: f32, c0: vec3<f32>, c1: vec3<f32>, c2: vec3<f32>, c3: vec3<f32>, c4: vec3<f32>, c5: vec3<f32>) -> vec3<f32> {",
+    "  let s = clamp(v, 0.0, 1.0) * 5.0;",
+    "  let i = floor(s); let f = s - i;",
+    "  if (i < 1.0) { return mix(c0, c1, f); }",
+    "  if (i < 2.0) { return mix(c1, c2, f); }",
+    "  if (i < 3.0) { return mix(c2, c3, f); }",
+    "  if (i < 4.0) { return mix(c3, c4, f); }",
+    "  return mix(c4, c5, f);",
+    "}",
+    "fn colormap(p: u32, v: f32) -> vec3<f32> {",
+    "  if (p == 1u) {", // signal: deep teal -> green -> amber -> hot
+    "    return ramp6(v, vec3<f32>(0.012,0.035,0.055), vec3<f32>(0.03,0.18,0.22), vec3<f32>(0.10,0.42,0.36),",
+    "      vec3<f32>(0.49,0.78,0.30), vec3<f32>(0.91,0.66,0.16), vec3<f32>(1.0,0.97,0.82));",
+    "  }",
+    "  if (p == 2u) {", // ice: indigo -> blue -> cyan -> white
+    "    return ramp6(v, vec3<f32>(0.02,0.02,0.08), vec3<f32>(0.06,0.10,0.34), vec3<f32>(0.10,0.32,0.66),",
+    "      vec3<f32>(0.20,0.62,0.85), vec3<f32>(0.58,0.86,0.94), vec3<f32>(0.96,0.99,1.0));",
+    "  }",
+    // ember (default): indigo -> violet -> magenta -> orange -> amber -> white
+    "  return ramp6(v, vec3<f32>(0.02,0.01,0.09), vec3<f32>(0.22,0.04,0.30), vec3<f32>(0.62,0.10,0.36),",
+    "    vec3<f32>(0.91,0.34,0.18), vec3<f32>(0.98,0.72,0.20), vec3<f32>(1.0,0.96,0.80));",
     "}",
     "@fragment fn fs(in: VOut) -> @location(0) vec4<f32> {",
-    "  let v = clamp(textureSample(tex, samp, in.uv).r, 0.0, 1.0);",
-    "  let rgb = hsl2rgb(150.0 + v*120.0, 0.8, 0.04 + v*v*0.56);",
-    "  return vec4<f32>(rgb, 1.0);",
+    "  let raw = textureSample(tex, samp, in.uv).r;",
+    "  var v = clamp((raw - disp.z) * disp.y, 0.0, 1.0);",
+    "  v = v * v * (3.0 - 2.0 * v);",        // smoothstep for contrast pop
+    "  return vec4<f32>(colormap(u32(disp.x + 0.5), v), 1.0);",
     "}"
   ].join("\n");
 
@@ -334,6 +348,7 @@
           });
           var sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
           var uniformBuffer = device.createBuffer({ size: layout.size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+          var dispBuffer = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 
           var tex = null, texW = 0, texH = 0;
           function ensureTexture(w, h) {
@@ -343,10 +358,13 @@
             texW = w; texH = h;
           }
 
-          function render(recipe, time) {
+          function render(recipe, time, display) {
             var w = Math.max(1, canvas.width), h = Math.max(1, canvas.height);
             ensureTexture(w, h);
             device.queue.writeBuffer(uniformBuffer, 0, packNoiseParams(layout, recipeToNoiseParams(recipe, { time: time || 0 })));
+            display = display || {};
+            device.queue.writeBuffer(dispBuffer, 0, new Float32Array([
+              display.palette || 0, display.gain == null ? 2.4 : display.gain, display.bias == null ? 0.04 : display.bias, 0 ]));
             var view = tex.createView();
             var computeBind = device.createBindGroup({
               layout: computePipeline.getBindGroupLayout(0),
@@ -354,7 +372,7 @@
             });
             var blitBind = device.createBindGroup({
               layout: blitPipeline.getBindGroupLayout(0),
-              entries: [{ binding: 0, resource: sampler }, { binding: 1, resource: view }]
+              entries: [{ binding: 0, resource: sampler }, { binding: 1, resource: view }, { binding: 2, resource: { buffer: dispBuffer } }]
             });
             var enc = device.createCommandEncoder();
             var cpass = enc.beginComputePass();
