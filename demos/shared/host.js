@@ -221,26 +221,47 @@
     }
     presetSel.onchange = function () { if (presetSel.value && cfg.presets) applyPreset(cfg.presets[presetSel.value]); };
 
-    // ---- plugin-let publish view: a curated subset of controls + a default ----
-    function applyPluginlet(pl) {
-      if (!pl) { ui.setPublic(null); plHead.style.display = "none"; return; }
-      var pre = typeof pl.preset === "string" ? (cfg.presets && cfg.presets[pl.preset]) : pl.preset;
-      if (pre) applyPreset(pre);
-      ui.setPublic(pl.controls || []);
-      plHead.innerHTML = '<span class="mk">◢</span> ' + (pl.name || "Plugin-let") + '<span class="tag">plugin-let</span>'
-        + (pl.desc ? '<div class="d">' + pl.desc + '</div>' : '');
+    // ---- plugin-let publish view: apply a (portable) manifest = curated subset ----
+    // A manifest is self-contained: { name, desc, controls[], driver, values{} } —
+    // or back-compat { preset } pointing at a named preset.
+    function applyManifest(m) {
+      if (!m) { ui.setPublic(null); plHead.style.display = "none"; return; }
+      if (m.preset && cfg.presets) applyPreset(cfg.presets[m.preset]);
+      if (m.driver) driver.set(m.driver);
+      if (m.values) for (var k in m.values) if (ui.refs[k]) ui.set(k, m.values[k]);
+      ui.setPublic(m.controls || []);
+      plHead.innerHTML = '<span class="mk">◢</span> ' + (m.name || "Plugin-let") + '<span class="tag">plugin-let</span>'
+        + (m.desc ? '<div class="d">' + m.desc + '</div>' : '');
       plHead.style.display = "";
     }
-    if (cfg.pluginlets && cfg.pluginlets.length) {
+    // components = inline pluginlets (cfg.pluginlets) + manifest URLs (cfg.manifests)
+    var comps = (cfg.pluginlets || []).map(function (pl) { return { name: pl.name, m: pl }; });
+    (cfg.manifests || []).forEach(function (u) { comps.push({ url: u, name: u.split("/").pop().replace(/\.json$/, "") }); });
+    function buildView() {
+      if (!comps.length) return;
       var viewSel = document.createElement("select"); viewSel.className = "sh-btn"; viewSel.title = "View";
       var oe = document.createElement("option"); oe.value = ""; oe.textContent = "✎ Edit (full)"; viewSel.appendChild(oe);
-      cfg.pluginlets.forEach(function (pl, i) { var o = document.createElement("option"); o.value = String(i); o.textContent = "◢ " + pl.name; viewSel.appendChild(o); });
-      viewSel.onchange = function () { applyPluginlet(viewSel.value === "" ? null : cfg.pluginlets[+viewSel.value]); };
+      comps.forEach(function (c, i) { var o = document.createElement("option"); o.value = String(i); o.textContent = "◢ " + (c.name || ("Component " + i)); viewSel.appendChild(o); });
+      viewSel.onchange = function () {
+        if (viewSel.value === "") { applyManifest(null); return; }
+        var c = comps[+viewSel.value];
+        if (c.m) applyManifest(c.m);
+        else fetch(c.url).then(function (r) { return r.json(); }).then(function (m) { c.m = m; if (!c.name) c.name = m.name; applyManifest(m); }).catch(function (e) { badge.textContent = "manifest load failed"; });
+      };
       bar.insertBefore(viewSel, presetSel);
+      return viewSel;
     }
+    // resolve URL-manifest names up front (small fetches) so the picker reads nicely
+    var urlComps = comps.filter(function (c) { return c.url && !c.m; });
+    if (urlComps.length) {
+      Promise.all(urlComps.map(function (c) { return fetch(c.url).then(function (r) { return r.json(); }).then(function (m) { c.m = m; c.name = m.name || c.name; }).catch(function () {}); })).then(buildView);
+    } else { buildView(); }
+    // ?component=<url> — load any portable component directly (host-for-any-component)
+    var compUrl = (location.search.match(/[?&]component=([^&]+)/) || [])[1];
+    if (compUrl) fetch(decodeURIComponent(compUrl)).then(function (r) { return r.json(); }).then(applyManifest).catch(function () {});
 
     loadHash();
-    return { driver: driver, ui: ui, applyPreset: applyPreset };
+    return { driver: driver, ui: ui, applyPreset: applyPreset, applyManifest: applyManifest };
   }
 
   var MODULES = [

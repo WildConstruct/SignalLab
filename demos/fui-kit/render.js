@@ -376,15 +376,8 @@
       { tier: "shaping", key: "sweep",   label: "Sweep speed", type: "slider", min: 0.1, max: 3, step: 0.05, value: 0.8, fmt: f2, when: { widget: "radar" } }
     ],
     presets: (root.DemoPresets || {}),
-    // curated plugin-lets: a focused instrument = preset + a small public control set
-    pluginlets: [
-      { name: "Neural Net", preset: "Neural Net", desc: "A living network. Dial the source and how readily nodes fire.",
-        controls: ["_src", "_rate", "nodes", "fire"] },
-      { name: "Radar", preset: "Radar", desc: "A sweep that paints contacts from the signal.",
-        controls: ["_src", "_rate", "blips", "sweep", "fire"] },
-      { name: "Processor Die", preset: "Processor", desc: "A chip lighting up. Size the grid; set the activity threshold.",
-        controls: ["_src", "_rate", "cols", "rows", "fire"] }
-    ],
+    // curated plugin-lets, loaded as portable manifest JSON (host builds the view)
+    manifests: ["manifests/neural-net.json", "manifests/radar.json", "manifests/processor-die.json"],
     render: render
   };
 })(typeof self !== "undefined" ? self : this);
