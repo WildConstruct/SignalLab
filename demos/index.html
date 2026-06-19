@@ -53,7 +53,10 @@ var DEMOS = [
     sig:{ x:{src:"sine",rate:2}, y:{src:"triangle",rate:3,phase:0.1}, drive:"mult" } },
   { dir:"field-bridge", name:"Field Bridge", ready:true, tag:"signal × etheros",
     desc:"Two engines, one look — the signal routes onto a recipe param of the real Etheros field engine, running in-browser on WebGPU.",
-    sig:{ x:{src:"sine",rate:0.4}, drive:"x" } }
+    sig:{ x:{src:"sine",rate:0.4}, drive:"x" } },
+  { dir:"field-distort", name:"Field Distort", ready:true, tag:"etheros × distort",
+    desc:"The other direction — an Etheros field distorts a FUI plate as a displacement map; the signal pulses the warp. Film-burn / sensor glitch.",
+    sig:{ x:{src:"sine",rate:0.5}, drive:"x" } }
 ];
 
 var grid = document.getElementById("grid");
