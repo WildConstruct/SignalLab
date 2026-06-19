@@ -321,6 +321,7 @@
   function createSliceRenderer(canvas, options) {
     options = options || {};
     var shaderBase = options.shaderBase || "../shared/etheros/";
+    var maxDim = options.maxDim || 576;   // cap compute resolution; blit upscales
     if (typeof navigator === "undefined" || !navigator.gpu) return Promise.resolve(null);
     return navigator.gpu.requestAdapter().then(function (adapter) {
       if (!adapter) return null;
@@ -350,7 +351,9 @@
           var uniformBuffer = device.createBuffer({ size: layout.size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
           var dispBuffer = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 
-          var tex = null, texW = 0, texH = 0;
+          var tex = null, texW = 0, texH = 0, lost = false;
+          // a crashed/lost device must not keep dispatching (mobile crash loop)
+          if (device.lost) device.lost.then(function () { lost = true; });
           function ensureTexture(w, h) {
             if (tex && texW === w && texH === h) return;
             if (tex) tex.destroy();
@@ -359,7 +362,12 @@
           }
 
           function render(recipe, time, display) {
-            var w = Math.max(1, canvas.width), h = Math.max(1, canvas.height);
+            if (lost) return;
+            // Render the compute at a capped resolution (heavy fractal shader at
+            // full device-pixel size crashes mobile GPUs); the blit upscales it.
+            var cw = Math.max(1, canvas.width), ch = Math.max(1, canvas.height);
+            var sc = Math.min(1, maxDim / Math.max(cw, ch));
+            var w = Math.max(1, Math.round(cw * sc)), h = Math.max(1, Math.round(ch * sc));
             ensureTexture(w, h);
             device.queue.writeBuffer(uniformBuffer, 0, packNoiseParams(layout, recipeToNoiseParams(recipe, { time: time || 0 })));
             display = display || {};
