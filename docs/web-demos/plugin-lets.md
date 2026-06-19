@@ -35,6 +35,59 @@ Type **3D multi-signal** demo) is:
   the right shape: A/B/C pre-wired, artist dials amounts.
 - Most plugin-lets want **one signal + three sliders.**
 
+## Precedent: Substance exposed parameters
+
+This is the **Substance** model (Designer → `.sbsar`): author a deep node graph,
+mark a subset of parameters **Exposed**, ship a portable runtime-evaluated package
+that hosts load and artists tune with the curated sliders.
+
+| Substance | Our plugin-let |
+|---|---|
+| Internal node graph | engine + authoring demo (superset) |
+| Exposed parameters | `pluginlet.controls` |
+| Param metadata (label/group/widget/range/default) | control schema |
+| "Visible If" | our `when:` gating (built) |
+| Baked presets in `.sbsar` | our presets |
+| `.sbsar` portable, runtime-evaluated | WC Component / OGraf wrapper |
+| Output channels (basecolor/normal/rough) | output passes (beauty/alpha/luma/motion) |
+| Nested/instanced graphs | composition (rigs of plugin-lets) |
+
+**Where we go beyond Substance (the differentiator):** Substance is parametric and
+static (materials). We are **temporal and signal-driven** — the exposed surface
+also declares *which signals are wired* and (next) *actions* (ignite/pulse/burst).
+Framing: **"Substance, but for time-based, signal-driven visual instruments"** —
+same author-deep / expose-shallow / ship-portable model, applied to motion. Useful
+Manifest v0 cues to borrow directly: param **groups**, **widget hints**, **visibleIf**
+(have it), **embedded presets**, **declared output passes**, **version + engine version**.
+
+## Adjacent tools & positioning (Substance / TouchDesigner / Notch)
+
+We're conceptually near the node-based realtime-procedural family — worth naming
+so we hold the line.
+
+- **TouchDesigner / Notch / Max / vvvv** = general-purpose **node-graph
+  environments**. Notably, TD's **CHOPs are literally channel/signal data driving
+  parameters** — which validates our whole "signal drives the look" model. But the
+  *product* is a canvas of operators the artist must wire; power comes with
+  complexity and a technical-artist learning curve.
+- **Substance** = author-deep / expose-shallow / ship-portable, but parametric &
+  static (materials).
+
+**Where we deliberately differ — and why this isn't TouchDesigner:**
+- We do **not** ship a node graph as the consumer surface. The graph (engine /
+  Entropy / future compiler) is an *internal/authoring* concern; the delivered
+  product is a **curated instrument** + a thin control surface. The plugin-let
+  curation philosophy *is* the guardrail against TD-ification — it's the
+  "don't over-power; make them want to play" rule, enforced.
+- We **embed where artists already are** (AE first) and ship **portable
+  components**, instead of being a standalone environment/runtime.
+- We're **temporal + signal-driven** (CHOP-like) AND **generative-conditioning
+  aware** (feed models), not just a material/output baker.
+
+One-liner: **TouchDesigner-class procedural power, packaged as Substance-style
+curated instruments, delivered into motion pipelines (and generative workflows) —
+not another node environment.**
+
 ## Manifest v0 (Signal Rack-scoped)
 
 The component doc calls for a Component Manifest above `plugin.params.json`. We
