@@ -35,7 +35,7 @@
   }
 
   function build(mount, specs, onChange) {
-    var state = {}, refs = {}, entries = [], sections = [];
+    var state = {}, refs = {}, entries = [], sections = [], publicSet = null;
     onChange = onChange || function () {};
 
     // every edit re-evaluates which controls are relevant, then notifies the host
@@ -51,7 +51,7 @@
       sec.appendChild(h);
       var body = el("div", "sh-sec-body");
       var secSpecs = [];
-      inTier.forEach(function (s) { var node = ctl(s); body.appendChild(node); entries.push({ node: node, spec: s }); secSpecs.push(s); });
+      inTier.forEach(function (s) { var node = ctl(s); node.setAttribute("data-key", s.key); body.appendChild(node); entries.push({ node: node, spec: s }); secSpecs.push(s); });
       sec.appendChild(body);
       mount.appendChild(sec);
       sections.push({ el: sec, specs: secSpecs });
@@ -65,11 +65,17 @@
         else if (v !== c) return false; }
       return true;
     }
+    function shown(s) { return matches(s.when) && (!publicSet || publicSet[s.key]); }   // publish = curated subset
     function applyVisibility() {
-      entries.forEach(function (e) { e.node.style.display = matches(e.spec.when) ? "" : "none"; });
+      entries.forEach(function (e) { e.node.style.display = shown(e.spec) ? "" : "none"; });
       sections.forEach(function (sec) {
-        sec.el.style.display = sec.specs.some(function (s) { return matches(s.when); }) ? "" : "none";
+        sec.el.style.display = sec.specs.some(shown) ? "" : "none";
       });
+    }
+    // curate the panel to a public subset of control keys (null = full authoring)
+    function setPublic(keys) {
+      publicSet = keys ? {} : null; if (keys) keys.forEach(function (k) { publicSet[k] = 1; });
+      mount.classList.toggle("sh-publish", !!keys); applyVisibility();
     }
 
     function ctl(s) {
@@ -127,7 +133,7 @@
     function refresh() { for (var k in refs) { var r = refs[k]; if (r && r.tagName === "INPUT" && r.type === "range" && r.oninput) r.oninput(); } }
 
     applyVisibility();   // initial pass so irrelevant controls start hidden
-    return { state: state, set: set, refresh: refresh, refs: refs };
+    return { state: state, set: set, refresh: refresh, refs: refs, setPublic: setPublic };
   }
 
   return { build: build, TIERS: TIERS };

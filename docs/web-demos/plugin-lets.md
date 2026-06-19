@@ -74,7 +74,7 @@ and plugin-let views.
   baked presentation — but the **curated control surface is authored here.**
 
 ## Status
-- [ ] Publish-view prototype in the demo host (curated subset from a manifest).
+- [x] Publish-view prototype: host **View** picker (Edit ⇄ plugin-lets); `controls.setPublic()` curates the panel to a subset; plugin-let header. FUI Kit ships 3 (Neural Net / Radar / Processor Die). Browser-verified.
 - [ ] Manifest v0 schema doc (extends `plugin.params.json`).
 - [ ] Pick a reference plugin-let to curate first (candidate: a single FUI widget
       as a focused instrument, or the 3D-text as the multi-signal exemplar).
