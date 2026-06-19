@@ -121,3 +121,30 @@ select.sh-btn{padding-right:6px}
   border-radius:3px;padding:2px 7px}
 .sh-soon{opacity:.45;pointer-events:none}
 .sh-gallery a{color:var(--accent)}
+
+/* ---- mobile: stack rail (as a tab strip) / canvas / inspector ---- */
+@media (max-width:760px){
+  html,body{font-size:13px}
+  .sh-app{flex-direction:column;height:100vh;height:100dvh}
+  .sh-rail{width:auto;flex:0 0 auto;display:flex;flex-direction:row;align-items:stretch;
+    overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--line);
+    padding:0;white-space:nowrap;-webkit-overflow-scrolling:touch}
+  .sh-rail-brand{border-bottom:none;border-right:1px solid var(--line);padding:0 14px;flex:0 0 auto;align-items:center}
+  .sh-rail-sec{display:none}
+  .sh-rail-item{border-left:none;border-bottom:2px solid transparent;padding:12px 14px;flex:0 0 auto}
+  .sh-rail-item:hover{background:transparent}
+  .sh-rail-item.active{background:transparent;border-left-color:transparent;border-bottom-color:var(--accent)}
+  .sh-stage{flex:0 0 auto;height:48vh;height:48dvh}
+  .sh-topbar{flex-wrap:nowrap;overflow-x:auto;gap:7px;padding:8px 10px;-webkit-overflow-scrolling:touch}
+  .sh-title{flex:0 0 auto}
+  .sh-spacer{display:none}
+  .sh-btn{flex:0 0 auto}
+  .sh-panel{width:auto;flex:1 1 auto;border-left:none;border-top:1px solid var(--line)}
+  /* bigger touch targets */
+  .sh-ctl{padding:8px 14px 9px}
+  .sh-ctl input[type=range]{height:6px}
+  .sh-ctl input[type=range]::-webkit-slider-thumb{width:20px;height:20px}
+  .sh-ctl input[type=range]::-moz-range-thumb{width:18px;height:18px}
+  .sh-ctl select,.sh-ctl input[type=text]{padding:9px 9px}
+  .sh-gallery{padding:30px 16px}
+}
