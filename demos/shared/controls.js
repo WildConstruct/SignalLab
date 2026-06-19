@@ -35,19 +35,48 @@
   }
 
   function build(mount, specs, onChange) {
-    var state = {}, refs = {};
+    var state = {}, refs = {}, entries = [], sections = [], publicSet = null;
     onChange = onChange || function () {};
+
+    // every edit re-evaluates which controls are relevant, then notifies the host
+    function emit(key) { applyVisibility(); onChange(state, key); }
 
     TIERS.forEach(function (tier) {
       var inTier = specs.filter(function (s) { return (s.tier || "shaping") === tier.key; });
       if (!inTier.length) return;
       var sec = el("div", "sh-section");
-      var h = el("h3"); h.textContent = tier.title;
+      var h = el("h3"); h.appendChild(document.createTextNode(tier.title));
       var hint = el("span", "sh-hint"); hint.textContent = tier.hint; h.appendChild(hint);
+      h.onclick = function () { sec.classList.toggle("collapsed"); };   // collapsible section
       sec.appendChild(h);
-      inTier.forEach(function (s) { sec.appendChild(ctl(s)); });
+      var body = el("div", "sh-sec-body");
+      var secSpecs = [];
+      inTier.forEach(function (s) { var node = ctl(s); node.setAttribute("data-key", s.key); body.appendChild(node); entries.push({ node: node, spec: s }); secSpecs.push(s); });
+      sec.appendChild(body);
       mount.appendChild(sec);
+      sections.push({ el: sec, specs: secSpecs });
     });
+
+    // a spec may carry `when: { key: value | [values] }`; it shows only when state matches
+    function matches(when) {
+      if (!when) return true;
+      for (var k in when) { var v = state[k], c = when[k];
+        if (Array.isArray(c)) { if (c.indexOf(v) === -1) return false; }
+        else if (v !== c) return false; }
+      return true;
+    }
+    function shown(s) { return matches(s.when) && (!publicSet || publicSet[s.key]); }   // publish = curated subset
+    function applyVisibility() {
+      entries.forEach(function (e) { e.node.style.display = shown(e.spec) ? "" : "none"; });
+      sections.forEach(function (sec) {
+        sec.el.style.display = sec.specs.some(shown) ? "" : "none";
+      });
+    }
+    // curate the panel to a public subset of control keys (null = full authoring)
+    function setPublic(keys) {
+      publicSet = keys ? {} : null; if (keys) keys.forEach(function (k) { publicSet[k] = 1; });
+      mount.classList.toggle("sh-publish", !!keys); applyVisibility();
+    }
 
     function ctl(s) {
       state[s.key] = s.value;
@@ -61,7 +90,7 @@
           var opt = el("option"); opt.value = o.value; opt.textContent = o.label;
           if (o.value === s.value) opt.selected = true; sel.appendChild(opt);
         });
-        sel.onchange = function () { state[s.key] = sel.value; onChange(state, s.key); };
+        sel.onchange = function () { state[s.key] = sel.value; emit(s.key); };
         wrap.appendChild(sel); refs[s.key] = sel; return wrap;
       }
 
@@ -69,7 +98,7 @@
         var rw = el("div", "sh-ctl row");
         var cb = el("input", null, { type: "checkbox" }); cb.checked = !!s.value;
         var l2 = el("label"); l2.innerHTML = s.label;
-        cb.onchange = function () { state[s.key] = cb.checked; onChange(state, s.key); };
+        cb.onchange = function () { state[s.key] = cb.checked; emit(s.key); };
         rw.appendChild(cb); rw.appendChild(l2); refs[s.key] = cb; return rw;
       }
 
@@ -77,7 +106,7 @@
         var tw = el("div", "sh-ctl");
         var tl = el("label"); tl.innerHTML = s.label; tw.appendChild(tl);
         var tx = el("input", null, { type: "text" }); tx.value = s.value;
-        tx.oninput = function () { state[s.key] = tx.value; onChange(state, s.key); };
+        tx.oninput = function () { state[s.key] = tx.value; emit(s.key); };
         tw.appendChild(tx); refs[s.key] = tx; return tw;
       }
 
@@ -90,7 +119,7 @@
       var r = el("input", null, { type: "range", min: s.min, max: s.max,
         step: s.step != null ? s.step : 1 });
       r.value = s.value;
-      r.oninput = function () { var v = +r.value; state[s.key] = v; val.textContent = fmt(v); onChange(state, s.key); };
+      r.oninput = function () { var v = +r.value; state[s.key] = v; val.textContent = fmt(v); emit(s.key); };
       r.ondblclick = function () { r.value = s.value; r.oninput(); };   // reset to default
       w.appendChild(r); refs[s.key] = r; return w;
     }
@@ -98,13 +127,13 @@
     function set(key, v) {
       state[key] = v;
       var r = refs[key];
-      if (!r) return;
-      if (r.type === "checkbox") r.checked = !!v; else r.value = v;
-      if (r.oninput) r.oninput();
+      if (r) { if (r.type === "checkbox") r.checked = !!v; else r.value = v; }
+      if (r && r.type === "range" && r.oninput) r.oninput(); else emit(key);
     }
     function refresh() { for (var k in refs) { var r = refs[k]; if (r && r.tagName === "INPUT" && r.type === "range" && r.oninput) r.oninput(); } }
 
-    return { state: state, set: set, refresh: refresh, refs: refs };
+    applyVisibility();   // initial pass so irrelevant controls start hidden
+    return { state: state, set: set, refresh: refresh, refs: refs, setPublic: setPublic };
   }
 
   return { build: build, TIERS: TIERS };

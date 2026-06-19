@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wildconstruct.com/etheros/schema/etheros-field-recipe.schema.json",
+  "title": "Etheros Field Recipe",
+  "description": "Canonical host-neutral recipe contract for Etheros scalar and volume field generation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "variation",
+    "structure",
+    "shape",
+    "motion",
+    "warp",
+    "output",
+    "volume"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "recipeId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metadata": {
+      "$ref": "#/$defs/recipeMetadata"
+    },
+    "variation": {
+      "$ref": "#/$defs/variationBlock"
+    },
+    "structure": {
+      "$ref": "#/$defs/structureBlock"
+    },
+    "shape": {
+      "$ref": "#/$defs/shapeBlock"
+    },
+    "motion": {
+      "$ref": "#/$defs/motionBlock"
+    },
+    "compose": {
+      "$ref": "#/$defs/composeBlock"
+    },
+    "warp": {
+      "$ref": "#/$defs/warpBlock"
+    },
+    "output": {
+      "$ref": "#/$defs/outputBlock"
+    },
+    "volume": {
+      "$ref": "#/$defs/volumeBlock"
+    },
+    "inspection": {
+      "$ref": "#/$defs/inspectionBlock"
+    }
+  },
+  "$defs": {
+    "recipeMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "author": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "productSurface": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "variationBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seed": { "type": "integer", "minimum": 0 },
+        "variation": { "type": "number" },
+        "coherence": { "type": "number" },
+        "phaseOffset": { "type": "number" }
+      }
+    },
+    "bandControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "amount": { "type": "number" },
+        "scale": { "type": "number", "exclusiveMinimum": 0.0 },
+        "roughness": { "type": "number" }
+      }
+    },
+    "frequencyBands": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "low": { "$ref": "#/$defs/bandControl" },
+        "mid": { "$ref": "#/$defs/bandControl" },
+        "high": { "$ref": "#/$defs/bandControl" }
+      }
+    },
+    "structureBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "type": "string",
+          "enum": [
+            "simplex",
+            "perlin",
+            "value",
+            "worley",
+            "phasor",
+            "valueCubic",
+            "cellularEdge",
+            "chladni",
+            "bubble"
+          ]
+        },
+        "fractalMode": {
+          "type": "string",
+          "enum": ["fbm", "ridged", "billow", "turbulence"]
+        },
+        "baseScale": { "type": "number", "exclusiveMinimum": 0.0 },
+        "detailScale": { "type": "number", "exclusiveMinimum": 0.0 },
+        "roughness": { "type": "number" },
+        "gain": { "type": "number" },
+        "lacunarity": { "type": "number", "exclusiveMinimum": 0.0 },
+        "octaveCount": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "amplitude": { "type": "number", "minimum": 0.0 },
+        "offset": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "number" }
+        },
+        "bands": { "$ref": "#/$defs/frequencyBands" }
+      }
+    },
+    "shapeBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bias": { "type": "number" },
+        "contrast": { "type": "number", "minimum": 0.0 },
+        "gain": { "type": "number", "minimum": 0.0 },
+        "thresholdLow": { "type": "number" },
+        "thresholdHigh": { "type": "number" },
+        "clampLow": { "type": "number" },
+        "clampHigh": { "type": "number" },
+        "invert": { "type": "boolean" },
+        "absolute": { "type": "boolean" }
+      }
+    },
+    "motionBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["static", "evolve", "flow", "flowAnisotropic"]
+        },
+        "timeScale": { "type": "number", "minimum": 0.0 },
+        "evolutionRate": { "type": "number" },
+        "flowDirection": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "number" }
+        },
+        "flowStrength": { "type": "number", "minimum": 0.0 },
+        "temporalStability": { "type": "number" },
+        "anisotropy": { "type": "number" },
+        "streakLength": { "type": "number", "minimum": 0.0 },
+        "flowField": { "$ref": "#/$defs/flowFieldBlock" }
+      }
+    },
+    "flowFieldBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["none", "internalCurl"]
+        },
+        "advectionSpeed": { "type": "number", "minimum": 0.0 },
+        "curlStrength": { "type": "number", "minimum": 0.0 },
+        "scale": { "type": "number", "exclusiveMinimum": 0.0 },
+        "seedOffset": { "type": "number" },
+        "evolutionRate": { "type": "number", "minimum": 0.0 },
+        "linkToMasterEvolution": { "type": "boolean" }
+      }
+    },
+    "composeBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["none", "mask", "add", "subtract"]
+        },
+        "amount": { "type": "number", "minimum": 0.0 },
+        "bias": { "type": "number" },
+        "contrast": { "type": "number", "minimum": 0.0 },
+        "secondarySeedOffset": { "type": "number" },
+        "secondaryOffset": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "number" }
+        },
+        "secondaryStructure": { "$ref": "#/$defs/structureBlock" }
+      }
+    },
+    "warpBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "warpType": {
+          "type": "string",
+          "enum": ["none", "noiseOffset", "directionalOffset"]
+        },
+        "amount": { "type": "number", "minimum": 0.0 },
+        "scale": { "type": "number", "exclusiveMinimum": 0.0 },
+        "secondarySeed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "outputBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "outputType": {
+          "type": "string",
+          "enum": [
+            "scalar",
+            "scalarOccupancyAlpha",
+            "value",
+            "thresholdGate",
+            "detail",
+            "energy",
+            "flow",
+            "gradient",
+            "pulse",
+            "crossUp",
+            "crossDown",
+            "delta",
+            "speed",
+            "acceleration"
+          ]
+        },
+        "normalize": { "type": "boolean" },
+        "rangeMin": { "type": "number" },
+        "rangeMax": { "type": "number" },
+        "tileX": { "type": "boolean" },
+        "tileY": { "type": "boolean" }
+      }
+    },
+    "volumeCeilingBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "height": { "type": "number" },
+        "softness": { "type": "number", "minimum": 0.0 },
+        "breakup": { "type": "number", "minimum": 0.0 },
+        "scale": { "type": "number", "exclusiveMinimum": 0.0 }
+      }
+    },
+    "colorTriplet": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+    },
+    "volumeCeilingMotionBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seedOffset": { "type": "number" },
+        "evolutionOffset": { "type": "number" },
+        "evolutionRate": { "type": "number", "minimum": 0.0 },
+        "linkToMasterEvolution": { "type": "boolean" }
+      }
+    },
+    "volumeShadingBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["monochrome", "transferRamp"]
+        },
+        "densityBias": { "type": "number" },
+        "densityScale": { "type": "number", "exclusiveMinimum": 0.0 },
+        "shadowColor": { "$ref": "#/$defs/colorTriplet" },
+        "midColor": { "$ref": "#/$defs/colorTriplet" },
+        "highlightColor": { "$ref": "#/$defs/colorTriplet" },
+        "shadowOpacity": { "type": "number", "minimum": 0.0 },
+        "midOpacity": { "type": "number", "minimum": 0.0 },
+        "highlightOpacity": { "type": "number", "minimum": 0.0 }
+      }
+    },
+    "volumeBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "depth": { "type": "number", "minimum": 0.0 },
+        "opacity": { "type": "number", "minimum": 0.0 },
+        "lightStrength": { "type": "number", "minimum": 0.0 },
+        "ceiling": { "$ref": "#/$defs/volumeCeilingBlock" },
+        "ceilingMotion": { "$ref": "#/$defs/volumeCeilingMotionBlock" },
+        "shading": { "$ref": "#/$defs/volumeShadingBlock" }
+      }
+    },
+    "inspectionBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["beauty", "frequencyBands", "flowField", "composition"]
+        },
+        "gain": { "type": "number", "minimum": 0.0 }
+      }
+    }
+  }
+}

@@ -8,7 +8,7 @@
 </head>
 <body>
 <div class="sh-gallery">
-  <h1>Signal Rack — Demo Lab</h1>
+  <h1><span class="mk">◢</span> Signal Rack — Demo Lab</h1>
   <p class="lead">One signal engine, many instruments. Each demo is a standalone
   renderer driven by the same parity engine the After-Effects bridge uses — built
   on the shared <b>Structure / Signal / Shaping</b> control language. Pick one.</p>
@@ -50,7 +50,10 @@ var DEMOS = [
     sig:{ x:{src:"sine",rate:1.5}, y:{src:"noise",rate:3}, drive:"max" } },
   { dir:"path-scope", name:"Path & Scope", ready:true, tag:"scope",
     desc:"The raw signal as geometry — wave runner, vectorscope, spirograph, rose.",
-    sig:{ x:{src:"sine",rate:2}, y:{src:"triangle",rate:3,phase:0.1}, drive:"mult" } }
+    sig:{ x:{src:"sine",rate:2}, y:{src:"triangle",rate:3,phase:0.1}, drive:"mult" } },
+  { dir:"field-bridge", name:"Field Bridge", ready:true, tag:"signal × etheros",
+    desc:"Two engines, one look — the signal routes onto a recipe param of the real Etheros field engine, running in-browser on WebGPU.",
+    sig:{ x:{src:"sine",rate:0.4}, drive:"x" } }
 ];
 
 var grid = document.getElementById("grid");

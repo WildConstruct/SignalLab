@@ -1,0 +1,7 @@
+{
+  "id": "fui.radar", "name": "Radar", "version": "0.1.0", "module": "fui-kit",
+  "desc": "A sweep that paints contacts from the signal.",
+  "controls": ["_src", "_rate", "blips", "sweep", "fire"],
+  "driver": { "x": { "src": "randomWalk", "rate": 1 }, "y": { "src": "noise", "rate": 2 }, "drive": "max" },
+  "values": { "widget": "radar", "blips": 14, "seed": 23, "fire": 0.4, "sweep": 0.8, "field": "stagger", "_src": "randomWalk", "_rate": 1, "_drive": "max" }
+}

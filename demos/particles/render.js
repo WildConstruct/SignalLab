@@ -8,6 +8,7 @@
  */
 (function (root) {
   "use strict";
+  var Field = root.Field;
   var parts = [], rings = [], prevE = 0, last = null;
 
   function step(F) { var t = F.t, dt = last == null ? 1 / 60 : Math.max(0, Math.min(0.1, t - last)); last = t; return dt * 60; }
@@ -47,11 +48,34 @@
     ctx.globalAlpha = 1;
   }
 
+  // Flow field — surfaces the field.js engine driver: particles advect along a
+  // sampled vector field; the signal scales field strength + population.
+  function flow(ctx, W, H, F, sp) {
+    var S = F.S, e = root.SignalShaping.response(Math.max(0, Math.min(1, F.n)), F.S);
+    var cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.5, type = S.ftype || "curl";
+    var scale = S.fscale != null ? S.fscale : 1.4, strength = (S.fstr != null ? S.fstr : 1.6) * (0.5 + e);
+    var target = Math.round(60 + S.rate * 10);
+    while (parts.length < target) parts.push({ x: Math.random() * W, y: Math.random() * H, l: 0.4 + Math.random() * 0.6, h: 150 + e * 120 });
+    for (var k = parts.length - 1; k >= 0; k--) {
+      var p = parts[k], v = Field.sample(type, (p.x - cx) / R, (p.y - cy) / R, F.t * 0.2, { scale: scale });
+      p.x += v.vx * strength * sp; p.y += v.vy * strength * sp; p.l -= 0.005 * sp;
+      if (p.l <= 0 || p.x < -8 || p.x > W + 8 || p.y < -8 || p.y > H + 8) { parts.splice(k, 1); continue; }
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.l)); ctx.fillStyle = "hsl(" + p.h + ",85%,60%)"; ctx.fillRect(p.x, p.y, 1.7, 1.7);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function render(ctx, W, H, F) {
     var sp = step(F);
+    if (F.fired && F.fired("burst")) {   // action: one-shot shockwave + ember spray from centre
+      rings.push({ r: 8, l: 1, h: 170, w: 5 });
+      for (var b = 0; b < 60; b++) { var a = Math.random() * Math.PI * 2, v = 3 + Math.random() * 9;
+        parts.push({ x: W / 2, y: H / 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v, l: 1, sz: 2 + Math.random() * 3, h: 150 + Math.random() * 120 }); }
+    }
     switch (F.S.variant) {
       case "rings":  shockRings(ctx, W, H, F, sp); break;
       case "stream": stream(ctx, W, H, F, sp); break;
+      case "flow":   flow(ctx, W, H, F, sp); break;
       default:       fountain(ctx, W, H, F, sp);
     }
   }
@@ -61,14 +85,19 @@
     driver: { x: { src: "sine", rate: 1.5 }, y: { src: "noise", rate: 3 }, drive: "max" },
     structure: [
       { tier: "structure", key: "variant", label: "Emitter", type: "select", value: "fountain", options: [
-        { value: "fountain", label: "Fountain" }, { value: "rings", label: "Shock rings" }, { value: "stream", label: "Stream field" } ] },
-      { tier: "structure", key: "rate", label: "Birth rate / density", type: "slider", min: 4, max: 40, step: 1, value: 16 }
+        { value: "fountain", label: "Fountain" }, { value: "rings", label: "Shock rings" }, { value: "stream", label: "Stream field" }, { value: "flow", label: "Flow field" } ] },
+      { tier: "structure", key: "rate", label: "Birth rate / density", type: "slider", min: 4, max: 40, step: 1, value: 16 },
+      { tier: "structure", key: "ftype", label: "Field type", type: "select", value: "curl", options: [
+        { value: "curl", label: "Curl / flow" }, { value: "vortex", label: "Vortex" }, { value: "radial", label: "Radial" } ], when: { variant: "flow" } },
+      { tier: "structure", key: "fscale", label: "Field scale", type: "slider", min: 0.4, max: 4, step: 0.1, value: 1.4, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "flow" } }
     ],
     shaping: [
       { tier: "shaping", key: "spread", label: "Spread / velocity <span>(fountain)</span>", type: "slider", min: 2, max: 20, step: 0.5, value: 11, fmt: function (v) { return (+v).toFixed(1); } },
-      { tier: "shaping", key: "burst",  label: "Burst threshold <span>(rings)</span>", type: "slider", min: 0.2, max: 0.9, step: 0.01, value: 0.5, fmt: function (v) { return (+v).toFixed(2); } }
+      { tier: "shaping", key: "burst",  label: "Burst threshold <span>(rings)</span>", type: "slider", min: 0.2, max: 0.9, step: 0.01, value: 0.5, fmt: function (v) { return (+v).toFixed(2); } },
+      { tier: "shaping", key: "fstr",   label: "Flow strength <span>(flow)</span>", type: "slider", min: 0.4, max: 4, step: 0.1, value: 1.6, fmt: function (v) { return (+v).toFixed(1); }, when: { variant: "flow" } }
     ].concat(root.SignalShaping.responseSpecs({ gamma: 1 })),
     presets: (root.DemoPresets || {}),
+    actions: [{ id: "burst", label: "💥 Burst" }],
     render: render
   };
 })(typeof self !== "undefined" ? self : this);

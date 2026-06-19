@@ -33,3 +33,56 @@ threshold lights nodes + ripples a pulse along edges (Shaping). One preset
 ## Notes
 The synapse net is already the reference implementation of Structure/Signal/
 Shaping — use it to validate the shared `controls.js` field-mapping kit first.
+
+---
+
+## Next FUI modules (roadmap, 2026-06-18)
+
+Built so far: Synapse net · Data packets · Processor die · Equalizer · Radar ·
+**Telemetry stack** (new). Proposed next, each built on *signal decides which
+elements fire & in what sequence* + *designer sizes by count/extent at a fixed
+element size*:
+
+1. **Reticle / Lock-on** — targeting reticle; brackets snap + colour flips to
+   "lock" past Fire; ring spin from signal. Size: reticle radius, bracket count.
+2. **Radial Spectrum** — circular equalizer; bars radiate from a ring (sweep ⇒
+   travelling wave). Size: radius + bar count.
+3. **Hex Grid** — honeycomb of hex cells (Die's sibling on a hex lattice). Size:
+   cols × rows of hexes at fixed hex size.
+4. **Waypoint Markers** — scattered HUD target brackets; each locks/labels when
+   its field sample fires. Size: marker count + spread (W×H).
+5. **Flow Diagram** — boxes joined by orthogonal routed wires; pulses travel
+   routes in sequence. Size: node count + canvas spread.
+
+Status: Telemetry stack DONE. Order TBD with Brian (first pick: Telemetry).
+
+## Designer-sizing audit (apply across ALL modules)
+Principle: element size is fixed; explicit count/extent controls grow the artwork;
+no aspect distortion (uniform shrink-to-fit only).
+- [x] FUI Processor die — Cell size + Columns/Rows grow the grid.
+- [x] FUI Equalizer — Bar width + Bands grow total width.
+- [x] FUI Telemetry — Row height + Lines grow the stack.
+- [x] Meters LED ladder — fixed segment size; segments grow the ladder.
+- [ ] Particles — explicit field width/height for stream/fountain extent.
+- [ ] Path & Scope — confirm radius/turns read as size (largely done).
+- [ ] Kinetic Type — explicit font-size control (currently auto from width).
+- [ ] Meters bar/radial — expose size (bar length / gauge radius).
+- [ ] Glitch — confirm block size / scan gap behave as fixed-element sizes.
+
+## Architecture: FUI primitive kit (2026-06-18)
+Per direction: a curated, signal-aware draw-helper library (`demos/shared/fui.js`)
+— NOT a drag-and-drop builder — so new widgets compose from shared parts and
+fill the Huds+Guis vocabulary cheaply and consistently. Existing widgets are
+left untouched; new ones build on it.
+- [x] `fui.js`: `lit` (shared glow), `cell`, `hexCell`, `tickRing`, `arc`,
+      `bracket`, `needle`, `readout`.
+- [x] **3D Processor Die** — first widget built on the kit + composition: a
+      depth stack of die layers, each reading a different slice of the wave,
+      drawn back-to-front. Opens a 2.5D direction for other widgets.
+- [x] **Hex grid** + **Hex grid (3D)** built on the kit (FUI.hexCell).
+- [x] 3D widgets gained **Depth offset** (dial the 3D-ness) + **Off-cell opacity** (fade/hide off cells so lit cells float — no camera).
+- [x] Built on the kit: **Radial spectrum**, **Reticle / lock-on** (with
+      callouts toggle), **Compass strip**, **Wireframe globe / orbit**.
+      FUI Kit now ships 13 widgets.
+- Note: 3D/volumetric variants are an interesting direction for several widgets
+      (e.g. stacked slices), enabled by the kit.

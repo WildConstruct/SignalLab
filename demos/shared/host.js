@@ -34,11 +34,16 @@
   ];
 
   function defaultSignalSpecs(d) {
+    var YWHEN = { _drive: ["mult", "mix", "diff", "min", "max"] };   // Y only matters when a combine uses it
+    var hz = function (v) { return (+v).toFixed(1); };
     return [
-      { tier: "signal", key: "_src",   label: "Source",     type: "select", value: srcName(d.x.src), options: SRC_OPTS },
-      { tier: "signal", key: "_rate",  label: "Rate <span>Hz</span>", type: "slider", min: 0.1, max: 6, step: 0.1, value: d.x.rate, fmt: function (v) { return (+v).toFixed(1); } },
-      { tier: "signal", key: "_drive", label: "Combine",    type: "select", value: d.drive, options: DRIVE_OPTS },
-      { tier: "signal", key: "_speed", label: "Speed",      type: "slider", min: 0.1, max: 3, step: 0.1, value: 1, fmt: function (v) { return (+v).toFixed(1) + "×"; } }
+      { tier: "signal", key: "_src",    label: "Source X",     type: "select", value: srcName(d.x.src), options: SRC_OPTS },
+      { tier: "signal", key: "_rate",   label: "Rate X <span>Hz</span>", type: "slider", min: 0.1, max: 6, step: 0.1, value: d.x.rate, fmt: hz },
+      { tier: "signal", key: "_drive",  label: "Combine",      type: "select", value: d.drive, options: DRIVE_OPTS },
+      { tier: "signal", key: "_ysrc",   label: "Source Y",     type: "select", value: srcName(d.y.src), options: SRC_OPTS, when: YWHEN },
+      { tier: "signal", key: "_yrate",  label: "Rate Y <span>Hz</span>", type: "slider", min: 0.1, max: 6, step: 0.1, value: d.y.rate, fmt: hz, when: YWHEN },
+      { tier: "signal", key: "_smooth", label: "Smoothing",    type: "slider", min: 0, max: 1, step: 0.01, value: d.x.smooth || 0, fmt: function (v) { return (+v).toFixed(2); } },
+      { tier: "signal", key: "_speed",  label: "Speed",        type: "slider", min: 0.1, max: 3, step: 0.1, value: 1, fmt: function (v) { return (+v).toFixed(1) + "×"; } }
     ];
   }
   var SRCNAMES = { 1: "sine", 2: "square", 3: "saw", 4: "noise", 5: "randomWalk", 8: "triangle", 9: "pulse" };
@@ -48,19 +53,22 @@
     var driver = SignalEngine.create(cfg.driver || {});
     var mount = document.getElementById(cfg.mount || "app");
 
-    // layout
+    // layout: [ module rail | stage | inspector ]
     var app = div("sh-app");
+    app.appendChild(buildRail(cfg.title));
     var stage = div("sh-stage");
     var bar = div("sh-topbar");
     var title = div("sh-title"); title.textContent = cfg.title || "Signal Demo";
-    var badge = div("sh-badge live"); badge.textContent = "engine: CPU parity";
+    var badge = div("sh-badge live"); badge.textContent = "CPU parity";
     var spacer = div("sh-spacer");
     // preset picker (named) — populated below once applyPreset exists
     var presetSel = document.createElement("select"); presetSel.className = "sh-btn"; presetSel.title = "Presets";
     var optDef = document.createElement("option"); optDef.textContent = "Presets…"; optDef.value = ""; presetSel.appendChild(optDef);
     Object.keys(cfg.presets || {}).forEach(function (name) { var o = document.createElement("option"); o.value = name; o.textContent = name; presetSel.appendChild(o); });
-    var bLink = btn("Copy link"), bExport = btn("Export JSON"), bImport = btn("Import"), bAE = btn("ƒ AE"), bSurprise = btn("🎲");
-    bar.append(title, badge, spacer, presetSel, bSurprise, bLink, bExport, bImport, bAE);
+    var bLink = btn("Copy link"), bExport = btn("Export JSON"), bImport = btn("Import"), bPng = btn("PNG"), bAE = btn("ƒ AE"), bSurprise = btn("🎲");
+    bAE.className = "sh-btn primary"; bAE.title = "Copy the self-contained After Effects expression";
+    bPng.title = "Export current frame (beauty + alpha)";
+    bar.append(title, badge, spacer, presetSel, bSurprise, bLink, bImport, bExport, bPng, bAE);
     var wrap = div("sh-canvas-wrap");
     var canvas = document.createElement("canvas"); canvas.className = "sh-canvas";
     wrap.appendChild(canvas);
@@ -75,11 +83,31 @@
       .concat(cfg.shaping || []);
     var ui = SignalControls.build(panel, specs, onChange);
     var speed = 1;
+    // plugin-let header (shown only in a curated publish view)
+    var plHead = div("sh-pluginlet-head"); plHead.style.display = "none"; panel.insertBefore(plHead, panel.firstChild);
+
+    // ---- named auxiliary signals (declarative multi-signal) ----
+    var auxSig = {};
+    (cfg.signals || []).forEach(function (s) { auxSig[s.id] = SignalEngine.create(s.driver || {}); });
+    function sig(id, tOffset) { var d = auxSig[id]; return d ? d.sample((clockT || 0) + (tOffset || 0)).n : 0; }
+
+    // ---- actions (triggers): envelope + one-shot ----
+    var actEnv = {}, actQueue = {}, clockT = 0, firedNow = {};
+    function fireAction(id) { actEnv[id] = clockT; actQueue[id] = (actQueue[id] || 0) + 1; }
+    function actEnvelope(id, decay) { var at = actEnv[id]; if (at == null) return 0; var a = clockT - at; return a < 0 ? 0 : Math.max(0, 1 - a / (decay || 0.6)); }
+    if (cfg.actions && cfg.actions.length) {
+      var actBar = div("sh-actions");
+      cfg.actions.forEach(function (a) { var b = btn(a.label || a.id); b.onclick = function () { fireAction(a.id); }; actBar.appendChild(b); });
+      panel.insertBefore(actBar, plHead.nextSibling);
+    }
 
     function applySignal(s) {
       var patch = {};
       if ("_src" in s) patch.x = { src: s._src };
-      if ("_rate" in s) { patch.x = Object.assign(patch.x || {}, { rate: +s._rate }); }
+      if ("_rate" in s) patch.x = Object.assign(patch.x || {}, { rate: +s._rate });
+      if ("_ysrc" in s) patch.y = { src: s._ysrc };
+      if ("_yrate" in s) patch.y = Object.assign(patch.y || {}, { rate: +s._yrate });
+      if ("_smooth" in s) { patch.x = Object.assign(patch.x || {}, { smooth: +s._smooth }); patch.y = Object.assign(patch.y || {}, { smooth: +s._smooth }); }
       if ("_drive" in s) patch.drive = s._drive;
       if (Object.keys(patch).length) driver.set(patch);
       if ("_speed" in s) speed = +s._speed;
@@ -87,26 +115,80 @@
     function onChange(s) { applySignal(s); pushHash(); }
     applySignal(ui.state);
 
-    // canvas sizing
-    var ctx = canvas.getContext("2d"), W = 0, H = 0;
+    // ---- Signal Scope: collapsible live graph of the wave function ----
+    var scopeSec = div("sh-section sh-scope collapsed");
+    var scopeH = document.createElement("h3"); scopeH.appendChild(document.createTextNode("Signal Scope"));
+    var scopeHint = div("sh-hint"); scopeHint.textContent = "the wave function"; scopeH.appendChild(scopeHint);
+    var scopeBody = div("sh-sec-body");
+    var scopeCanvas = document.createElement("canvas"); scopeCanvas.className = "sh-scope-cv";
+    var legend = div("sh-scope-legend");
+    legend.innerHTML = '<span><i style="background:#7ec77a"></i>signal</span>'
+      + '<span><i style="background:#5aa9e6"></i>X</span><span><i style="background:#9a9aa0"></i>Y</span>';
+    scopeBody.append(scopeCanvas, legend);
+    scopeSec.append(scopeH, scopeBody);
+    panel.appendChild(scopeSec);
+    var sctx = scopeCanvas.getContext("2d"), sW = 0, sH = 0;
+    function resizeScope() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      sW = scopeCanvas.clientWidth; sH = scopeCanvas.clientHeight;
+      if (!sW || !sH) return;
+      scopeCanvas.width = sW * dpr; scopeCanvas.height = sH * dpr; sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    scopeH.onclick = function () { scopeSec.classList.toggle("collapsed"); setTimeout(resizeScope, 0); };
+    window.addEventListener("resize", resizeScope);
+    function drawScope(w) {
+      if (scopeSec.classList.contains("collapsed")) return;
+      if (!sW) { resizeScope(); if (!sW) return; }
+      var L = w.bufX.length;
+      sctx.clearRect(0, 0, sW, sH);
+      sctx.strokeStyle = "#1b1b1f"; sctx.lineWidth = 1;
+      sctx.beginPath(); sctx.moveTo(0, sH / 2); sctx.lineTo(sW, sH / 2); sctx.stroke();   // mid line
+      function plot(buf, color, lw, alpha) {
+        sctx.globalAlpha = alpha; sctx.strokeStyle = color; sctx.lineWidth = lw; sctx.beginPath();
+        for (var i = 0; i < L; i++) { var x = i / (L - 1) * sW, y = (1 - buf[i]) * (sH - 6) + 3; i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); }
+        sctx.stroke(); sctx.globalAlpha = 1;
+      }
+      var needY = driver.drive !== "x";
+      plot(w.bufX, "#5aa9e6", 1, 0.5);                         // channel X
+      if (needY) plot(w.bufY, "#9a9aa0", 1, 0.45);            // channel Y
+      sctx.strokeStyle = "#7ec77a"; sctx.lineWidth = 1.7; sctx.beginPath();   // combined = the signal
+      for (var i = 0; i < L; i++) { var dv = SignalEngine.combine(driver.drive, w.bufX[i], w.bufY[i]); var x = i / (L - 1) * sW, y = (1 - dv) * (sH - 6) + 3; i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); }
+      sctx.stroke();
+    }
+
+    // canvas sizing — the context type (2D vs WebGPU) is decided below: a demo
+    // with cfg.gpu tries to claim a WebGPU context first and falls back to 2D.
+    var ctx = null, gpuRenderer = null, lastFrame = null, W = 0, H = 0;
     function resize() {
       var dpr = Math.min(window.devicePixelRatio || 1, 2);
       W = wrap.clientWidth; H = wrap.clientHeight;
       canvas.width = W * dpr; canvas.height = H * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // GPU renderer reads canvas.width/height itself
     }
-    window.addEventListener("resize", resize); resize();
+    window.addEventListener("resize", resize);
+    function startCPU() { if (!ctx && !gpuRenderer) { ctx = canvas.getContext("2d"); resize(); } }
+    if (cfg.gpu && cfg.gpu.init) {
+      resize();   // size the canvas (device px) before the engine configures its context
+      Promise.resolve().then(function () { return cfg.gpu.init(canvas); }).then(function (r) {
+        if (r) { gpuRenderer = r; badge.textContent = r.label || "WebGPU engine"; badge.classList.add("live"); }
+        else { startCPU(); badge.textContent = "CPU fallback"; }
+      }).catch(function (e) { console.warn("GPU init failed, CPU fallback:", e); startCPU(); badge.textContent = "CPU fallback"; });
+    } else { startCPU(); }
 
     // render loop
     var t0 = performance.now();
     function frame() {
-      var t = (performance.now() - t0) / 1000 * speed;
+      var t = (performance.now() - t0) / 1000 * speed; clockT = t;
       var w = driver.window(t, 512);
-      ctx.clearRect(0, 0, W, H);
+      firedNow = {}; for (var aid in actQueue) { if (actQueue[aid] > 0) { firedNow[aid] = true; actQueue[aid] = 0; } }
+      var F = { t: t, n: w.n, x: w.bufX[511], y: w.bufY[511], bufX: w.bufX, bufY: w.bufY, S: ui.state,
+        act: actEnvelope, fired: function (id) { return !!firedNow[id]; }, sig: sig };
+      lastFrame = F;
       try {
-        cfg.render(ctx, W, H, { t: t, n: w.n, x: w.bufX[511], y: w.bufY[511],
-          bufX: w.bufX, bufY: w.bufY, S: ui.state });
+        if (gpuRenderer) { gpuRenderer.render(F, canvas.width, canvas.height); }
+        else if (ctx) { ctx.clearRect(0, 0, W, H); cfg.render(ctx, W, H, F); }
       } catch (e) { badge.textContent = "render error: " + e.message; badge.classList.remove("live"); }
+      drawScope(w);
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
@@ -134,6 +216,12 @@
       if (navigator.clipboard) navigator.clipboard.writeText(expr);
       bAE.textContent = "Copied ƒ!"; setTimeout(function () { bAE.textContent = "ƒ AE"; }, 1400);
       console.log(expr);
+    };
+    bPng.onclick = function () {   // output pass: beauty + alpha (canvas keeps transparency)
+      // WebGPU canvases don't preserve the drawing buffer; re-render the last frame first.
+      if (gpuRenderer && lastFrame) { try { gpuRenderer.render(lastFrame, canvas.width, canvas.height); } catch (e) {} }
+      canvas.toBlob(function (blob) { if (!blob) return; var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+        a.download = (cfg.title || "frame").toLowerCase().replace(/\s+/g, "-") + ".png"; a.click(); });
     };
     bImport.onclick = function () {
       var inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,.wcx";
@@ -167,8 +255,68 @@
     }
     presetSel.onchange = function () { if (presetSel.value && cfg.presets) applyPreset(cfg.presets[presetSel.value]); };
 
+    // ---- plugin-let publish view: apply a (portable) manifest = curated subset ----
+    // A manifest is self-contained: { name, desc, controls[], driver, values{} } —
+    // or back-compat { preset } pointing at a named preset.
+    function applyManifest(m) {
+      if (!m) { ui.setPublic(null); plHead.style.display = "none"; return; }
+      if (m.preset && cfg.presets) applyPreset(cfg.presets[m.preset]);
+      if (m.driver) driver.set(m.driver);
+      if (m.values) for (var k in m.values) if (ui.refs[k]) ui.set(k, m.values[k]);
+      ui.setPublic(m.controls || []);
+      plHead.innerHTML = '<span class="mk">◢</span> ' + (m.name || "Plugin-let") + '<span class="tag">plugin-let</span>'
+        + (m.desc ? '<div class="d">' + m.desc + '</div>' : '');
+      plHead.style.display = "";
+    }
+    // components = inline pluginlets (cfg.pluginlets) + manifest URLs (cfg.manifests)
+    var comps = (cfg.pluginlets || []).map(function (pl) { return { name: pl.name, m: pl }; });
+    (cfg.manifests || []).forEach(function (u) { comps.push({ url: u, name: u.split("/").pop().replace(/\.json$/, "") }); });
+    function buildView() {
+      if (!comps.length) return;
+      var viewSel = document.createElement("select"); viewSel.className = "sh-btn"; viewSel.title = "View";
+      var oe = document.createElement("option"); oe.value = ""; oe.textContent = "✎ Edit (full)"; viewSel.appendChild(oe);
+      comps.forEach(function (c, i) { var o = document.createElement("option"); o.value = String(i); o.textContent = "◢ " + (c.name || ("Component " + i)); viewSel.appendChild(o); });
+      viewSel.onchange = function () {
+        if (viewSel.value === "") { applyManifest(null); return; }
+        var c = comps[+viewSel.value];
+        if (c.m) applyManifest(c.m);
+        else fetch(c.url).then(function (r) { return r.json(); }).then(function (m) { c.m = m; if (!c.name) c.name = m.name; applyManifest(m); }).catch(function (e) { badge.textContent = "manifest load failed"; });
+      };
+      bar.insertBefore(viewSel, presetSel);
+      return viewSel;
+    }
+    // resolve URL-manifest names up front (small fetches) so the picker reads nicely
+    var urlComps = comps.filter(function (c) { return c.url && !c.m; });
+    if (urlComps.length) {
+      Promise.all(urlComps.map(function (c) { return fetch(c.url).then(function (r) { return r.json(); }).then(function (m) { c.m = m; c.name = m.name || c.name; }).catch(function () {}); })).then(buildView);
+    } else { buildView(); }
+    // ?component=<url> — load any portable component directly (host-for-any-component)
+    var compUrl = (location.search.match(/[?&]component=([^&]+)/) || [])[1];
+    if (compUrl) fetch(decodeURIComponent(compUrl)).then(function (r) { return r.json(); }).then(applyManifest).catch(function () {});
+
     loadHash();
-    return { driver: driver, ui: ui, applyPreset: applyPreset };
+    return { driver: driver, ui: ui, applyPreset: applyPreset, applyManifest: applyManifest };
+  }
+
+  var MODULES = [
+    { dir: "fui-kit", name: "FUI Kit" }, { dir: "glitch-distortion", name: "Glitch / Distortion" },
+    { dir: "transitions", name: "Transitions" }, { dir: "kinetic-type", name: "Kinetic Type" },
+    { dir: "meters", name: "Meters" }, { dir: "particles", name: "Particles" },
+    { dir: "path-scope", name: "Path & Scope" }
+  ];
+  // left rail: brand (→ gallery) + module switcher; active module highlighted
+  function buildRail() {
+    var rail = div("sh-rail");
+    var brand = document.createElement("a"); brand.className = "sh-rail-brand"; brand.href = "../";
+    brand.innerHTML = '<span class="mk">◢</span> Signal Rack';
+    rail.appendChild(brand);
+    var sec = div("sh-rail-sec"); sec.textContent = "Modules"; rail.appendChild(sec);
+    var here = location.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "").split("/").pop();
+    MODULES.forEach(function (m) {
+      var a = document.createElement("a"); a.className = "sh-rail-item" + (m.dir === here ? " active" : "");
+      a.href = "../" + m.dir + "/"; a.textContent = m.name; rail.appendChild(a);
+    });
+    return rail;
   }
 
   function div(cls) { var e = document.createElement("div"); e.className = cls; return e; }
