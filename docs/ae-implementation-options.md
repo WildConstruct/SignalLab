@@ -39,7 +39,7 @@ plugin/SignalRackPlugin  (Adobe SDK; WebGpuBackend holds the wgpu::Device)
 - The **engine is portable**: the identical `signal_core.wgsl` runs in the
   browser (`prototypes/webgpu-lab`) for development and inside AE via Dawn for
   production. **[C — browser harness dispatches the real WGSL; CPU reference
-  port passes 15/15 parity tests]**
+  port passes the current parity suite]**
 - Outputs are **interpreted scalars** emitted by the shader (the Etheros
   "outputs philosophy"), so the AE plugin exposes them as ordinary
   pick-whippable output params — the controller-null workflow, productized. **[I — plugin param wiring written to spec, not yet built in AE]**

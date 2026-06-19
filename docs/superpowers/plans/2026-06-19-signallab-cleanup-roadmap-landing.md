@@ -82,7 +82,7 @@ git commit -m "docs: add cleanup roadmap landing plan"
 
 - [ ] **Step 1: Replace stale validation and demo-count claims**
 
-Update `15/15` and `10/10` references to the current `30/30` engine-reference result. Replace "seven-demo suite" where it describes the current launcher with "nine-module suite" or "seven product demos plus two field-convergence demos."
+Update legacy validation-count references to the current `30/30` engine-reference result. Replace outdated seven-module language where it describes the current launcher with "nine-module suite" or "seven product demos plus two field-convergence demos."
 
 - [ ] **Step 2: Make maturity labels explicit**
 
@@ -97,7 +97,7 @@ Remove MVP-only language where variants now exist. Mention current variants and 
 Run:
 
 ```powershell
-rg -n "seven-demo suite|10/10|15/15|MVP ships|MVP:|Roadmap in" README.md IMPLEMENTATION-REPORT.md docs demos
+rg -n "seven-demo suite|legacy validation count|MVP ships|MVP:|Roadmap in" README.md IMPLEMENTATION-REPORT.md docs demos -g "!docs/superpowers/**"
 ```
 
 Expected: no stale references in current-state docs; historical backlog headings may remain only where they describe completed phases.

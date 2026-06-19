@@ -45,13 +45,14 @@ docs/ · tests/ · examples/ · tooling/ae/
 
 Canonical paths (matched to Etheros): `Recipe → CompiledConfig → runtime`,
 `Recipe → .wcx payload`, `Recipe → Moniker → name`. WebGPU/Dawn is the only
-backend — no CPU fallback.
+native backend — no CPU fallback in the AE/native runtime. Browser tools keep a
+CPU reference mirror only as a parity oracle and preview fallback.
 
 ## Run what's runnable now
 
 ```bash
 # 1. Engine logic parity oracle (no GPU)
-cd prototypes/webgpu-lab && node validate.js          # 15/15 pass (engine owns source/smooth/process/sidechain/lag/luma)
+cd prototypes/webgpu-lab && node validate.js          # 30/30 pass (engine owns source/smooth/process/sidechain/lag/luma/window/z)
 
 # 2. C++ contract (Recipe→Compile→params parity, AE param mapping)
 g++ -std=c++17 -I include -I . examples/core_contract_test.cpp -o /tmp/t && /tmp/t
@@ -65,6 +66,11 @@ cmake -DWGSL_IN=shaders/signal_core.wgsl -DWGSL_OUT=/tmp/h.h -DWGSL_SYMBOL=kSign
 
 The native runtime (`runtime/dawn/*`, `examples/signal_smoke.cpp`) and the AE
 plugin need a Dawn tree + the AE SDK to build — see `docs/conventions.md`.
+
+The current browser demo surface is broader than the native plugin scaffold:
+`demos/` now contains seven product demos plus two Etheros convergence demos.
+Treat those as executable WebGPU/CPU-reference proof, not as completed AE plugin
+verification.
 
 ## Start here
 - `IMPLEMENTATION-REPORT.md` — what was built, decisions, findings, open questions.

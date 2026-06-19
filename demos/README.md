@@ -1,8 +1,10 @@
 # Signal Rack — Demo Lab (`demos/`)
 
-The working seven-demo suite: one shared signal engine + per-product renderers,
-each built on the **Structure / Signal / Shaping** control language. This is the
-executable counterpart to the strategy in
+The working nine-module suite: seven product demos plus two Etheros convergence
+demos, all running over shared Signal Rack demo infrastructure. The product demos
+use one shared signal engine + per-product renderers, each built on the
+**Structure / Signal / Shaping** control language. This is the executable
+counterpart to the strategy in
 [`docs/product-breakup.md`](../docs/product-breakup.md) and the plans in
 [`docs/web-demos/`](../docs/web-demos/README.md).
 
@@ -14,7 +16,7 @@ python3 -m http.server
 # then open http://localhost:8000/demos/
 ```
 
-The launcher (`demos/index.html`) links all seven demos with live signal
+The launcher (`demos/index.html`) links all nine modules with live signal
 thumbnails.
 
 ## Layout
@@ -30,7 +32,7 @@ demos/
   <demo>/             index.html + render.js + presets.js + README.md
 ```
 
-## The seven demos
+## The seven product demos
 | Demo | Variants |
 |---|---|
 | **fui-kit** | Synapse net · Data packets · Processor die · Equalizer · Radar |
@@ -40,6 +42,12 @@ demos/
 | **meters** | Bar + gate · radial gauge · LED ladder (peak-hold) |
 | **particles** | Fountain · shock rings · stream field |
 | **path-scope** | Wave runner · vectorscope · spirograph · rose |
+
+## Field convergence demos
+| Demo | What it proves |
+|---|---|
+| **field-bridge** | Signal Rack drives a real Etheros field parameter in-browser. |
+| **field-distort** | An Etheros field distorts a FUI plate while Signal Rack pulses the warp. |
 
 ## Contract every renderer obeys
 Renderers read only `n` / `bufX` / `bufY` from the shared driver and never do

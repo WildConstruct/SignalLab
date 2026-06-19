@@ -22,9 +22,11 @@ verification (AE + Dawn).
 - **Dawn runtime** `runtime/dawn/`: `SignalRuntime` (pipeline/buffers) + bridge
   impl that embeds and dispatches the WGSL. **[I — needs Dawn to compile]**
 - **AE surface** `plugins/after-effects/signalrack_bridge.h`: params⇄recipe
-  mapping, CPU-tested. Plugin itself stubbed in `plugin/SignalRackPlugin/`. **[C map / I plugin]**
+  mapping, CPU-tested. Plugin itself remains a skeleton in
+  `plugin/SignalRackPlugin/`; AE output publishing is bake/courier-first, not
+  direct Render-written sliders. **[C map / I plugin]**
 - **WebGPU lab** `prototypes/webgpu-lab/`: runs the real WGSL in-browser; CPU
-  reference port + `validate.js` (10/10) as the parity oracle. **[C]**
+  reference port + `validate.js` (30/30) as the parity oracle. **[C]**
 - **Build** `CMakeLists.txt` + `tools/embed_wgsl.cmake` (`IAN_` options, WGSL
   embedding). Embed step verified. **[C]**
 - **Schemas** recipe + output-profile JSON, 8 example recipes, `.wcx` envelope. **[C]**
@@ -59,10 +61,12 @@ expression-snippets.md}`. Schemas: `schemas/*` (+ 8 recipes + wcx envelope).
 Docs: `docs/*`. Tests: `tests/*`.
 
 ## 5. How to run / inspect
-See README "Run what's runnable now". Confirmed here: `node validate.js` (10/10),
-`core_contract_test.cpp` compiles+passes, WGSL embed codegen works. The browser
-lab runs the real WGSL on `navigator.gpu`. Native runtime + plugin need Dawn +
-AE SDK.
+See README "Run what's runnable now". Current local checks: `node validate.js`
+(30/30), `codec-validate.js` (8/8), and JS syntax checks across the browser
+surface. `core_contract_test.cpp` compiles+passes where a C++ compiler is
+available; the current Windows shell used for the cleanup pass did not have
+`g++` on PATH. The browser lab runs the real WGSL on `navigator.gpu`. Native
+runtime + plugin still need Dawn + AE SDK.
 
 ## 6. Demonstrated workflows
 - One signal → one property (Pulse → Scale %). **[C in lab / I in AE]**

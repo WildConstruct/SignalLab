@@ -8,10 +8,13 @@
 >
 > **Implementation status:** this analysis is now being executed. See
 > [`docs/web-demos/`](web-demos/README.md) for the architecture + per-demo plans
-> and [`demos/`](../demos/) for the working seven-demo suite over a shared signal
+> and [`demos/`](../demos/) for the working nine-module suite over shared signal
 > engine. Build progress is tracked in
 > [`docs/web-demos/BACKLOG.md`](web-demos/BACKLOG.md) and the Notion sub-project
 > **[Signal Rack — Web Demos (Engineering)](https://app.notion.com/p/383b77d6cd4f81699963d80c643576a5)**.
+> Current branch note: the original breakup still describes seven product demos.
+> The executable gallery now also includes two Etheros convergence demos
+> (`field-bridge`, `field-distort`) that prove the field↔signal composition.
 
 ---
 

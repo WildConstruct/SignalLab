@@ -11,6 +11,11 @@
 Order matters: Phase 0 (shared foundation) unblocks everything; then each demo
 gets a thin MVP slice before any demo gets polish. Build breadth first.
 
+Current branch note (2026-06-19): Phases 0-4 below describe the original seven
+product demos and are complete. The gallery now also includes two Etheros
+convergence demos (`field-bridge`, `field-distort`) developed after the original
+backlog to prove Signal Rack ↔ Etheros composition.
+
 ---
 
 ## Phase 0 — Shared foundation (unblocks all demos)

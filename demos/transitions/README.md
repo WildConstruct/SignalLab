@@ -1,9 +1,11 @@
 # Transitions (demo)
-Signal-shaped animate-ins. MVP: a **loading bar** whose fill pace is shaped by the
-signal while staying monotonic (never regresses). Roadmap (wipe, radial, text
-reveal) in `docs/web-demos/transitions.md`.
+Signal-shaped animate-ins. Current variants include loading bar, wipe, radial
+fill, and text reveal. The playhead stays monotonic while the signal shapes the
+pace through easing and response controls.
 
 `python3 -m http.server` → `/demos/transitions/`
 
-- **Structure** — *Bar width*. **Signal** — source/rate/combine/speed.
-- **Shaping** — *Signal pace*: how much the signal accelerates the climb.
+- **Structure** — variant picker plus geometry/text controls where relevant.
+- **Signal** — source/rate/combine/speed.
+- **Shaping** — signal pace and easing curve: how strongly the driver bends the
+  climb without letting it regress.

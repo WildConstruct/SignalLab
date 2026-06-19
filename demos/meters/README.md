@@ -1,8 +1,11 @@
 # Meters (demo)
-Calibrated readouts. MVP: **bar meter + gate** — fill follows the signal through a
-response curve (γ), redlines past a threshold, peak-holds, and the gate dot keys
-off n ≥ 0.5. Roadmap (radial, LED, dial) in `docs/web-demos/meters.md`.
+Calibrated readouts. Current variants include bar meter + gate, radial gauge,
+LED ladder, VU dial, and goniometer. Fill follows the signal through a response
+curve, redlines past a threshold, and peak-holds across variants.
 
 `python3 -m http.server` → `/demos/meters/`
 
-- **Shaping** — *Response γ*, *Redline ≥*. **Signal** — source/rate/combine/speed.
+- **Structure** — meter type, segments, and variant-specific geometry.
+- **Signal** — source/rate/combine/speed.
+- **Shaping** — response curve, redline threshold, peak-hold, and goniometer
+  channel mapping where selected.

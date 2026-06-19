@@ -1,9 +1,14 @@
 # STATUS — restructure complete
 
-**Date:** 2026-06-13
+**Date:** 2026-06-19
 
 The WebGPU-first + Dawn-bridge restructure is **done**. This file previously
 tracked a pre-pivot checkpoint; that work has been carried out.
+
+Current branch note: the browser demo suite has moved beyond the original seven
+product demos and now includes two Etheros convergence demos (`field-bridge` and
+`field-distort`). The browser surface is executable proof; native AE remains at
+contract/scaffold level until built with Dawn + the AE SDK and verified in-app.
 
 ## Architecture (now in place)
 The engine is **WGSL** (`shaders/signal_core.wgsl`), developed in WebGPU first
@@ -28,8 +33,9 @@ open items still flagged **[verify]** against Notion.
 | `prototypes/ae-script/SignalRack.jsx` | **Shrunk** to `tooling/ae/SignalRack-binding-helper.jsx` (bind/chain/bake over the plugin; no engine). |
 
 ## Verified runnable here
-- `node prototypes/webgpu-lab/validate.js` → 15/15 (incl. engine-owned processor, sidechain, lag).
-- `examples/core_contract_test.cpp` compiles + passes (Compile() WGSL parity).
+- `node prototypes/webgpu-lab/validate.js` → 30/30 (incl. engine-owned processor, sidechain, lag, window, z/distort).
+- `node prototypes/webgpu-lab/codec-validate.js` → 8/8 (live-courier value codec).
+- `examples/core_contract_test.cpp` compiles + passes where a C++ compiler is available (Compile() WGSL parity).
 - WGSL embed codegen (`tools/embed_wgsl.cmake`) works.
 
 See `IMPLEMENTATION-REPORT.md` for the full report and open questions.

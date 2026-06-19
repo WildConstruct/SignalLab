@@ -1,8 +1,11 @@
 # Particles (demo)
-Signal-driven emitters; the bridge to **Entropy**. MVP: a **fountain** whose birth
-rate is a curved function of signal energy (quiet → sparse, peaks → eruption) and
-whose spread scales with it. Roadmap in `docs/web-demos/particles.md`.
+Signal-driven emitters; the bridge to **Entropy**. Current variants include
+fountain, shock rings, stream field, and flow-field/vortex emitters. Birth rate,
+spread, burst threshold, and field strength are driven by signal energy.
 
 `python3 -m http.server` → `/demos/particles/`
 
-- **Structure** — *Birth rate*. **Shaping** — *Spread / velocity*. **Signal** — source/rate/combine/speed.
+- **Structure** — emitter type, birth rate/density, field type, and field scale.
+- **Signal** — source/rate/combine/speed.
+- **Shaping** — response, spread/velocity, burst threshold, and flow-field
+  strength. The `Burst` action proves the manifest action lane.
