@@ -230,6 +230,8 @@ Meters (reuse fui.js + goniometer via scope.js) → particles.js (curl/attractor
 
 
 ## Build log
+- [x] **Engine:** `lissajous.js` (parametric x/y[/z] from freq ratios + phase) — deterministic, normalized.
+- [x] **Surfaced:** Path & Scope **Lissajous** (2D/3D via proj3; signal→phase). Meters **VU dial** + **Goniometer** (reuse `fui.js`; goniometer plots the live L/R channels). Engine drivers now feed multiple tools each.
 - [x] **Engine:** `field.js` (vector field: curl/flow, vortex, radial) — deterministic, unit vectors.
 - [x] **Surfaced:** Particles gains a **Flow field** emitter (field type/scale/strength); presets Flow Field + Vortex. `field.js` also earmarked for Glitch warp.
 - [x] **Engine:** `proj3.js` (projection) + `attractor.js` (Lorenz/Aizawa/Thomas/de Jong/Clifford) — deterministic, normalized, parity-verified.
