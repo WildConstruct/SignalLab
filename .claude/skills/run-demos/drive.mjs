@@ -13,8 +13,13 @@ const pages = [
   ['launcher', '/'],
   ['fui-kit', '/fui-kit/'],
   ['glitch-distortion', '/glitch-distortion/'],
+  ['transitions', '/transitions/'],
   ['kinetic-type', '/kinetic-type/'],
+  ['meters', '/meters/'],
+  ['particles', '/particles/'],
   ['path-scope', '/path-scope/'],
+  ['field-bridge', '/field-bridge/'],
+  ['field-distort', '/field-distort/'],
 ];
 
 import { mkdirSync } from 'node:fs';

@@ -19,8 +19,9 @@ python3 -m http.server 8123
 timeout 15 bash -c 'until curl -sf http://127.0.0.1:8123/demos/ >/dev/null; do sleep 0.5; done'
 ```
 
-The launcher is `/demos/`; each demo is `/demos/<name>/` (fui-kit,
-glitch-distortion, transitions, kinetic-type, meters, particles, path-scope).
+The launcher is `/demos/`; each demo is `/demos/<name>/`:
+`fui-kit`, `glitch-distortion`, `transitions`, `kinetic-type`, `meters`,
+`particles`, `path-scope`, `field-bridge`, and `field-distort`.
 
 ## 2 · Browser: use the PRE-CACHED Chromium
 
@@ -45,9 +46,9 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node /tmp/drive.mjs
 ## 3 · Driver
 
 A ready driver lives next to this skill: [`drive.mjs`](drive.mjs). It opens the
-launcher + four demos, waits ~1.5s so the `requestAnimationFrame` loop paints,
-screenshots each to `/tmp/shots/`, and reports painted-pixel counts + console
-errors. Edit the `pages` array to target other demos. Run it, then **look at the
+launcher plus all nine current demo modules, waits ~1.5s so the
+`requestAnimationFrame` loop paints, screenshots each to `/tmp/shots/`, and
+reports painted-pixel counts + console errors. Run it, then **look at the
 screenshots** (`/tmp/shots/*.png`).
 
 ## 4 · Stop
