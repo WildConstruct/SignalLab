@@ -56,8 +56,9 @@ const plansReadme = read("docs/web-demos/README.md");
 assert.ok(/ferrofluid/i.test(plansReadme), "web demo plans README must mention ferrofluid");
 
 const renderSource = read("demos/ferrofluid/render.js");
-assert.ok(/buildSurfaceActors/.test(renderSource), "renderer must use animated surface actors");
-assert.ok(/drawResonantSpikes/.test(renderSource), "renderer must draw the resonant spike field");
+assert.ok(/createFluidSolver/.test(renderSource), "renderer must use the stateful fluid solver");
+assert.ok(/sampleFluidSurface/.test(renderSource), "renderer must shade the displaced fluid field");
+assert.ok(!/buildSurfaceActors|drawResonantSpikes|drawSpikeCone|drawSpikeBase/.test(renderSource), "renderer must not use actor/spike primitives");
 
 const presets = loadFerrofluidPresets();
 Object.entries(presets).forEach(([name, preset]) => {

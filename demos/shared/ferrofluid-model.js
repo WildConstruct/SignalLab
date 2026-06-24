@@ -169,67 +169,328 @@
     return droplets;
   }
 
-  function buildSurfaceActors(frame, field) {
-    frame = frame || {};
-    field = field || buildField(frame);
-    var S = field.controls || frameControls(frame);
-    var t = finiteNumber(frame.t, 0);
-    var agitation = clamp(field.energy * 0.55 + field.spike * 0.45 + S.resonance * 0.28, 0, 1.6);
-    var looseness = clamp(1 - S.surfaceTension * 0.72 + S.resonance * 0.38, 0.18, 1.2);
-    var viscosityDrag = 1 - S.viscosity * 0.58;
-    var corePulse = 0.5 + Math.sin(t * (1.8 + S.resonance * 2.2) + field.phaseBias) * 0.5;
-    var core = {
-      x: Math.sin(t * 0.42 + field.phaseBias) * 0.025 * looseness,
-      y: 0.05 + Math.cos(t * 0.31 + field.phaseBias * 0.7) * 0.018 * looseness,
-      rx: 0.32 + S.blobSize * 0.28 + field.pull * 0.05,
-      ry: 0.18 + S.blobSize * 0.17 + field.pull * 0.04,
-      pulse: corePulse,
-      energy: agitation
-    };
-    var spikes = [];
+  function gridIndex(w, x, y) {
+    return x + y * w;
+  }
 
-    for (var i = 0; i < field.lobes.length; i++) {
-      var l = field.lobes[i];
-      var u = i / Math.max(1, field.lobes.length);
-      var ringCount = S.resonance > 0.78 ? 3 : 2;
+  function setGridBoundary(dst, w, h) {
+    var x, y;
+    for (x = 1; x < w - 1; x++) {
+      dst[gridIndex(w, x, 0)] = dst[gridIndex(w, x, 1)];
+      dst[gridIndex(w, x, h - 1)] = dst[gridIndex(w, x, h - 2)];
+    }
+    for (y = 1; y < h - 1; y++) {
+      dst[gridIndex(w, 0, y)] = dst[gridIndex(w, 1, y)];
+      dst[gridIndex(w, w - 1, y)] = dst[gridIndex(w, w - 2, y)];
+    }
+    dst[0] = dst[gridIndex(w, 1, 1)];
+    dst[w - 1] = dst[gridIndex(w, w - 2, 1)];
+    dst[gridIndex(w, 0, h - 1)] = dst[gridIndex(w, 1, h - 2)];
+    dst[gridIndex(w, w - 1, h - 1)] = dst[gridIndex(w, w - 2, h - 2)];
+  }
 
-      for (var ringIndex = 0; ringIndex < ringCount; ringIndex++) {
-        var ringMix = ringCount === 1 ? 1 : ringIndex / (ringCount - 1);
-        var seed = S.seed * 13.13 + i * 41.71 + ringIndex * 97.29;
-        var waveX = sampleArray(frame.bufX, u + t * (0.035 + S.resonance * 0.018) + hash1(seed) * 0.11, frame.x || field.signal);
-        var waveY = sampleArray(frame.bufY, 1 - u + t * (0.043 + S.resonance * 0.02) + hash1(seed + 5) * 0.13, frame.y || field.signal);
-        var wave = clamp((waveX + waveY + field.signal) / 3, 0, 1);
-        var tremor = Math.sin(t * (1.25 + S.resonance * 3.1 + viscosityDrag) + i * 1.77 + ringIndex * 0.73 + S.seed * 0.011);
-        var precess = Math.cos(t * (0.75 + S.resonance * 1.45) + i * 2.31 + ringIndex * 1.19 + field.phaseBias);
-        var angle = l.angle + ringIndex * (Math.PI / Math.max(3, field.lobes.length)) + tremor * 0.13 * looseness + precess * 0.05 * S.resonance;
-        var ring = clamp(0.18 + S.blobSize * (0.2 + ringMix * 0.24) + l.amp * 0.09 + wave * 0.05, 0.16, 0.86);
-        var baseX = Math.cos(angle) * ring + core.x * 0.45;
-        var baseY = Math.sin(angle) * ring * 0.58 + core.y + (ringMix - 0.5) * 0.02;
-        var energy = clamp(l.amp * (0.62 + (1 - ringMix) * 0.24) + field.spike * 0.72 + wave * 0.36 + S.resonance * 0.22, 0, 1.6);
-        var baseRadius = clamp((0.032 + S.blobSize * 0.026 + (1 - S.surfaceTension) * 0.026 + wave * 0.012) * (1 - ringMix * 0.2), 0.024, 0.12);
-        var length = clamp((0.16 + energy * (0.3 + S.fieldStrength * 0.24) + field.spike * 0.28 - S.surfaceTension * 0.024) * (1.18 - ringMix * 0.24), 0.11, 0.96);
-        var lean = Math.sin(angle + t * 0.7 + ringIndex) * 0.08 * looseness;
-        spikes.push({
-          index: i + ringIndex * field.lobes.length,
-          angle: angle,
-          x: baseX,
-          y: baseY,
-          tipX: baseX + Math.cos(angle) * length * 0.09 + lean,
-          tipY: baseY - length * (0.82 + (1 - baseY) * 0.2) + Math.sin(angle) * length * 0.06,
-          baseRadius: baseRadius,
-          length: length,
-          energy: energy,
-          phase: fract(hash1(seed + 9) + t * (0.08 + S.resonance * 0.13)),
-          depth: baseY
-        });
+  function sampleGrid(src, w, h, x, y) {
+    x = clamp(x, 0, w - 1);
+    y = clamp(y, 0, h - 1);
+    var x0 = Math.floor(x);
+    var y0 = Math.floor(y);
+    var x1 = Math.min(w - 1, x0 + 1);
+    var y1 = Math.min(h - 1, y0 + 1);
+    var tx = x - x0;
+    var ty = y - y0;
+    var a = lerp(src[gridIndex(w, x0, y0)], src[gridIndex(w, x1, y0)], tx);
+    var b = lerp(src[gridIndex(w, x0, y1)], src[gridIndex(w, x1, y1)], tx);
+    return lerp(a, b, ty);
+  }
+
+  function advect(dst, src, vx, vy, w, h, dt, dissipation) {
+    var x, y, i, backX, backY;
+    var dtX = dt * (w - 2);
+    var dtY = dt * (h - 2);
+    for (y = 1; y < h - 1; y++) {
+      for (x = 1; x < w - 1; x++) {
+        i = gridIndex(w, x, y);
+        backX = x - vx[i] * dtX;
+        backY = y - vy[i] * dtY;
+        dst[i] = sampleGrid(src, w, h, backX, backY) * dissipation;
       }
     }
+    setGridBoundary(dst, w, h);
+  }
 
-    spikes.sort(function (a, b) { return a.depth - b.depth; });
+  function projectVelocity(vx, vy, pressure, divergence, w, h) {
+    var x, y, i, k;
+    for (y = 1; y < h - 1; y++) {
+      for (x = 1; x < w - 1; x++) {
+        i = gridIndex(w, x, y);
+        divergence[i] = -0.5 * (
+          (vx[gridIndex(w, x + 1, y)] - vx[gridIndex(w, x - 1, y)]) / w +
+          (vy[gridIndex(w, x, y + 1)] - vy[gridIndex(w, x, y - 1)]) / h
+        );
+        pressure[i] = 0;
+      }
+    }
+    setGridBoundary(divergence, w, h);
+    setGridBoundary(pressure, w, h);
+
+    for (k = 0; k < 12; k++) {
+      for (y = 1; y < h - 1; y++) {
+        for (x = 1; x < w - 1; x++) {
+          i = gridIndex(w, x, y);
+          pressure[i] = (
+            divergence[i] +
+            pressure[gridIndex(w, x - 1, y)] +
+            pressure[gridIndex(w, x + 1, y)] +
+            pressure[gridIndex(w, x, y - 1)] +
+            pressure[gridIndex(w, x, y + 1)]
+          ) * 0.25;
+        }
+      }
+      setGridBoundary(pressure, w, h);
+    }
+
+    for (y = 1; y < h - 1; y++) {
+      for (x = 1; x < w - 1; x++) {
+        i = gridIndex(w, x, y);
+        vx[i] -= 0.5 * w * (pressure[gridIndex(w, x + 1, y)] - pressure[gridIndex(w, x - 1, y)]);
+        vy[i] -= 0.5 * h * (pressure[gridIndex(w, x, y + 1)] - pressure[gridIndex(w, x, y - 1)]);
+      }
+    }
+    setGridBoundary(vx, w, h);
+    setGridBoundary(vy, w, h);
+  }
+
+  function seedFluidHeight(height, w, h) {
+    var x, y, sx, sy, r, core;
+    for (y = 0; y < h; y++) {
+      sy = y / (h - 1) * 2 - 1;
+      for (x = 0; x < w; x++) {
+        sx = x / (w - 1) * 2 - 1;
+        r = Math.sqrt(sx * sx + (sy / 0.72) * (sy / 0.72));
+        core = 1 - smoothstep(0.34, 0.84, r);
+        height[gridIndex(w, x, y)] = core * 0.18;
+      }
+    }
+  }
+
+  function magneticPotential(frame, field, sx, sy, t) {
+    var S = field.controls || frameControls(frame);
+    var ey = sy / 0.72;
+    var r = Math.sqrt(sx * sx + ey * ey);
+    var angle = Math.atan2(ey, sx);
+    var blobRadius = 0.36 + S.blobSize * 0.42;
+    var rim = 1 - smoothstep(blobRadius, blobRadius + 0.2 - S.surfaceTension * 0.08, r);
+    var u = (angle / (Math.PI * 2)) + 0.5;
+    var sigX = sampleArray(frame.bufX, u + r * 0.31 + t * 0.019, field.signal);
+    var sigY = sampleArray(frame.bufY, 1 - u + r * 0.23 + t * 0.023, field.signal);
+    var signal = clamp((sigX + sigY + field.signal) / 3, 0, 1);
+    var radial = 0.5 + 0.5 * Math.cos(r * (15 + S.lobeCount * 1.7) - t * (2.2 + S.resonance * 4.4) + field.phaseBias * 2.2);
+    var angular = 0.5 + 0.5 * Math.cos(angle * S.lobeCount + t * (1.1 + S.resonance * 2.9) + field.phaseBias * 2.8);
+    var resonance = Math.pow(clamp(radial * 0.62 + angular * 0.38, 0, 1), 2.35);
+    var core = Math.exp(-r * r * (3.6 - S.blobSize * 1.4));
+    var threshold = smoothstep(S.spikeThreshold * 0.72, 1, signal);
+    var lift = rim * (0.1 + field.pull * 0.18 + core * 0.24);
+    lift += rim * resonance * (0.14 + field.spike * 0.62 + S.resonance * 0.28 + threshold * 0.22);
+    return lift;
+  }
+
+  function injectMagneticField(state, frame, field, dt) {
+    var S = field.controls || frameControls(frame);
+    var w = state.width;
+    var h = state.height;
+    var t = finiteNumber(frame && frame.t, 0);
+    var potential = state.potential;
+    var x, y, i, sx, sy, p, gx, gy, swirl, gain, relax;
+    for (y = 0; y < h; y++) {
+      sy = y / (h - 1) * 2 - 1;
+      for (x = 0; x < w; x++) {
+        sx = x / (w - 1) * 2 - 1;
+        potential[gridIndex(w, x, y)] = magneticPotential(frame, field, sx, sy, t);
+      }
+    }
+    setGridBoundary(potential, w, h);
+
+    gain = dt * (4.5 + S.fieldStrength * 7.5 + S.resonance * 6);
+    relax = clamp(dt * (1.1 + S.resonance * 3.6 + S.fieldStrength * 2.2), 0, 0.34);
+    for (y = 1; y < h - 1; y++) {
+      sy = y / (h - 1) * 2 - 1;
+      for (x = 1; x < w - 1; x++) {
+        sx = x / (w - 1) * 2 - 1;
+        i = gridIndex(w, x, y);
+        p = potential[i];
+        gx = potential[gridIndex(w, x + 1, y)] - potential[gridIndex(w, x - 1, y)];
+        gy = potential[gridIndex(w, x, y + 1)] - potential[gridIndex(w, x, y - 1)];
+        swirl = (sampleArray(frame.bufX, (x / w) + t * 0.031, field.signal) -
+          sampleArray(frame.bufY, (y / h) + t * 0.037, field.signal)) * S.resonance;
+        state.vx[i] += gx * gain - sy * swirl * dt * 0.55;
+        state.vy[i] += gy * gain + sx * swirl * dt * 0.55;
+        state.heightField[i] = clamp(lerp(state.heightField[i], p, relax) + p * field.spike * dt * 0.15, 0, 1.6);
+      }
+    }
+    setGridBoundary(state.vx, w, h);
+    setGridBoundary(state.vy, w, h);
+    setGridBoundary(state.heightField, w, h);
+  }
+
+  function diffuseHeight(state, amount) {
+    var w = state.width;
+    var h = state.height;
+    var src = state.heightField;
+    var dst = state.scratch;
+    var x, y, i, avg;
+    for (y = 1; y < h - 1; y++) {
+      for (x = 1; x < w - 1; x++) {
+        i = gridIndex(w, x, y);
+        avg = (
+          src[gridIndex(w, x - 1, y)] +
+          src[gridIndex(w, x + 1, y)] +
+          src[gridIndex(w, x, y - 1)] +
+          src[gridIndex(w, x, y + 1)]
+        ) * 0.25;
+        dst[i] = lerp(src[i], avg, amount);
+      }
+    }
+    setGridBoundary(dst, w, h);
+    state.heightField.set(dst);
+  }
+
+  function fluidStats(snapshot) {
+    var h = snapshot.heightField;
+    var vx = snapshot.velocityX;
+    var vy = snapshot.velocityY;
+    var w = snapshot.width;
+    var height = snapshot.height;
+    var mass = 0;
+    var maxHeight = 0;
+    var velocityEnergy = 0;
+    var curlEnergy = 0;
+    var i, x, y, c;
+    for (i = 0; i < h.length; i++) {
+      mass += h[i];
+      maxHeight = Math.max(maxHeight, h[i]);
+      velocityEnergy += vx[i] * vx[i] + vy[i] * vy[i];
+    }
+    for (y = 1; y < height - 1; y++) {
+      for (x = 1; x < w - 1; x++) {
+        c = (vy[gridIndex(w, x + 1, y)] - vy[gridIndex(w, x - 1, y)]) -
+          (vx[gridIndex(w, x, y + 1)] - vx[gridIndex(w, x, y - 1)]);
+        curlEnergy += Math.abs(c);
+      }
+    }
     return {
-      core: core,
-      spikes: spikes,
-      agitation: agitation
+      mass: mass / h.length,
+      maxHeight: maxHeight,
+      velocityEnergy: Math.sqrt(velocityEnergy / h.length),
+      curlEnergy: curlEnergy / Math.max(1, (w - 2) * (height - 2))
+    };
+  }
+
+  function createFluidSolver(width, height) {
+    width = Math.round(clamp(width, 12, 256));
+    height = Math.round(clamp(height, 12, 256));
+    var size = width * height;
+    var state = {
+      width: width,
+      height: height,
+      heightField: new Float32Array(size),
+      heightPrev: new Float32Array(size),
+      vx: new Float32Array(size),
+      vy: new Float32Array(size),
+      vxPrev: new Float32Array(size),
+      vyPrev: new Float32Array(size),
+      pressure: new Float32Array(size),
+      divergence: new Float32Array(size),
+      potential: new Float32Array(size),
+      scratch: new Float32Array(size),
+      lastTime: null
+    };
+
+    function reset() {
+      state.heightField.fill(0);
+      state.heightPrev.fill(0);
+      state.vx.fill(0);
+      state.vy.fill(0);
+      state.vxPrev.fill(0);
+      state.vyPrev.fill(0);
+      state.pressure.fill(0);
+      state.divergence.fill(0);
+      state.potential.fill(0);
+      state.scratch.fill(0);
+      seedFluidHeight(state.heightField, width, height);
+      state.lastTime = null;
+    }
+
+    function snapshot(frame, field) {
+      var out = {
+        width: width,
+        height: height,
+        heightField: state.heightField,
+        velocityX: state.vx,
+        velocityY: state.vy,
+        field: field || buildField(frame),
+        controls: (field && field.controls) || frameControls(frame)
+      };
+      out.stats = fluidStats(out);
+      return out;
+    }
+
+    function step(frame) {
+      frame = frame || {};
+      var field = buildField(frame);
+      var S = field.controls;
+      var t = finiteNumber(frame.t, 0);
+      var dt = state.lastTime == null ? 1 / 60 : clamp(t - state.lastTime, 1 / 120, 1 / 24);
+      state.lastTime = t;
+
+      injectMagneticField(state, frame, field, dt);
+      projectVelocity(state.vx, state.vy, state.pressure, state.divergence, width, height);
+
+      state.vxPrev.set(state.vx);
+      state.vyPrev.set(state.vy);
+      var velDissipation = 0.992 - S.viscosity * 0.09;
+      advect(state.vx, state.vxPrev, state.vxPrev, state.vyPrev, width, height, dt, velDissipation);
+      advect(state.vy, state.vyPrev, state.vxPrev, state.vyPrev, width, height, dt, velDissipation);
+      projectVelocity(state.vx, state.vy, state.pressure, state.divergence, width, height);
+
+      state.heightPrev.set(state.heightField);
+      advect(state.heightField, state.heightPrev, state.vx, state.vy, width, height, dt, 0.992 - S.surfaceTension * 0.04);
+      diffuseHeight(state, 0.025 + S.surfaceTension * 0.05);
+      injectMagneticField(state, frame, field, dt * 0.55);
+
+      return snapshot(frame, field);
+    }
+
+    reset();
+    return {
+      width: width,
+      height: height,
+      reset: reset,
+      step: step,
+      snapshot: snapshot
+    };
+  }
+
+  function sampleFluidSurface(snapshot, sx, sy) {
+    snapshot = snapshot || {};
+    var w = snapshot.width || 1;
+    var h = snapshot.height || 1;
+    var field = snapshot.heightField || [0];
+    sx = Number(sx) || 0;
+    sy = Number(sy) || 0;
+    var gx = (sx * 0.5 + 0.5) * (w - 1);
+    var gy = (sy * 0.5 + 0.5) * (h - 1);
+    var height = sampleGrid(field, w, h, gx, gy);
+    var dx = sampleGrid(field, w, h, gx + 1, gy) - sampleGrid(field, w, h, gx - 1, gy);
+    var dy = sampleGrid(field, w, h, gx, gy + 1) - sampleGrid(field, w, h, gx, gy - 1);
+    var nx = -dx * 8;
+    var ny = -dy * 8;
+    var nz = 1;
+    var inv = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
+    return {
+      height: height,
+      mask: smoothstep(0.025, 0.16, height),
+      pressure: height,
+      normal: [nx * inv, ny * inv, nz * inv]
     };
   }
 
@@ -287,7 +548,8 @@
     normalizeControls: normalizeControls,
     buildField: buildField,
     buildDroplets: buildDroplets,
-    buildSurfaceActors: buildSurfaceActors,
+    createFluidSolver: createFluidSolver,
+    sampleFluidSurface: sampleFluidSurface,
     sampleSurface: sampleSurface,
     _private: {
       clamp: clamp,

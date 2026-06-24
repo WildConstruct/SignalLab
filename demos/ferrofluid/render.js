@@ -1,7 +1,7 @@
 /*
  * FERROFLUID - Signal Rack magnetic resonance demo
- * A Signal Rack waveform mimics a magnetic field pulling a reflective black
- * 2.5D ferrofluid blob into lobes, droplets, and high-energy spikelets.
+ * A Signal Rack waveform is pushed through a small fluid/height solver,
+ * displacing a reflective black ferrofluid surface.
  */
 (function (root) {
   "use strict";
@@ -35,24 +35,30 @@
     ctx.strokeStyle = "rgba(30,30,28,0.08)"; ctx.lineWidth = 2; ctx.beginPath();
     ctx.arc(cx, cy, Math.min(W, H) * 0.34, 0, Math.PI * 2); ctx.stroke();
   }
-  function sceneMetrics(W, H) {
-    var s = Math.min(W, H);
-    return { cx: W * 0.5, cy: H * 0.57, sx: s * 0.5, sy: s * 0.36, s: s };
+  var solver = null, solverCols = 0, solverRows = 0;
+  var fluidCanvas = null, fluidCtx = null, fluidImage = null;
+
+  function ensureFluidSurface(W, H) {
+    var cols = Math.min(180, Math.max(96, Math.round(W / 5)));
+    var rows = Math.min(150, Math.max(72, Math.round(cols * H / W)));
+    if (!solver || cols !== solverCols || rows !== solverRows) {
+      solver = Model.createFluidSolver(cols, rows);
+      solverCols = cols;
+      solverRows = rows;
+      fluidCanvas = document.createElement("canvas");
+      fluidCanvas.width = cols;
+      fluidCanvas.height = rows;
+      fluidCtx = fluidCanvas.getContext("2d");
+      fluidImage = fluidCtx.createImageData(cols, rows);
+    }
   }
-  function project(m, x, y) {
-    return { x: m.cx + x * m.sx, y: m.cy + y * m.sy };
-  }
-  function rgba(rgb, alpha) {
-    return "rgba(" + Math.round(rgb[0]) + "," + Math.round(rgb[1]) + "," + Math.round(rgb[2]) + "," + alpha + ")";
-  }
-  function accentCss(S, alpha) {
-    return rgba(accentColor(S.accent), alpha);
-  }
-  function drawFieldWell(ctx, W, H, S, m, actors) {
-    var core = project(m, actors.core.x, actors.core.y);
-    var rx = (0.5 + actors.core.energy * 0.16) * m.sx;
-    var ry = (0.34 + actors.core.energy * 0.08) * m.sy;
-    var g = ctx.createRadialGradient(core.x, core.y, 0, core.x, core.y, rx);
+
+  function drawMagneticWell(ctx, W, H, S, snapshot) {
+    var cx = W * 0.5;
+    var cy = H * 0.55;
+    var rx = W * (0.3 + S.blobSize * 0.12);
+    var ry = H * (0.22 + S.blobSize * 0.08);
+    var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
     if (S.stage === "dark") {
       g.addColorStop(0, "rgba(92,102,100,0.34)");
       g.addColorStop(0.55, "rgba(42,52,52,0.2)");
@@ -64,147 +70,76 @@
     }
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.ellipse(core.x, core.y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, rx * (1 + snapshot.stats.mass * 0.18), ry, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  function drawCorePool(ctx, W, H, F, field, actors) {
-    var S = controlsFor(field, F), m = sceneMetrics(W, H), p = project(m, actors.core.x, actors.core.y);
-    var rx = actors.core.rx * m.sx;
-    var ry = actors.core.ry * m.sy;
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.62)";
-    ctx.shadowBlur = Math.max(12, m.s * 0.04);
-    var body = ctx.createRadialGradient(p.x - rx * 0.28, p.y - ry * 0.6, 0, p.x, p.y, Math.max(rx, ry));
-    body.addColorStop(0, "rgba(82,86,92,0.72)");
-    body.addColorStop(0.12, "rgba(18,19,22,0.98)");
-    body.addColorStop(0.72, "rgba(0,0,0,1)");
-    body.addColorStop(1, "rgba(0,0,0,0.96)");
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = "rgba(255,255,255," + (0.12 + S.reflection * 0.1) + ")";
-    ctx.lineWidth = Math.max(1, m.s * 0.002);
-    ctx.stroke();
-    ctx.restore();
-  }
-  function drawTravelingHighlights(ctx, W, H, F, field, actors) {
-    var S = controlsFor(field, F), m = sceneMetrics(W, H), p = project(m, actors.core.x, actors.core.y);
+
+  function shadeFluidPixel(F, snapshot, sx, sy) {
+    var S = snapshot.controls;
     var t = Number(F && F.t) || 0;
-    ctx.save();
-    ctx.lineCap = "round";
-    for (var i = 0; i < 4; i++) {
-      var phase = t * (0.52 + S.resonance * 0.28) + i * 1.9;
-      var alpha = (0.13 + Math.max(0, Math.sin(phase)) * 0.2) * S.reflection;
-      var rx = (actors.core.rx * (0.44 + i * 0.11)) * m.sx;
-      var ry = (actors.core.ry * (0.36 + i * 0.08)) * m.sy;
-      ctx.strokeStyle = "rgba(255,255,255," + alpha + ")";
-      ctx.lineWidth = Math.max(1, m.s * (0.0025 + i * 0.0007));
-      ctx.beginPath();
-      ctx.ellipse(p.x + Math.sin(phase) * m.s * 0.012, p.y - ry * 0.16, rx, ry, -0.3, Math.PI * 1.05, Math.PI * 1.72);
-      ctx.stroke();
-    }
+    var sample = Model.sampleFluidSurface(snapshot, sx, sy);
+    if (sample.mask <= 0.002) return [0, 0, 0, 0];
+
+    var n = sample.normal;
+    var h = sample.height;
+    var rim = Math.pow(Math.max(0, 1 - n[2]), 1.1);
+    var key = Math.pow(Math.max(0, n[0] * -0.42 + n[1] * -0.66 + n[2] * 0.78), 28) * S.reflection;
+    var sweep = Math.pow(Math.max(0, Math.sin((sx * 2.2 - sy * 1.25 + h * 7.2 + t * 0.42) * Math.PI)), 42) * S.reflection;
+    var ridge = Math.pow(Math.max(0, h - 0.28), 1.45) * 38;
+    var base = Math.max(0, Math.min(22, h * 12));
+    var hi = (key * 210 + sweep * 58 + rim * 28 + ridge) * sample.mask;
+    var r = base + hi;
+    var g = base + hi;
+    var b = base + hi + Math.min(12, h * 18);
+
     if (S.accent !== "none") {
-      ctx.strokeStyle = accentCss(S, 0.34 * S.reflection);
-      ctx.lineWidth = Math.max(1, m.s * 0.003);
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, actors.core.rx * m.sx * 0.86, actors.core.ry * m.sy * 0.78, 0.16, Math.PI * 1.14, Math.PI * 1.52);
-      ctx.stroke();
+      var ac = accentColor(S.accent);
+      var accent = Math.pow(Math.max(0, Math.sin((sx * 5.7 + sy * 3.1 + h * 5 + t * 0.7) * Math.PI)), 24) * sample.mask * S.resonance * 0.35;
+      r += ac[0] * accent;
+      g += ac[1] * accent;
+      b += ac[2] * accent;
     }
-    ctx.restore();
+
+    return [
+      Math.max(0, Math.min(255, r)),
+      Math.max(0, Math.min(255, g)),
+      Math.max(0, Math.min(255, b)),
+      Math.max(0, Math.min(255, sample.mask * 255))
+    ];
   }
-  function drawDroplets(ctx, W, H, F, field) {
-    var S = controlsFor(field, F), m = sceneMetrics(W, H), drops = Model.buildDroplets(F, field);
-    var t = Number(F && F.t) || 0;
-    drops.forEach(function (d, index) {
-      var wobble = Math.sin(t * (1.7 + field.energy) + d.phase * Math.PI * 2 + index) * 0.035 * (0.4 + S.resonance);
-      var p = project(m, d.x + wobble, d.y * 0.64 + Math.cos(t * 1.1 + index) * 0.012);
-      var r = Math.max(3, d.r * m.s * (1.05 + field.spike * 0.55));
-      var g = ctx.createRadialGradient(p.x - r * 0.38, p.y - r * 0.5, 0, p.x, p.y, r);
-      g.addColorStop(0, "rgba(255,255,255,0.92)");
-      g.addColorStop(0.15, "rgba(48,50,56,0.88)");
-      g.addColorStop(0.46, "rgba(2,2,3,1)");
-      g.addColorStop(1, "rgba(0,0,0,0.96)");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, r * 1.16, r * 0.92, wobble * 3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }
-  function drawSpikeBase(ctx, m, S, spike) {
-    var p = project(m, spike.x, spike.y);
-    var r = Math.max(3, spike.baseRadius * m.s * (1.1 + spike.energy * 0.28));
-    var g = ctx.createRadialGradient(p.x - r * 0.34, p.y - r * 0.5, 0, p.x, p.y, r * 1.2);
-    g.addColorStop(0, "rgba(255,255,255,0.78)");
-    g.addColorStop(0.16, "rgba(45,48,54,0.86)");
-    g.addColorStop(0.55, "rgba(0,0,0,1)");
-    g.addColorStop(1, "rgba(0,0,0,0.95)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y, r * 1.25, r * 0.86, spike.angle * 0.2, 0, Math.PI * 2);
-    ctx.fill();
-    if (S.accent !== "none" && spike.energy > 0.75) {
-      ctx.fillStyle = accentCss(S, 0.34);
-      ctx.beginPath();
-      ctx.ellipse(p.x + r * 0.36, p.y - r * 0.38, r * 0.26, r * 0.1, spike.angle, 0, Math.PI * 2);
-      ctx.fill();
+
+  function drawFluidSurface(ctx, W, H, F, field) {
+    ensureFluidSurface(W, H);
+    var snapshot = solver.step(F);
+    drawMagneticWell(ctx, W, H, controlsFor(field, F), snapshot);
+
+    var data = fluidImage.data;
+    var p = 0;
+    for (var y = 0; y < solverRows; y++) {
+      for (var x = 0; x < solverCols; x++) {
+        var sx = x / (solverCols - 1) * 2 - 1;
+        var sy = y / (solverRows - 1) * 2 - 1;
+        var c = shadeFluidPixel(F, snapshot, sx, sy);
+        data[p++] = c[0];
+        data[p++] = c[1];
+        data[p++] = c[2];
+        data[p++] = c[3];
+      }
     }
-  }
-  function drawSpikeCone(ctx, m, S, F, spike) {
-    var b = project(m, spike.x, spike.y), tip = project(m, spike.tipX, spike.tipY);
-    var dx = tip.x - b.x, dy = tip.y - b.y;
-    var len = Math.sqrt(dx * dx + dy * dy) || 1;
-    var px = -dy / len, py = dx / len;
-    var width = Math.max(4, spike.baseRadius * m.s * (0.72 + spike.energy * 0.26));
-    var grd = ctx.createLinearGradient(tip.x, tip.y, b.x, b.y);
-    grd.addColorStop(0, "rgba(168,174,186,0.56)");
-    grd.addColorStop(0.13, "rgba(42,44,50,0.82)");
-    grd.addColorStop(0.62, "rgba(4,4,6,1)");
-    grd.addColorStop(1, "rgba(0,0,0,0.96)");
-    ctx.fillStyle = grd;
-    ctx.beginPath();
-    ctx.moveTo(tip.x, tip.y);
-    ctx.quadraticCurveTo(b.x + px * width * 1.08 + dx * 0.18, b.y + py * width * 1.08 + dy * 0.18, b.x + px * width, b.y + py * width);
-    ctx.quadraticCurveTo(b.x - dx * 0.08, b.y - dy * 0.05, b.x - px * width, b.y - py * width);
-    ctx.quadraticCurveTo(b.x - px * width * 0.82 + dx * 0.14, b.y - py * width * 0.82 + dy * 0.14, tip.x, tip.y);
-    ctx.closePath();
-    ctx.fill();
-    var shimmer = (0.45 + Math.sin(((Number(F && F.t) || 0) * 4.8) + spike.phase * Math.PI * 2) * 0.35) * S.reflection;
-    ctx.strokeStyle = "rgba(255,255,255," + (0.035 * S.reflection) + ")";
-    ctx.lineWidth = Math.max(1, width * 0.03);
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(255,255,255," + Math.min(0.86, 0.16 + shimmer * spike.energy * 0.46) + ")";
-    ctx.lineWidth = Math.max(1, width * 0.08);
-    ctx.beginPath();
-    ctx.moveTo(tip.x + px * width * 0.04, tip.y + py * width * 0.04);
-    ctx.quadraticCurveTo(b.x + px * width * 0.58 + dx * 0.18, b.y + py * width * 0.58 + dy * 0.18, b.x + px * width * 0.2, b.y + py * width * 0.2);
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(255,255,255," + (0.08 * S.reflection) + ")";
-    ctx.lineWidth = Math.max(1, width * 0.032);
-    ctx.beginPath();
-    ctx.moveTo(tip.x - px * width * 0.08, tip.y - py * width * 0.08);
-    ctx.quadraticCurveTo(b.x - px * width * 0.48 + dx * 0.2, b.y - py * width * 0.48 + dy * 0.2, b.x - px * width * 0.14, b.y - py * width * 0.14);
-    ctx.stroke();
-  }
-  function drawResonantSpikes(ctx, W, H, F, field, actors) {
-    var S = controlsFor(field, F), m = sceneMetrics(W, H);
+    fluidCtx.putImageData(fluidImage, 0, 0);
     ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.5)";
-    ctx.shadowBlur = Math.max(2, m.s * 0.006);
-    actors.spikes.forEach(function (spike) { drawSpikeBase(ctx, m, S, spike); });
-    actors.spikes.forEach(function (spike) { drawSpikeCone(ctx, m, S, F, spike); });
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.shadowColor = "rgba(0,0,0,0.58)";
+    ctx.shadowBlur = Math.min(W, H) * 0.035;
+    ctx.drawImage(fluidCanvas, 0, 0, W, H);
     ctx.restore();
   }
+
   function render2D(ctx, W, H, F) {
     var field = Model.buildField(F);
-    var actors = Model.buildSurfaceActors(F, field);
     drawStage(ctx, W, H, controlsFor(field, F));
-    drawFieldWell(ctx, W, H, controlsFor(field, F), sceneMetrics(W, H), actors);
-    drawCorePool(ctx, W, H, F, field, actors);
-    drawDroplets(ctx, W, H, F, field);
-    drawResonantSpikes(ctx, W, H, F, field, actors);
-    drawTravelingHighlights(ctx, W, H, F, field, actors);
+    drawFluidSurface(ctx, W, H, F, field);
   }
 
   var f2 = function (v) { return (+v).toFixed(2); };

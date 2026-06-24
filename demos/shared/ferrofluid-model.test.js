@@ -32,10 +32,6 @@ function frame(overrides) {
   return Object.assign(base, overrides || {});
 }
 
-function controls(overrides) {
-  return Object.assign({}, frame().S, overrides || {});
-}
-
 const defaults = FerrofluidModel.normalizeControls({});
 assert.strictEqual(defaults.stage, "aperture");
 assert.strictEqual(defaults.accent, "none");
@@ -91,44 +87,38 @@ assert.ok(nonFiniteTimeDroplets.every((droplet) => {
     droplet.r < 0.08;
 }), "non-finite time should produce finite bounded droplets");
 
-assert.strictEqual(typeof FerrofluidModel.buildSurfaceActors, "function", "model exposes animated surface actors");
+assert.strictEqual(typeof FerrofluidModel.createFluidSolver, "function", "model exposes a stateful fluid solver");
+assert.strictEqual(FerrofluidModel.buildSurfaceActors, undefined, "model should not expose actor primitives for ferrofluid motion");
 
-const activeFrame = frame({
-  t: 2.5,
-  n: 0.82,
-  S: controls({ fieldStrength: 1, resonance: 1, surfaceTension: 0.34, lobeCount: 9, spikeThreshold: 0.58 })
-});
-const activeField = FerrofluidModel.buildField(activeFrame);
-const activeActors = FerrofluidModel.buildSurfaceActors(activeFrame, activeField);
-assert.ok(activeActors.core.rx > 0.2 && activeActors.core.ry > 0.15, "core actor has visible size");
-assert.ok(activeActors.spikes.length >= activeField.lobes.length * 2, "high resonance creates a dense multi-ring spike field");
-assert.ok(activeActors.spikes.every((spike) => {
-  return Number.isFinite(spike.x) &&
-    Number.isFinite(spike.y) &&
-    Number.isFinite(spike.tipX) &&
-    Number.isFinite(spike.tipY) &&
-    spike.baseRadius > 0 &&
-    spike.length > 0 &&
-    spike.energy >= 0 &&
-    spike.energy <= 1.6;
-}), "spike actors are finite and bounded enough to render");
+const quietSolver = FerrofluidModel.createFluidSolver(36, 28);
+const loudSolver = FerrofluidModel.createFluidSolver(36, 28);
+let quietSnapshot = null;
+let loudSnapshot = null;
+for (let i = 0; i < 8; i++) {
+  quietSnapshot = quietSolver.step(frame({ t: i / 30, n: 0.12, x: 0.12, y: 0.18 }));
+  loudSnapshot = loudSolver.step(frame({ t: i / 30, n: 0.92, x: 0.92, y: 0.84, S: Object.assign({}, frame().S, {
+    fieldStrength: 1,
+    resonance: 1,
+    surfaceTension: 0.32,
+    viscosity: 0.28,
+    lobeCount: 10,
+    spikeThreshold: 0.56
+  }) }));
+}
 
-const laterFrame = frame(Object.assign({}, activeFrame, { t: 3.15 }));
-const laterActors = FerrofluidModel.buildSurfaceActors(laterFrame, FerrofluidModel.buildField(laterFrame));
-const averageTravel = activeActors.spikes.reduce((sum, spike, index) => {
-  const later = laterActors.spikes[index];
-  const dx = later.tipX - spike.tipX;
-  const dy = later.tipY - spike.tipY;
-  return sum + Math.sqrt(dx * dx + dy * dy);
-}, 0) / activeActors.spikes.length;
-assert.ok(averageTravel > 0.02, "animated actors visibly travel over time");
+assert.strictEqual(loudSnapshot.width, 36);
+assert.strictEqual(loudSnapshot.height, 28);
+assert.strictEqual(loudSnapshot.heightField.length, 36 * 28, "height field covers solver grid");
+assert.strictEqual(loudSnapshot.velocityX.length, 36 * 28, "velocity field covers solver grid");
+assert.ok(loudSnapshot.stats.mass > 0.01, "fluid surface has displaced mass");
+assert.ok(loudSnapshot.stats.velocityEnergy > 0.0001, "signal injects velocity into the field");
+assert.ok(loudSnapshot.stats.maxHeight > quietSnapshot.stats.maxHeight + 0.04, "high resonance lifts the displaced fluid field");
+assert.ok(loudSnapshot.stats.curlEnergy > quietSnapshot.stats.curlEnergy, "high resonance adds more rotational field motion");
 
-const quietFrame = frame({ n: 0.08, S: controls({ fieldStrength: 0.42, resonance: 0.2, spikeThreshold: 0.7 }) });
-const loudFrame = frame({ n: 0.96, S: controls({ fieldStrength: 1, resonance: 1, spikeThreshold: 0.55 }) });
-const quietActors = FerrofluidModel.buildSurfaceActors(quietFrame, FerrofluidModel.buildField(quietFrame));
-const loudActors = FerrofluidModel.buildSurfaceActors(loudFrame, FerrofluidModel.buildField(loudFrame));
-const quietHeight = Math.max.apply(null, quietActors.spikes.map((spike) => spike.length));
-const loudHeight = Math.max.apply(null, loudActors.spikes.map((spike) => spike.length));
-assert.ok(loudHeight > quietHeight + 0.08, "high resonance creates visibly taller spikes");
+const sampleA = FerrofluidModel.sampleFluidSurface(loudSnapshot, 0, 0);
+const sampleB = FerrofluidModel.sampleFluidSurface(loudSnapshot, 0.18, -0.12);
+assert.ok(sampleA.height >= 0 && sampleA.mask >= 0 && sampleA.mask <= 1, "fluid surface sample is bounded");
+assert.ok(Array.isArray(sampleA.normal) && sampleA.normal.length === 3, "fluid surface sample exposes normals");
+assert.notStrictEqual(sampleA.height, sampleB.height, "fluid surface samples vary across the displaced field");
 
 console.log("ferrofluid-model tests passed");

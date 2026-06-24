@@ -1,18 +1,19 @@
 # Ferrofluid
 
 Signal Rack behaves like a magnetic resonance driver: the waveform becomes a
-synthetic magnetic field that pulls a glossy black 2.5D ferrofluid blob into
-lobes, dimples, beads, and high-energy spikelets.
+synthetic magnetic field that pushes through a small 2D fluid/height solver.
+The rendered surface is a glossy black displacement field shaded from the
+solver's height and normal data.
 
-The default preset is the blobby aperture look. Dark and high-resonance presets
-push toward reflective macro ferrofluid, but this demo does not claim physical
-magnetohydrodynamics accuracy.
+The demo is an art-directed fluid approximation rather than a full
+magnetohydrodynamics model, but the visible motion is carried by solver state:
+velocity advection, pressure projection, and signal-driven height displacement.
 
 ## Signal Mapping
 
-- `n` controls overall magnetic pull and breathing.
-- `bufX` shapes angular lobe pressure around the blob.
-- `bufY` adds secondary wobble and bead variation when the combine mode uses it.
+- `n` controls overall magnetic pull and height displacement.
+- `bufX` pushes angular pressure through the velocity field.
+- `bufY` adds secondary field drift and rotational energy when the combine mode uses it.
 
 ## Run
 
