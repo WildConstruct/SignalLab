@@ -8,7 +8,8 @@
   var Model = root.FerrofluidModel;
   var WebGL = root.FerrofluidWebGL;
 
-  var off = null, octx = null, imageData = null;
+  var RASTER_INTERVAL = 1 / 30;
+  var off = null, octx = null, imageData = null, lastRasterTime = -Infinity, lastRasterKey = "";
   function ensureOffscreen(cols, rows) {
     if (!off) { off = document.createElement("canvas"); octx = off.getContext("2d"); }
     if (off.width !== cols || off.height !== rows) {
@@ -18,6 +19,10 @@
   }
   function controlsFor(field, F) {
     return field.controls || (Model.normalizeControls ? Model.normalizeControls(F && F.S) : (F && F.S) || {});
+  }
+  function rasterKey(cols, rows, S) {
+    return [cols, rows, S.blobSize, S.surfaceTension, S.fieldStrength, S.resonance,
+      S.lobeCount, S.reflection, S.accent, S.spikeThreshold, S.seed].join(":");
   }
   function accentColor(name) {
     if (name === "magenta") return [255, 42, 232];
@@ -68,20 +73,25 @@
     ];
   }
   function drawBlob(ctx, W, H, F, field) {
-    var cols = Math.min(260, Math.max(140, Math.round(W / 3.2)));
+    var cols = Math.min(200, Math.max(120, Math.round(W / 4)));
     var rows = Math.max(1, Math.round(cols * H / W));
     ensureOffscreen(cols, rows);
-    var img = imageData, data = img.data, p = 0;
-    var aspect = W / H;
-    for (var y = 0; y < rows; y++) {
-      for (var x = 0; x < cols; x++) {
-        var nx = (x / (cols - 1) * 2 - 1) * aspect;
-        var ny = y / (rows - 1) * 2 - 1;
-        var c = shadePixel(F, field, nx, ny);
-        data[p++] = c[0]; data[p++] = c[1]; data[p++] = c[2]; data[p++] = c[3];
+    var t = Number(F && F.t) || 0, key = rasterKey(cols, rows, controlsFor(field, F));
+    if (key !== lastRasterKey || t < lastRasterTime || t - lastRasterTime >= RASTER_INTERVAL) {
+      var img = imageData, data = img.data, p = 0;
+      var aspect = W / H;
+      for (var y = 0; y < rows; y++) {
+        for (var x = 0; x < cols; x++) {
+          var nx = (x / (cols - 1) * 2 - 1) * aspect;
+          var ny = y / (rows - 1) * 2 - 1;
+          var c = shadePixel(F, field, nx, ny);
+          data[p++] = c[0]; data[p++] = c[1]; data[p++] = c[2]; data[p++] = c[3];
+        }
       }
+      octx.putImageData(img, 0, 0);
+      lastRasterTime = t;
+      lastRasterKey = key;
     }
-    octx.putImageData(img, 0, 0);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
     ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = Math.min(W, H) * 0.04;
     ctx.drawImage(off, 0, 0, cols, rows, 0, 0, W, H);
@@ -113,7 +123,7 @@
     structure: [
       { tier: "structure", key: "stage", label: "Stage", type: "select", value: "aperture", options: [
         { value: "aperture", label: "Aperture" }, { value: "dark", label: "Dark stage" }, { value: "plate", label: "Macro plate" } ] },
-      { tier: "structure", key: "blobSize", label: "Blob size", type: "slider", min: 0.38, max: 1.1, step: 0.01, value: 0.76, fmt: f2 },
+      { tier: "structure", key: "blobSize", label: "Blob size", type: "slider", min: 0.38, max: 1, step: 0.01, value: 0.76, fmt: f2 },
       { tier: "structure", key: "surfaceTension", label: "Surface tension", type: "slider", min: 0, max: 1, step: 0.01, value: 0.76, fmt: f2 },
       { tier: "structure", key: "droplets", label: "Droplets", type: "slider", min: 0, max: 1, step: 0.01, value: 0.28, fmt: f2 },
       { tier: "structure", key: "seed", label: "Seed", type: "slider", min: 1, max: 999, step: 1, value: 19 }
