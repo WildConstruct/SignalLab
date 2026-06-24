@@ -13,7 +13,7 @@ function exists(p) { return fs.existsSync(path.join(root, p)); }
 });
 
 const launcher = read("demos/index.html");
-assert.ok(/dir:"ferrofluid"/.test(launcher), "launcher must include ferrofluid card");
+assert.ok(/dir:\s*"ferrofluid"/.test(launcher), "launcher must include ferrofluid card");
 assert.ok(/magnetic resonance/i.test(launcher), "launcher description should position the demo");
 
 const host = read("demos/shared/host.js");
