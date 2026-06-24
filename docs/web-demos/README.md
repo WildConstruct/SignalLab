@@ -5,7 +5,8 @@
 > folder is the *how*: one shared signal-engine core + seven standalone product
 > demos, each a renderer exposing the **Structure / Signal / Shaping** control
 > triad. The current gallery also includes two Etheros convergence demos
-> (`field-bridge`, `field-distort`) that prove signal↔field composition.
+> (`field-bridge`, `field-distort`) that prove signal-field composition plus
+> a ferrofluid resonance demo (`ferrofluid`) driven by the same signal layer.
 > These plans are written to be executed incrementally by the overnight build
 > loop (see `BACKLOG.md`).
 
@@ -99,6 +100,7 @@ setup round-trips through copy-link/export-JSON.
 |---|---|
 | `etheros-convergence.md` / `field-bridge` | Signal Rack routes `n` onto a live Etheros field recipe parameter. |
 | `field-distort` | Etheros field output acts as a displacement source while Signal Rack pulses the warp. |
+| `ferrofluid` | Signal Rack waveform mimics a magnetic field that drives a reflective blobby ferrofluid height/displacement surface. |
 
 Each plan lists: purpose & positioning, the full Structure/Signal/Shaping
 control list, the MVP increment (first loop deliverable), the increment roadmap,

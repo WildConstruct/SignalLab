@@ -56,7 +56,10 @@ var DEMOS = [
     sig:{ x:{src:"sine",rate:0.4}, drive:"x" } },
   { dir:"field-distort", name:"Field Distort", ready:true, tag:"etheros × distort",
     desc:"The other direction — an Etheros field distorts a FUI plate as a displacement map; the signal pulses the warp. Film-burn / sensor glitch.",
-    sig:{ x:{src:"sine",rate:0.5}, drive:"x" } }
+    sig:{ x:{src:"sine",rate:0.5}, drive:"x" } },
+  { dir:"ferrofluid", name:"Ferrofluid", ready:true, tag:"magnetic resonance",
+    desc:"A glossy black ferrofluid blob whose lobes, beads, and spikelets answer the Signal Rack waveform like a magnetic field.",
+    sig:{ x:{src:"sine",rate:0.45}, y:{src:"sine",rate:0.9,phase:0.2}, drive:"max" } }
 ];
 
 var grid = document.getElementById("grid");

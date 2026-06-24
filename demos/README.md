@@ -1,8 +1,9 @@
 # Signal Rack — Demo Lab (`demos/`)
 
-The working nine-module suite: seven product demos plus two Etheros convergence
-demos, all running over shared Signal Rack demo infrastructure. The product demos
-use one shared signal engine + per-product renderers, each built on the
+The working ten-module suite: seven product demos plus two Etheros convergence
+demos plus the Ferrofluid resonance demo, all running over shared Signal Rack
+demo infrastructure. The product demos use one shared signal engine +
+per-product renderers, each built on the
 **Structure / Signal / Shaping** control language. This is the executable
 counterpart to the strategy in
 [`docs/product-breakup.md`](../docs/product-breakup.md) and the plans in
@@ -16,7 +17,7 @@ python3 -m http.server
 # then open http://localhost:8000/demos/
 ```
 
-The launcher (`demos/index.html`) links all nine modules with live signal
+The launcher (`demos/index.html`) links all ten modules with live signal
 thumbnails.
 
 ## Layout
@@ -48,6 +49,7 @@ demos/
 |---|---|
 | **field-bridge** | Signal Rack drives a real Etheros field parameter in-browser. |
 | **field-distort** | An Etheros field distorts a FUI plate while Signal Rack pulses the warp. |
+| **ferrofluid** | Signal Rack mimics a magnetic resonance field that deforms a reflective black ferrofluid blob. |
 
 ## Contract every renderer obeys
 Renderers read only `n` / `bufX` / `bufY` from the shared driver and never do
