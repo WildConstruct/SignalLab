@@ -61,4 +61,30 @@ assert.ok(sample.height >= 0, "height is nonnegative");
 assert.ok(Array.isArray(sample.normal) && sample.normal.length === 3, "normal is vec3-like");
 assert.ok(sample.normal[2] > 0, "normal points toward viewer");
 
+const nonFiniteTimeField = FerrofluidModel.buildField(frame({ t: Infinity }));
+assert.ok(nonFiniteTimeField.lobes.every((lobe) => {
+  return Number.isFinite(lobe.angle) &&
+    Number.isFinite(lobe.x) &&
+    Number.isFinite(lobe.y) &&
+    Math.abs(lobe.x) <= 1 &&
+    Math.abs(lobe.y) <= 1 &&
+    lobe.radius >= 0 &&
+    lobe.radius <= 1 &&
+    lobe.amp >= 0 &&
+    lobe.amp <= 1 &&
+    lobe.pressure >= 0 &&
+    lobe.pressure <= 1.5;
+}), "non-finite time should produce finite bounded lobes");
+
+const nonFiniteTimeDroplets = FerrofluidModel.buildDroplets(frame({ t: Infinity }), nonFiniteTimeField);
+assert.ok(nonFiniteTimeDroplets.every((droplet) => {
+  return Number.isFinite(droplet.x) &&
+    Number.isFinite(droplet.y) &&
+    Number.isFinite(droplet.r) &&
+    Math.abs(droplet.x) <= 1.2 &&
+    Math.abs(droplet.y) <= 1.2 &&
+    droplet.r > 0 &&
+    droplet.r < 0.08;
+}), "non-finite time should produce finite bounded droplets");
+
 console.log("ferrofluid-model tests passed");

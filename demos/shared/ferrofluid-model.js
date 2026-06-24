@@ -23,6 +23,11 @@
     return clamp(v, 0, 1);
   }
 
+  function finiteNumber(v, fallback) {
+    v = Number(v);
+    return isFinite(v) ? v : fallback;
+  }
+
   function lerp(a, b, t) {
     return a + (b - a) * t;
   }
@@ -90,7 +95,7 @@
   function buildField(frame) {
     frame = frame || {};
     var S = frameControls(frame);
-    var t = Number(frame.t) || 0;
+    var t = finiteNumber(frame.t, 0);
     var n = clamp01(frame.n, 0);
     var x = clamp01(frame.x, n);
     var y = clamp01(frame.y, n);
@@ -143,7 +148,7 @@
     if (S.droplets <= 0) return [];
     var count = Math.max(3, Math.round(S.droplets * 8 + field.spike * 2));
     var droplets = [];
-    var t = Number(frame.t) || 0;
+    var t = finiteNumber(frame.t, 0);
 
     for (var i = 0; i < count; i++) {
       var seed = S.seed * 97.13 + i * 53.31;
@@ -222,6 +227,7 @@
     _private: {
       clamp: clamp,
       clamp01: clamp01,
+      finiteNumber: finiteNumber,
       lerp: lerp,
       hash1: hash1,
       hash2: hash2,
