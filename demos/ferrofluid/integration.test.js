@@ -55,6 +55,10 @@ assert.ok(/Ferrofluid/.test(demosReadme), "demos README must mention Ferrofluid"
 const plansReadme = read("docs/web-demos/README.md");
 assert.ok(/ferrofluid/i.test(plansReadme), "web demo plans README must mention ferrofluid");
 
+const renderSource = read("demos/ferrofluid/render.js");
+assert.ok(/buildSurfaceActors/.test(renderSource), "renderer must use animated surface actors");
+assert.ok(/drawResonantSpikes/.test(renderSource), "renderer must draw the resonant spike field");
+
 const presets = loadFerrofluidPresets();
 Object.entries(presets).forEach(([name, preset]) => {
   assert.deepStrictEqual(

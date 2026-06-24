@@ -169,6 +169,70 @@
     return droplets;
   }
 
+  function buildSurfaceActors(frame, field) {
+    frame = frame || {};
+    field = field || buildField(frame);
+    var S = field.controls || frameControls(frame);
+    var t = finiteNumber(frame.t, 0);
+    var agitation = clamp(field.energy * 0.55 + field.spike * 0.45 + S.resonance * 0.28, 0, 1.6);
+    var looseness = clamp(1 - S.surfaceTension * 0.72 + S.resonance * 0.38, 0.18, 1.2);
+    var viscosityDrag = 1 - S.viscosity * 0.58;
+    var corePulse = 0.5 + Math.sin(t * (1.8 + S.resonance * 2.2) + field.phaseBias) * 0.5;
+    var core = {
+      x: Math.sin(t * 0.42 + field.phaseBias) * 0.025 * looseness,
+      y: 0.05 + Math.cos(t * 0.31 + field.phaseBias * 0.7) * 0.018 * looseness,
+      rx: 0.32 + S.blobSize * 0.28 + field.pull * 0.05,
+      ry: 0.18 + S.blobSize * 0.17 + field.pull * 0.04,
+      pulse: corePulse,
+      energy: agitation
+    };
+    var spikes = [];
+
+    for (var i = 0; i < field.lobes.length; i++) {
+      var l = field.lobes[i];
+      var u = i / Math.max(1, field.lobes.length);
+      var ringCount = S.resonance > 0.78 ? 3 : 2;
+
+      for (var ringIndex = 0; ringIndex < ringCount; ringIndex++) {
+        var ringMix = ringCount === 1 ? 1 : ringIndex / (ringCount - 1);
+        var seed = S.seed * 13.13 + i * 41.71 + ringIndex * 97.29;
+        var waveX = sampleArray(frame.bufX, u + t * (0.035 + S.resonance * 0.018) + hash1(seed) * 0.11, frame.x || field.signal);
+        var waveY = sampleArray(frame.bufY, 1 - u + t * (0.043 + S.resonance * 0.02) + hash1(seed + 5) * 0.13, frame.y || field.signal);
+        var wave = clamp((waveX + waveY + field.signal) / 3, 0, 1);
+        var tremor = Math.sin(t * (1.25 + S.resonance * 3.1 + viscosityDrag) + i * 1.77 + ringIndex * 0.73 + S.seed * 0.011);
+        var precess = Math.cos(t * (0.75 + S.resonance * 1.45) + i * 2.31 + ringIndex * 1.19 + field.phaseBias);
+        var angle = l.angle + ringIndex * (Math.PI / Math.max(3, field.lobes.length)) + tremor * 0.13 * looseness + precess * 0.05 * S.resonance;
+        var ring = clamp(0.18 + S.blobSize * (0.2 + ringMix * 0.24) + l.amp * 0.09 + wave * 0.05, 0.16, 0.86);
+        var baseX = Math.cos(angle) * ring + core.x * 0.45;
+        var baseY = Math.sin(angle) * ring * 0.58 + core.y + (ringMix - 0.5) * 0.02;
+        var energy = clamp(l.amp * (0.62 + (1 - ringMix) * 0.24) + field.spike * 0.72 + wave * 0.36 + S.resonance * 0.22, 0, 1.6);
+        var baseRadius = clamp((0.032 + S.blobSize * 0.026 + (1 - S.surfaceTension) * 0.026 + wave * 0.012) * (1 - ringMix * 0.2), 0.024, 0.12);
+        var length = clamp((0.16 + energy * (0.3 + S.fieldStrength * 0.24) + field.spike * 0.28 - S.surfaceTension * 0.024) * (1.18 - ringMix * 0.24), 0.11, 0.96);
+        var lean = Math.sin(angle + t * 0.7 + ringIndex) * 0.08 * looseness;
+        spikes.push({
+          index: i + ringIndex * field.lobes.length,
+          angle: angle,
+          x: baseX,
+          y: baseY,
+          tipX: baseX + Math.cos(angle) * length * 0.09 + lean,
+          tipY: baseY - length * (0.82 + (1 - baseY) * 0.2) + Math.sin(angle) * length * 0.06,
+          baseRadius: baseRadius,
+          length: length,
+          energy: energy,
+          phase: fract(hash1(seed + 9) + t * (0.08 + S.resonance * 0.13)),
+          depth: baseY
+        });
+      }
+    }
+
+    spikes.sort(function (a, b) { return a.depth - b.depth; });
+    return {
+      core: core,
+      spikes: spikes,
+      agitation: agitation
+    };
+  }
+
   function surfaceHeight(frame, field, sx, sy) {
     frame = frame || {};
     field = field || buildField(frame);
@@ -223,6 +287,7 @@
     normalizeControls: normalizeControls,
     buildField: buildField,
     buildDroplets: buildDroplets,
+    buildSurfaceActors: buildSurfaceActors,
     sampleSurface: sampleSurface,
     _private: {
       clamp: clamp,

@@ -32,6 +32,10 @@ function frame(overrides) {
   return Object.assign(base, overrides || {});
 }
 
+function controls(overrides) {
+  return Object.assign({}, frame().S, overrides || {});
+}
+
 const defaults = FerrofluidModel.normalizeControls({});
 assert.strictEqual(defaults.stage, "aperture");
 assert.strictEqual(defaults.accent, "none");
@@ -86,5 +90,45 @@ assert.ok(nonFiniteTimeDroplets.every((droplet) => {
     droplet.r > 0 &&
     droplet.r < 0.08;
 }), "non-finite time should produce finite bounded droplets");
+
+assert.strictEqual(typeof FerrofluidModel.buildSurfaceActors, "function", "model exposes animated surface actors");
+
+const activeFrame = frame({
+  t: 2.5,
+  n: 0.82,
+  S: controls({ fieldStrength: 1, resonance: 1, surfaceTension: 0.34, lobeCount: 9, spikeThreshold: 0.58 })
+});
+const activeField = FerrofluidModel.buildField(activeFrame);
+const activeActors = FerrofluidModel.buildSurfaceActors(activeFrame, activeField);
+assert.ok(activeActors.core.rx > 0.2 && activeActors.core.ry > 0.15, "core actor has visible size");
+assert.ok(activeActors.spikes.length >= activeField.lobes.length * 2, "high resonance creates a dense multi-ring spike field");
+assert.ok(activeActors.spikes.every((spike) => {
+  return Number.isFinite(spike.x) &&
+    Number.isFinite(spike.y) &&
+    Number.isFinite(spike.tipX) &&
+    Number.isFinite(spike.tipY) &&
+    spike.baseRadius > 0 &&
+    spike.length > 0 &&
+    spike.energy >= 0 &&
+    spike.energy <= 1.6;
+}), "spike actors are finite and bounded enough to render");
+
+const laterFrame = frame(Object.assign({}, activeFrame, { t: 3.15 }));
+const laterActors = FerrofluidModel.buildSurfaceActors(laterFrame, FerrofluidModel.buildField(laterFrame));
+const averageTravel = activeActors.spikes.reduce((sum, spike, index) => {
+  const later = laterActors.spikes[index];
+  const dx = later.tipX - spike.tipX;
+  const dy = later.tipY - spike.tipY;
+  return sum + Math.sqrt(dx * dx + dy * dy);
+}, 0) / activeActors.spikes.length;
+assert.ok(averageTravel > 0.02, "animated actors visibly travel over time");
+
+const quietFrame = frame({ n: 0.08, S: controls({ fieldStrength: 0.42, resonance: 0.2, spikeThreshold: 0.7 }) });
+const loudFrame = frame({ n: 0.96, S: controls({ fieldStrength: 1, resonance: 1, spikeThreshold: 0.55 }) });
+const quietActors = FerrofluidModel.buildSurfaceActors(quietFrame, FerrofluidModel.buildField(quietFrame));
+const loudActors = FerrofluidModel.buildSurfaceActors(loudFrame, FerrofluidModel.buildField(loudFrame));
+const quietHeight = Math.max.apply(null, quietActors.spikes.map((spike) => spike.length));
+const loudHeight = Math.max.apply(null, loudActors.spikes.map((spike) => spike.length));
+assert.ok(loudHeight > quietHeight + 0.08, "high resonance creates visibly taller spikes");
 
 console.log("ferrofluid-model tests passed");
