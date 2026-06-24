@@ -8,10 +8,13 @@
   var Model = root.FerrofluidModel;
   var WebGL = root.FerrofluidWebGL;
 
-  var off = null, octx = null;
+  var off = null, octx = null, imageData = null;
   function ensureOffscreen(cols, rows) {
     if (!off) { off = document.createElement("canvas"); octx = off.getContext("2d"); }
-    if (off.width !== cols || off.height !== rows) { off.width = cols; off.height = rows; }
+    if (off.width !== cols || off.height !== rows) {
+      off.width = cols; off.height = rows;
+      imageData = octx.createImageData(cols, rows);
+    }
   }
   function controlsFor(field, F) {
     return field.controls || (Model.normalizeControls ? Model.normalizeControls(F && F.S) : (F && F.S) || {});
@@ -65,10 +68,10 @@
     ];
   }
   function drawBlob(ctx, W, H, F, field) {
-    var cols = Math.min(420, Math.max(180, Math.round(W / 2.7)));
+    var cols = Math.min(260, Math.max(140, Math.round(W / 3.2)));
     var rows = Math.max(1, Math.round(cols * H / W));
     ensureOffscreen(cols, rows);
-    var img = octx.createImageData(cols, rows), data = img.data, p = 0;
+    var img = imageData, data = img.data, p = 0;
     var aspect = W / H;
     for (var y = 0; y < rows; y++) {
       for (var x = 0; x < cols; x++) {
@@ -116,11 +119,11 @@
       { tier: "structure", key: "seed", label: "Seed", type: "slider", min: 1, max: 999, step: 1, value: 19 }
     ],
     shaping: [
-      { tier: "shaping", key: "fieldStrength", label: "Field strength", type: "slider", min: 0, max: 1.5, step: 0.01, value: 0.62, fmt: f2 },
-      { tier: "shaping", key: "resonance", label: "Resonance", type: "slider", min: 0, max: 1.5, step: 0.01, value: 0.48, fmt: f2 },
+      { tier: "shaping", key: "fieldStrength", label: "Field strength", type: "slider", min: 0, max: 1, step: 0.01, value: 0.62, fmt: f2 },
+      { tier: "shaping", key: "resonance", label: "Resonance", type: "slider", min: 0, max: 1, step: 0.01, value: 0.48, fmt: f2 },
       { tier: "shaping", key: "viscosity", label: "Viscosity", type: "slider", min: 0, max: 1, step: 0.01, value: 0.72, fmt: f2 },
-      { tier: "shaping", key: "lobeCount", label: "Lobes", type: "slider", min: 2, max: 12, step: 1, value: 4 },
-      { tier: "shaping", key: "reflection", label: "Reflection", type: "slider", min: 0, max: 1.5, step: 0.01, value: 0.92, fmt: f2 },
+      { tier: "shaping", key: "lobeCount", label: "Lobes", type: "slider", min: 3, max: 12, step: 1, value: 4 },
+      { tier: "shaping", key: "reflection", label: "Reflection", type: "slider", min: 0, max: 1, step: 0.01, value: 0.92, fmt: f2 },
       { tier: "shaping", key: "accent", label: "Accent", type: "select", value: "none", options: [
         { value: "none", label: "None" }, { value: "magenta", label: "Magenta" }, { value: "amber", label: "Amber" }, { value: "signal", label: "Signal green" } ] },
       { tier: "shaping", key: "spikeThreshold", label: "Spike threshold", type: "slider", min: 0.2, max: 1, step: 0.01, value: 0.9, fmt: f2 }
