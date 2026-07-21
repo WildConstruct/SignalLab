@@ -55,6 +55,10 @@ add_executable(ae_bake_contract_test examples/ae_bake_contract_test.cpp)
 target_link_libraries(ae_bake_contract_test PRIVATE signalrack_core)
 add_test(NAME ae_bake_contract_test COMMAND ae_bake_contract_test)
 
+add_executable(ae_output_transport_test examples/ae_output_transport_test.cpp)
+target_link_libraries(ae_output_transport_test PRIVATE signalrack_core)
+add_test(NAME ae_output_transport_test COMMAND ae_output_transport_test)
+
 add_executable(live_courier_strip_test examples/live_courier_strip_test.cpp)
 target_link_libraries(live_courier_strip_test PRIVATE signalrack_core)
 add_test(NAME live_courier_strip_test COMMAND live_courier_strip_test)
