@@ -59,6 +59,18 @@ add_executable(live_courier_strip_test examples/live_courier_strip_test.cpp)
 target_link_libraries(live_courier_strip_test PRIVATE signalrack_core)
 add_test(NAME live_courier_strip_test COMMAND live_courier_strip_test)
 
+find_program(SIGNALRACK_NODE_EXECUTABLE node)
+if(SIGNALRACK_NODE_EXECUTABLE)
+    add_test(NAME lensboy_support_idle_recipe_test
+        COMMAND ${SIGNALRACK_NODE_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/validate-lensboy-support-idle.mjs")
+    set_tests_properties(lensboy_support_idle_recipe_test PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+else()
+    message(STATUS
+        "SignalRack: Node was not found; the Lensboy support-idle recipe test is unavailable.")
+endif()
+
 # --- dawn runtime (requires a Dawn target named dawn::webgpu_dawn) ------------
 if(IAN_BUILD_SIGNALRACK_DAWN_RUNTIME)
     if(NOT IAN_DAWN_SOURCE_DIR AND NOT IAN_USE_EXTERNAL_DAWN)

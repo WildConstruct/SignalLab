@@ -1,0 +1,65 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Support Idle",
+  "id": "sg_support_idle_001",
+  "version": "0.3",
+  "rackType": "generator",
+  "inputs": { "A": null, "B": null, "C": null },
+  "source": {
+    "type": "sine",
+    "rate": 0.12,
+    "amount": 1.0,
+    "phase": 0.1,
+    "offset": 0.0
+  },
+  "process": {
+    "smooth": 0.0,
+    "gain": 0.18,
+    "bias": 0.0,
+    "quantize": 0.0,
+    "gate": 0.0,
+    "lag": 0.0,
+    "warp": 0.0,
+    "fold": 0.0,
+    "sat": 0.0,
+    "invert": false,
+    "rectify": false
+  },
+  "outputs": {
+    "A": {
+      "name": "Support Idle",
+      "profile": "normalized_0_1",
+      "range": [0.0, 1.0],
+      "units": "normalized",
+      "semantic": "Slow continuous attention envelope for secondary support graphics.",
+      "valueType": "scalar",
+      "behavior": "continuous",
+      "deterministic": true,
+      "memory": "none",
+      "arbitraryTimeEvaluation": true,
+      "suggestedDestinations": [
+        "supportLane.opacity",
+        "secondaryAnnotation.opacity",
+        "guideOverlay.opacity"
+      ]
+    }
+  },
+  "timebase": { "mode": "compTime", "seed": 37 },
+  "visualization": {
+    "mode": "guide_waveform",
+    "showProbe": false,
+    "showOutputLabels": true
+  },
+  "bake": { "mode": "none", "simplify": false, "preservePeaks": true },
+  "wildConstruct": {
+    "rackId": "sg_support_idle_001",
+    "channels": { "A.value": "support_idle" },
+    "targetIdentity": "semantic_support_idle"
+  },
+  "compatibilityTags": [
+    "host:arbitrary-time",
+    "wc:semantic-signal",
+    "wc:lensboy"
+  ],
+  "notes": "A host-neutral, memoryless sine source narrowed by gain to 0.41..0.59. Consumers map that normalized envelope into a subtle destination-specific opacity band. Outputs B and C are intentionally absent rather than anonymous spare channels."
+}
