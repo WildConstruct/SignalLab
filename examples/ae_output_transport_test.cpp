@@ -42,6 +42,10 @@ int main() {
                publication.sourceExpression.find("sg_support_idle_001@0.3") !=
                    std::string::npos,
            "S1 expression is identity-stamped and does not use the live courier");
+    Expect(publication.sourceExpression.rfind(
+               "// Signal Rack sg_support_idle_001@0.3 Output A\n", 0u) == 0u &&
+               publication.sourceExpression.find("\\n") == std::string::npos,
+           "S1 expression terminates its identity comment with a real line feed");
     Expect(publication.report.preserved.size() == 5u &&
                publication.report.lost == std::vector<std::string>{"wgslExecutionPath"},
            "expression publication reports preservation and execution-path loss");

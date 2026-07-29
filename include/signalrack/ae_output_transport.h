@@ -71,7 +71,7 @@ inline std::string BuildOutputReferenceExpression(
 // bounded expression publication path for the memoryless S1 recipe. It is not
 // the live courier and it does not make AE state canonical.
 inline std::string BuildSupportIdleOutputAExpression() {
-    return "// Signal Rack sg_support_idle_001@0.3 Output A\\n"
+    return "// Signal Rack sg_support_idle_001@0.3 Output A\n"
            "var seedPhase=((37*0.07)%1+1)%1;"
            "var x=time*0.12+0.1+seedPhase;"
            "var source=Math.min(1,Math.max(0,(Math.sin(x*Math.PI*2)+1)/2));"
