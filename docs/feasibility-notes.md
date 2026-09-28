@@ -109,7 +109,7 @@ exclusion is well-documented but verify.]**
 radius, postEffect, t)` returning averaged `[r,g,b,a]`; `radius=[0.5,0.5]` = 1×1,
 `[2.5,2.5]` = 5×5. The **production** path (chosen) is the plugin: it samples the
 source layer's pixels on the GPU/host and feeds per-sample luma into the shader's
-`lumaIn` buffer, then smoothing/threshold happen in WGSL. Probing should be
+external input buffer (`extIn`, binding 2), then smoothing/threshold happen in WGSL. Probing should be
 **analyze-and-cache** (bake) for performance; live sampling is preview-grade.
 Speed/accuracy/color-management caveats are in `tests/luma-probe-tests.md`. **[I]**
 

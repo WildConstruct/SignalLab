@@ -98,7 +98,7 @@ model. **[C model / I in-AE render exclusion]**
 ## 10. Luma probe findings
 Mapping (luma → smooth/threshold → output) works against a mocked source
 (`validate.js` test 10). Real pixel sampling needs the plugin to fill the
-shader's `lumaIn` buffer; treat probing as **analyze-and-cache** (bake) for
+shader's `extIn` buffer (binding 2); treat probing as **analyze-and-cache** (bake) for
 production. Color-management, pre/post-effect, kernel-size, and sub-pixel caveats
 in `tests/luma-probe-tests.md`. **[C mapping / I real pixels]**
 
@@ -143,9 +143,25 @@ O(window) per frame — keep sample counts modest.
    TempBridge) and wire the param order in `signalrack_bridge.h`. **Prove one
    rack drives one AE property end-to-end** — that's the gate.
 2. Vendor/pin Dawn; get `examples/signal_smoke.cpp` building and printing scalars.
-3. Add the luma-probe pixel path (fill `lumaIn`) and benchmark.
+3. Add the luma-probe pixel path (fill `extIn`, binding 2) and benchmark.
 4. Confirm guide-layer render exclusion and the bake/detach round-trip in AE.
 5. Only then consider a panel and stateful-DSP state buffers.
+
+## 14b. Addendum (2026-09-28) — real audio source + real spring
+- **Audio lane** (`audioLane`, source 10): the engine reads a per-sample
+  external input; binding 2 was generalised from `lumaIn` to `extIn` (luma *or*
+  audio lane — one source per rack, so no new binding). `tympo-lane.js` renders
+  Tympo `level` (interpolated) / `hits` (strength·e^(−t/decay)) lanes onto the
+  rack grid; the web tool loads Tympo exports. Replaces `audioPlaceholder`. **[C]**
+- **Spring** stage: the lag loop's alternative, weighted by a damped
+  2nd-order impulse response (unit DC gain, ≤64 taps, strided + interpolated on
+  fine grids), packed into v10.y/z/w by the JS packer and `Compile()`. Step
+  overshoot matches e^(−ζπ/√(1−ζ²)); ζ≈1 has none; outputs get [−1, 2] headroom
+  while it is on. Needle Bounce now bounces. Still a bounded FIR, not state. **[C]**
+- **CPU vs GPU parity** is now measured on the real WGSL (headless Chromium,
+  SwiftShader): `gpu-parity.html` / `gpu-parity-run.js`. It exposed two
+  pre-existing gaps (value noise in f32, smooth tap rounding) — see
+  `docs/known-limitations.md`. **[C]**
 
 ## 15. Open questions for Brian and Harry
 - Is there a **shared `.wcx` schema** Signal Rack should depend on rather than

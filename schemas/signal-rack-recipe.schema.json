@@ -30,7 +30,8 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["sine", "pulse", "ramp", "noise", "randomWalk", "linked", "lumaProbe", "audioPlaceholder"]
+          "enum": ["sine", "pulse", "ramp", "noise", "randomWalk", "linked", "lumaProbe", "audioLane", "audioPlaceholder"],
+          "description": "audioLane = engine source 10: a per-sample external input rendered from an audio-analysis lane (Tympo). audioPlaceholder is kept for old recipes only; it is not an engine source."
         },
         "rate": { "type": "number", "description": "Hz (cycles per second)." },
         "amount": { "type": "number" },
@@ -39,7 +40,17 @@
         "sourceLayer": { "type": "string", "description": "For probe sources." },
         "position": { "type": "array", "items": { "type": "number" }, "description": "Probe sample point [x,y]." },
         "sampleKernel": { "type": "string", "enum": ["1x1", "3x3_average", "5x5_average"] },
-        "sampleMode": { "type": "string", "enum": ["preEffect", "postEffect"] }
+        "sampleMode": { "type": "string", "enum": ["preEffect", "postEffect"] },
+        "lane": {
+          "type": "object",
+          "description": "audioLane only: which Tympo lane the host renders into the rack's per-sample input (see prototypes/webgpu-lab/tympo-lane.js).",
+          "properties": {
+            "file": { "type": "string", "description": "Tympo export / bundle reference." },
+            "band": { "type": "string", "description": "Lane name within a multi-lane bundle, e.g. 'kick'." },
+            "feed": { "type": "string", "enum": ["level", "hits"], "description": "level = continuous 0..1 (linear interpolation); hits = decaying kicks." },
+            "hitDecay": { "type": "number", "minimum": 0, "description": "Seconds. Each hit renders as strength * e^(-(t - hitTime)/hitDecay); 0 = one frame." }
+          }
+        }
       }
     },
     "process": {
@@ -50,7 +61,11 @@
         "threshold": { "type": "number" },
         "hysteresis": { "type": "number" },
         "invert": { "type": "boolean" },
-        "quantizeSteps": { "type": "integer" }
+        "quantizeSteps": { "type": "integer" },
+        "lag": { "type": "number", "description": "0..1 finite geometric EWMA over past frames." },
+        "spring": { "type": "number", "minimum": 0, "maximum": 1, "description": "0 = off; else wet amount of a damped 2nd-order spring (bounded FIR, replaces lag). With it on, outputs may overshoot their range." },
+        "springHz": { "type": "number", "description": "Spring natural frequency, Hz." },
+        "springDamping": { "type": "number", "description": "Damping ratio zeta (0.05..1). Step overshoot ~ e^(-zeta*pi/sqrt(1-zeta^2)); ~1 = none." }
       }
     },
     "outputs": {

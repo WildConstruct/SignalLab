@@ -27,6 +27,6 @@ not a graph.
 | No graph | the whole chain is just pick-whips |
 
 ## Demo chains to verify
-1. Audio Transient → Needle Bounce → type Scale
+1. Audio lane (Tympo hits) → Needle Bounce (spring) → type Scale
 2. Luma Probe → Smooth/Gate → Entropy Birth Driver → birth rate
 3. Clock → Divider → Gate → Type Reveal
