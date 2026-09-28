@@ -21,7 +21,10 @@
  *     modInput  (binding 3) sidechain modulator · z.input (binding 4) distort
  * See tympo-lane.js for turning a Tympo lane into extInput.
  *
- * NOTE ON NOISE: the value-noise here matches the WGSL value-noise exactly.
+ * NOTE ON NOISE: the value-noise here is the WGSL value-noise formula, but a
+ * GPU evaluates its hash fract(sin(n)*43758.5) in f32, which amplifies sin()
+ * error, so noise/randomWalk do not match a GPU sample-for-sample (see
+ * gpu-parity.html). The other paths match to ~1e-4 (f32 + WGSL sin/exp).
  * -------------------------------------------------------------------------
  */
 (function (root, factory) {
