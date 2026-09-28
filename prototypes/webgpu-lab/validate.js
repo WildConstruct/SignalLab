@@ -150,5 +150,77 @@ ok("Distort depth 0 == identity", approx(zOff.output("A",0.3,10), new Rack({srcT
 var zChanged=false; for (var zt=0; zt<2; zt+=1/60){ var k=Math.round(zt*30)%WN; if (Math.abs(zOn.output("A",zt,k)-zOff.output("A",zt,k))>0.02){ zChanged=true; break; } }
 ok("Distort depth > 0 bends the signal", zChanged);
 
+// --- audio lane source ----------------------------------------------------
+var NORM = { A: { mode: MODE.normalized, min: 0, max: 1 } };
+
+// 10a. audioLane reads the per-sample external input (binding 2) + offset, clamped
+var laneIn = new Float32Array([0, 0.25, 0.5, 0.95, 1]);
+var al = new Rack({ srcType: SOURCE.audioLane, extInput: laneIn, offset: 0.1, outputs: NORM });
+ok("audioLane reads extInput[idx] + offset", approx(al.output("A", 0, 1), 0.35, 1e-7) && approx(al.output("A", 0, 2), 0.6, 1e-7));
+ok("audioLane clamps to [0,1]", al.output("A", 0, 3) === 1 && new Rack({ srcType: SOURCE.audioLane, extInput: laneIn, offset: -0.1, outputs: NORM }).output("A", 0, 0) === 0);
+ok("audioLane is per-sample (index, not time)", al.output("A", 0, 2) === al.output("A", 123.4, 2));
+ok("lumaInput alias still feeds lumaProbe", new Rack({ srcType: SOURCE.lumaProbe, lumaInput: laneIn, outputs: NORM }).output("A", 0, 2) === 0.5);
+
+// --- spring (true overshoot) -------------------------------------------------
+// Step 0 -> 1 through an audioLane input; the analytic 2nd-order overshoot is
+// e^(-zeta*pi/sqrt(1-zeta^2)) (0.372 at zeta = 0.3).
+function springStep(zeta, fd, hz, amount, outs) {
+  var n = Math.ceil(4 / hz / fd) + 40, step = new Float32Array(n);
+  for (var i = 20; i < n; i++) step[i] = 1;
+  var r = new Rack({ srcType: SOURCE.audioLane, extInput: step, frameDur: fd, process: { spring: amount != null ? amount : 1, springHz: hz, springDamping: zeta }, outputs: outs || NORM });
+  var mx = -9, last = 0;
+  for (var i = 0; i < n; i++) { last = r.output("A", i * fd, i); if (last > mx) mx = last; }
+  return { peak: mx, last: last };
+}
+var OS03 = Math.exp(-0.3 * Math.PI / Math.sqrt(1 - 0.09));
+var sp60 = springStep(0.3, 1 / 60, 2), sp600 = springStep(0.3, 1 / 600, 2);
+ok("Spring zeta=0.3 overshoots by the analytic amount (60 fps)", Math.abs((sp60.peak - 1) - OS03) < 0.02);
+ok("Spring zeta=0.3 same overshoot on a fine grid (strided taps)", Math.abs((sp600.peak - 1) - OS03) < 0.02);
+ok("Spring zeta~1 does not overshoot", springStep(1.0, 1 / 60, 2).peak <= 1 + 1e-9 && springStep(0.97, 1 / 60, 2).peak <= 1 + 1e-6);
+ok("Spring settles to the input (unit DC gain)", approx(sp60.last, 1, 1e-9));
+ok("Spring amount 0.5 = wet/dry mix (half the overshoot)", approx(springStep(0.3, 1 / 60, 2, 0.5).peak - 1, (sp60.peak - 1) / 2, 1e-6));
+var spPct = springStep(0.3, 1 / 60, 2, 1, { A: { mode: MODE.percentage, min: 100, max: 118 } });
+ok("Spring overshoot reaches the outputs (headroom past the range)", spPct.peak > 118 + 18 * 0.3);
+var sq = new Rack({ srcType: SOURCE.pulse, rate: 0.5, frameDur: 1 / 60, process: { spring: 1, springHz: 3, springDamping: 0.3 }, outputs: NORM });
+var sqHi = -9, sqLo = 9; for (var i = 0; i < 240; i++) { var v = sq.output("A", 10 + i / 60, i); sqHi = Math.max(sqHi, v); sqLo = Math.min(sqLo, v); }
+ok("Spring on a generator step bounces both ways", sqHi > 1.3 && sqLo < -0.3);
+var pk = new Rack({ process: { spring: 0.7, springHz: 2.5, springDamping: 0.2 } }).pack(0, 1 / 60, 8);
+ok("pack() puts spring in v10.yzw (floats 41..43)", pk.length === 44 && approx(pk[41], 0.7, 1e-7) && approx(pk[42], 2.5, 1e-7) && approx(pk[43], 0.2, 1e-7));
+
+// --- regression: spring off == the pre-spring engine, bit for bit --------------
+// Hash (FNV-1a over the float64 bits) of every A/B/C output over 78 configs:
+// all sources, processors, lag, smoothing, sidechain, window, distort, linked.
+// Golden recorded from the engine before the spring/audioLane change (a83b90f).
+function battery(extra) {
+  var BN = 48, fb = new Float64Array(1), u32 = new Uint32Array(fb.buffer), h = 0x811c9dc5, count = 0;
+  function mix(v) { fb[0] = v; for (var w = 0; w < 2; w++) { var x = u32[w]; for (var b = 0; b < 4; b++) { h ^= (x >>> (b * 8)) & 255; h = Math.imul(h, 0x01000193) >>> 0; } } count++; }
+  var ramp = new Float32Array(BN), wob = new Float32Array(BN);
+  for (var i = 0; i < BN; i++) { ramp[i] = i / (BN - 1); wob[i] = 0.5 + 0.5 * Math.sin(i * 0.37); }
+  var outs = { A: { mode: MODE.percentage, min: 90, max: 110 }, B: { mode: MODE.signed, min: -1, max: 1 }, C: { mode: MODE.trigger, min: 0, max: 1 } };
+  var outsG = { A: { mode: MODE.normalized, min: 0, max: 1 }, B: { mode: MODE.degrees, min: -15, max: 15 }, C: { mode: MODE.gate, min: 0, max: 1 } };
+  var procs = [null, { gain: 1.4, bias: 0.05 }, { sat: 0.6, warp: 0.4 }, { fold: 0.5, invert: true }, { rectify: true, quantize: 5 }, { gate: 0.55 }, { lag: 0.3 }, { lag: 0.85, gain: 0.8 }, { lag: 0.97, warp: -0.6, sat: 0.2 }];
+  var cfgs = [];
+  [1, 2, 3, 4, 5, 7, 8, 9].forEach(function (s) { procs.forEach(function (p, pi) {
+    cfgs.push({ srcType: s, rate: 1.7, phase: 0.13, amount: 0.9, seed: 1941 + pi, offset: pi % 2 ? 0.07 : 0, smooth: [0, 0.3, 0.07][pi % 3], frameDur: 1 / 30, process: p, lumaInput: s === 7 ? wob : null, sampleN: BN, outputs: pi % 2 ? outs : outsG });
+  }); });
+  cfgs.push({ srcType: 1, rate: 3, mod: { target: "amp", depth: 0.8 }, modInput: wob, sampleN: BN, outputs: outs });
+  cfgs.push({ srcType: 8, rate: 2, mod: { target: "rate", depth: 0.4 }, modInput: ramp, frameDur: 1 / 60, sampleN: BN, outputs: outsG });
+  cfgs.push({ srcType: 4, rate: 2, seed: 77, mod: { target: "phase", depth: 0.6 }, modInput: wob, process: { lag: 0.6 }, sampleN: BN, outputs: outs });
+  cfgs.push({ srcType: 1, rate: 2, sampleN: BN, win: { left: 0.2, right: 0.8, featherL: 0.1, featherR: 0.2 }, outputs: outsG });
+  cfgs.push({ srcType: 5, rate: 1, sampleN: BN, z: { input: wob, depth: 0.4 }, process: { lag: 0.5 }, outputs: outs });
+  cfgs.forEach(function (c) {
+    var r = new Rack(extra ? extra(c) : c);
+    for (var i = 0; i < BN; i++) { var tt = 12.3 + i / 30; mix(r.output("A", tt, i)); mix(r.output("B", tt, i)); mix(r.output("C", tt, i)); }
+  });
+  var la = new Rack({ srcType: 1, rate: 1 }), lcfg = { srcType: 6, outputs: outs, process: { lag: 0.4 } };
+  var lb = new Rack(extra ? extra(lcfg) : lcfg); lb.connectInputA(la, "A");
+  for (var i = 0; i < BN; i++) mix(lb.output("A", 3 + i / 30, i));
+  return ("00000000" + h.toString(16)).slice(-8) + "/" + count;
+}
+var GOLDEN = "657d7a5f/11136";
+ok("Spring off == pre-spring engine bit for bit (78 configs, golden " + GOLDEN + ")", battery() === GOLDEN);
+ok("spring:0 with spring params set == no spring, bit for bit", battery(function (c) {
+  c = Object.assign({}, c); c.process = Object.assign({}, c.process || {}, { spring: 0, springHz: 5, springDamping: 0.1 }); return c; }) === GOLDEN);
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
