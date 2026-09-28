@@ -25,6 +25,13 @@ Two independent generators, **Channel X** and **Channel Y**. Each has a
 **Rate, Phase, Amount, Offset, Smooth, Seed**. Seed re-rolls the random sources
 and shifts the wave.
 
+- **Audio lane (Tympo)** — Channel X can instead read a real audio-analysis
+  lane: choose it as the Source and load a Tympo export (`.json` with
+  `sampleRate` + `level` / `hits`, a multi-lane bundle, or a `timeline`). Pick the
+  **Band**, **Feed** (`level` = continuous envelope, `hits` = decaying kicks) and
+  **Hit decay**. The lane loops from when it was loaded; the processor, window
+  and spring all apply. Rendering lives in `prototypes/webgpu-lab/tympo-lane.js`.
+
 - **Oscillators** — the small **“o”** beside Amount/Phase slowly oscillates that
   value (a macro LFO), so a parameter breathes on its own.
 - **Channel Y link** — **Sync to X** makes Y identical to X; **Invert (mirror X)**
@@ -32,7 +39,10 @@ and shifts the wave.
 
 ## 2 · Shape
 - **Processor** (shapes Channel X): gain, bias, saturate, warp, fold, gate,
-  quantize, lag, invert, rectify.
+  quantize, lag, invert, rectify, and **Spring** (amount, Hz, damping): a real
+  damped 2nd-order bounce that replaces lag when on. It overshoots and settles
+  (lower damping = more bounce; ~1 = none), and the value may pass 0..1 while it
+  bounces. See the **Needle Bounce** preset.
 - **Window** — a feathered region that fades the signal in/out across the scope.
 - **Sidechain** — Channel X modulates Channel Y’s **amplitude (AM)**, **rate (FM)**
   or **phase**, with depth.
@@ -73,11 +83,12 @@ others ignore it.
 
 ## 5 · Use it
 - **ƒ AE expression** (Applied drawer) — the **full, self-contained** After Effects
-  expression. It reproduces the entire driver: both channels, processor, window,
-  distort, oscillators, sidechain, the selected Drive combine, and the master
-  **Speed** time-scale — mapped to the property range. Copy it onto any property;
-  no plugin required. (FM sidechain is approximated as a phase vibrato; that's the
-  only non-exact part, and it's commented.)
+  expression. It reproduces the entire driver: both channels, processor (incl.
+  the spring), window, distort, oscillators, sidechain, the selected Drive
+  combine, and the master **Speed** time-scale — mapped to the property range.
+  Copy it onto any property; no plugin required. (FM sidechain is approximated as
+  a phase vibrato; an audio-lane source reads a 0..1 slider you key from the lane
+  — both are commented.)
 - **Record video** — captures the visualization (scope + CRT) to mp4 where the
   browser supports it, else webm.
 - **Copy link** / **Export JSON** — the whole setup round-trips in a URL hash or a
@@ -99,8 +110,10 @@ close · **?** open the Guide · **double-click a slider** resets it.
 ## Engine
 The badge (top-right) shows the active path:
 - **WebGPU** — dispatches the real `shaders/signal_core.wgsl` (the product engine).
-- **CPU reference** — a bit-identical `signal-core-reference.js` fallback so the
-  demo always renders. Parity is enforced by `prototypes/webgpu-lab/validate.js`.
+- **CPU reference** — the `signal-core-reference.js` port of the WGSL, so the
+  demo always renders. Logic is enforced by `prototypes/webgpu-lab/validate.js`;
+  CPU-vs-GPU parity is measured by `prototypes/webgpu-lab/gpu-parity.html`
+  (matches within ~1e-4 except value noise, whose f32 hash diverges on GPUs).
 
 This is the dev/preview surface; the same engine is exposed natively in After
 Effects through the Dawn bridge (see the repo-root `README.md`).

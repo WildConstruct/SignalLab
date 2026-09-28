@@ -20,10 +20,12 @@ Probe a pulsing beam: Output A = raw luma (Normalized), Output B = smoothed and
 remapped to **Entropy Birth Rate (0–250)**, Output C = threshold **Gate**. The
 beam now drives particle bursts. (Bake for final renders — probing is preview-grade live.)
 
-## 4 — Sidechained audio bounce
-Rack 1 = audio transient → Output C **Trigger**. Rack 2 = **Needle Bounce**,
-Input A pick-whipped to Rack 1 Output C; Output A = scale overshoot, B = rotation
-kick. Type bounces on hits. No cables — just one pick-whip.
+## 4 — Audio bounce
+**Needle Bounce** rack: source = **Audio lane** (Tympo kick `hits`), processor =
+**Spring** (≈3 Hz, damping ≈0.25); Output A = scale overshoot, B = rotation kick.
+Each hit throws the type up, it swings back past rest and settles. The spring
+needs the lane's history, so the rack reads the lane itself rather than a
+pick-whipped Input A (a single scalar per frame has no history to bounce on).
 
 ## 5 — Cathode sync drift
 `Broadcast Sync Drift` recipe: slow random-walk → Output A = sync drift (px),

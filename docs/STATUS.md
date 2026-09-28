@@ -28,8 +28,25 @@ open items still flagged **[verify]** against Notion.
 | `prototypes/ae-script/SignalRack.jsx` | **Shrunk** to `tooling/ae/SignalRack-binding-helper.jsx` (bind/chain/bake over the plugin; no engine). |
 
 ## Verified runnable here
-- `node prototypes/webgpu-lab/validate.js` → 15/15 (incl. engine-owned processor, sidechain, lag).
-- `examples/core_contract_test.cpp` compiles + passes (Compile() WGSL parity).
+- `node prototypes/webgpu-lab/validate.js` → 54/54 (engine-owned processor,
+  sidechain, lag, audio lane + Tympo helper, spring overshoot vs analytic, and a
+  78-config bit-exact golden proving spring-off output is unchanged).
+- `node prototypes/webgpu-lab/codec-validate.js` → 8/8.
+- `examples/core_contract_test.cpp` compiles + passes (Compile() WGSL parity,
+  incl. spring packing in v10.y/z/w and the AudioLane source).
+- `node prototypes/webgpu-lab/gpu-parity-run.js` (optional; Playwright +
+  Chromium, WebGPU on SwiftShader) → 9/9 CPU-vs-GPU configs within 2e-3, plus 2
+  pre-existing divergences reported (value noise, smooth tap rounding).
 - WGSL embed codegen (`tools/embed_wgsl.cmake`) works.
+
+## Update 2026-09-28 — audio lane + spring
+- **Audio lane (source 10)** reads the per-sample external input (binding 2,
+  `extIn`, shared with the luma probe); `tympo-lane.js` renders Tympo `level` /
+  `hits` lanes onto a rack's grid. Replaces the `audioPlaceholder` stand-in
+  (`schemas/examples/05b-audio-lane.json`).
+- **Spring** (`spring`, `springHz`, `springDamping` in v10.y/z/w) replaces lag
+  with a damped 2nd-order FIR that genuinely overshoots and settles; Needle
+  Bounce (tool preset + `03-needle-bounce.json`) now uses it. Limits in
+  `docs/known-limitations.md`.
 
 See `IMPLEMENTATION-REPORT.md` for the full report and open questions.

@@ -7,7 +7,7 @@
 
 A browser playground to **experiment with signals** — two generators driving an
 oscilloscope **waveform** and an X-Y **vectorscope** (Lissajous). Runs the real
-`signal_core.wgsl` on WebGPU, with a bit-identical CPU-reference fallback so it
+`signal_core.wgsl` on WebGPU, with a CPU-reference fallback (parity-checked) so it
 always shows. Tweak sources/rate/phase/offset live; presets; export any
 experiment as a recipe JSON.
 
@@ -51,7 +51,8 @@ backend — no CPU fallback.
 
 ```bash
 # 1. Engine logic parity oracle (no GPU)
-cd prototypes/webgpu-lab && node validate.js          # 15/15 pass (engine owns source/smooth/process/sidechain/lag/luma)
+cd prototypes/webgpu-lab && node validate.js          # 54/54 pass (engine owns source/smooth/process/sidechain/lag/spring/luma/audio lane)
+node gpu-parity-run.js                                 # optional: CPU vs real WGSL (needs Playwright + Chromium; SwiftShader WebGPU)
 
 # 2. C++ contract (Recipe→Compile→params parity, AE param mapping)
 g++ -std=c++17 -I include -I . examples/core_contract_test.cpp -o /tmp/t && /tmp/t

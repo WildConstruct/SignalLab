@@ -91,7 +91,7 @@ Chaining is pick-whip into an Input param, not cables.
 The browser WebGPU surface proves the *engine*; it cannot do the *AE
 integration*. These require the plugin + Dawn bridge:
 - Reading AE pixels for the **luma probe** at render time (the plugin feeds
-  per-sample luma into the shader's `lumaIn` buffer). **[C — contract defined]**
+  per-sample luma into the shader's `extIn` buffer, binding 2). **[C — contract defined]**
 - Exposing **pick-whippable output params** inside AE. **[I]**
 - Sharing AE's **Dawn device** so the engine renders in the AE pipeline. **[I]**
 - True **stateful DSP** (one-pole lag, hysteresis, S&H) — even on GPU this needs

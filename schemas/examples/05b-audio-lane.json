@@ -1,0 +1,24 @@
+{
+  "type": "wildconstruct.signalRecipe",
+  "name": "Audio Lane (Tympo)",
+  "id": "sg_audio_lane_001",
+  "version": "0.2",
+  "rackType": "probe",
+  "inputs": { "A": null, "B": null, "C": null },
+  "source": {
+    "type": "audioLane",
+    "offset": 0,
+    "lane": { "file": "tympo-export.json", "band": "kick", "feed": "level" }
+  },
+  "process": { "smooth": 0, "gain": 1.15, "bias": -0.04, "lag": 0.35 },
+  "outputs": {
+    "A": { "name": "Envelope", "profile": "normalized_0_1", "range": [0, 1], "units": "none" },
+    "B": { "name": "Glow Drive", "profile": "percentage", "range": [0, 100], "units": "percent" },
+    "C": { "name": "Kick Gate", "profile": "gate", "range": [0, 1], "units": "none" }
+  },
+  "timebase": { "mode": "compTime", "seed": 808 },
+  "visualization": { "mode": "bar_meter", "showProbe": false, "showOutputLabels": true },
+  "bake": { "mode": "outputKeyframes", "simplify": false, "preservePeaks": true },
+  "compatibilityTags": ["engine:wgsl", "wc:tympo"],
+  "notes": "Real audio source. The host renders a Tympo lane onto the rack's sample grid (tympo-lane.js: levelToInput linearly interpolates the published level; hitsToInput renders hits as strength*e^(-t/decay)) and passes it as the per-sample external input (binding 2). The engine then runs smooth -> process -> lag|spring -> outputs as usual. Gate (not Trigger) for C: the trigger look-back does not see per-sample history. Replaces 05-audio-transient-placeholder."
+}

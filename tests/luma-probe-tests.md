@@ -5,7 +5,8 @@
   synthetic luma function into a `LumaProbe` rack and asserts a normalized
   driven output. This proves the *mapping* (luma → smooth/threshold → output).
 - **Real pixel sampling: needs the plugin** to read AE layer pixels and fill the
-  shader's `lumaIn` buffer. Not runnable here. [I]
+  shader's external input buffer (`extIn`, binding 2 — shared with the audio
+  lane). Not runnable here. [I]
 
 ## What to test in AE (manual, once the plugin probes pixels)
 | Variable | Cases | Watch for |
