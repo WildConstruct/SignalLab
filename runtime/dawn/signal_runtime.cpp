@@ -73,7 +73,7 @@ void SignalRuntime::EnsureCapacity(wgpu::Device& device, std::uint32_t sampleCou
     wgpu::BufferDescriptor lb{};
     lb.size = static_cast<std::uint64_t>(capacity_) * sizeof(float);
     lb.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-    lumaBuf_ = device.CreateBuffer(&lb);
+    inputBuf_ = device.CreateBuffer(&lb);  // external input (luma / audio lane)
     modBuf_ = device.CreateBuffer(&lb);  // same shape (f32 * capacity)
     zBuf_ = device.CreateBuffer(&lb);
 
@@ -86,7 +86,7 @@ void SignalRuntime::EnsureCapacity(wgpu::Device& device, std::uint32_t sampleCou
 bool SignalRuntime::Evaluate(wgpu::Device& device,
                              const CompiledSignalConfig& cfg,
                              std::uint32_t sampleCount,
-                             const float* lumaSamples,
+                             const float* inputSamples,
                              const float* modSamples,
                              const float* zSamples,
                              float startTime, float dt,
@@ -97,8 +97,8 @@ bool SignalRuntime::Evaluate(wgpu::Device& device,
     EnsureCapacity(device, sampleCount);
 
     device.GetQueue().WriteBuffer(paramBuf_, 0, cfg.data(), CompiledSignalConfig::byteSize());
-    if (lumaSamples) {
-        device.GetQueue().WriteBuffer(lumaBuf_, 0, lumaSamples, sampleCount * sizeof(float));
+    if (inputSamples) {
+        device.GetQueue().WriteBuffer(inputBuf_, 0, inputSamples, sampleCount * sizeof(float));
     }
     if (modSamples) {
         device.GetQueue().WriteBuffer(modBuf_, 0, modSamples, sampleCount * sizeof(float));
@@ -110,7 +110,7 @@ bool SignalRuntime::Evaluate(wgpu::Device& device,
     wgpu::BindGroupEntry entries[5]{};
     entries[0].binding = 0; entries[0].buffer = paramBuf_;
     entries[1].binding = 1; entries[1].buffer = outBuf_;
-    entries[2].binding = 2; entries[2].buffer = lumaBuf_;
+    entries[2].binding = 2; entries[2].buffer = inputBuf_;   // extIn
     entries[3].binding = 3; entries[3].buffer = modBuf_;
     entries[4].binding = 4; entries[4].buffer = zBuf_;
     wgpu::BindGroupDescriptor bgDesc{};

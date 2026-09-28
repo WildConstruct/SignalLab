@@ -24,8 +24,11 @@ namespace ItsAllNoise {
 namespace SignalRack {
 
 // What the host asks the engine to evaluate. The host has already resolved any
-// sidechain Input A to a single scalar, and (for LumaProbe) supplied per-sample
-// luma in `lumaSamples` (size must equal sampleCount).
+// sidechain Input A to a single scalar, and supplied the rack's per-sample
+// EXTERNAL INPUT in `inputSamples` (size must equal sampleCount): luma for
+// LumaProbe, or an audio lane (e.g. Tympo, see tympo-lane.js) for AudioLane.
+// Lag/spring look back over past samples, so for those stages the host should
+// evaluate a window that includes the history and read the last sample.
 struct SignalRenderRequest {
     SignalRecipe recipe;
 
@@ -35,7 +38,8 @@ struct SignalRenderRequest {
     uint32_t sampleCount  = 1;        // 1 = current frame; N = scope window
 
     float        resolvedInputA = 0.0f;  // sidechain scalar for SourceType::Linked
-    const float* lumaSamples    = nullptr;  // length == sampleCount, for LumaProbe
+    const float* inputSamples   = nullptr;  // length == sampleCount, LumaProbe / AudioLane
+    const float* lumaSamples    = nullptr;  // deprecated alias of inputSamples (LumaProbe)
     const float* modSamples     = nullptr;  // length == sampleCount, per-sample modulator
     const float* zSamples       = nullptr;  // length == sampleCount, third-signal distort input
 };

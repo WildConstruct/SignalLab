@@ -29,12 +29,14 @@ public:
     // module or pipeline fails — no fallback path exists.
     bool Initialize(wgpu::Device& device, std::string* message);
 
-    // Dispatch `cfg` for `sampleCount` samples; `lumaSamples` (may be null)
-    // length must equal sampleCount when the source is a LumaProbe. Fills out.
+    // Dispatch `cfg` for `sampleCount` samples. `inputSamples` (may be null) is
+    // the rack's external input on binding 2 — luma for a LumaProbe, an audio
+    // lane for an AudioLane — and its length must equal sampleCount for those
+    // sources. `modSamples` / `zSamples` feed bindings 3 / 4. Fills out.
     bool Evaluate(wgpu::Device& device,
                   const CompiledSignalConfig& cfg,
                   std::uint32_t sampleCount,
-                  const float* lumaSamples,
+                  const float* inputSamples,
                   const float* modSamples,
                   const float* zSamples,
                   float startTime, float dt,
@@ -48,9 +50,9 @@ private:
 
     bool                 ready_ = false;
     wgpu::ComputePipeline pipeline_;
-    wgpu::Buffer          paramBuf_;   // uniform, 96 bytes
+    wgpu::Buffer          paramBuf_;   // uniform, 176 bytes (11 vec4 rows)
     wgpu::Buffer          outBuf_;     // storage, vec4 * capacity
-    wgpu::Buffer          lumaBuf_;    // storage, f32 * capacity (probe input)
+    wgpu::Buffer          inputBuf_;   // storage, f32 * capacity (binding 2: luma / audio lane)
     wgpu::Buffer          modBuf_;     // storage, f32 * capacity (sidechain input)
     wgpu::Buffer          zBuf_;       // storage, f32 * capacity (third-signal distort input)
     wgpu::Buffer          readBuf_;    // map-read, vec4 * capacity

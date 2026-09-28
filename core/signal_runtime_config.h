@@ -3,7 +3,7 @@
 //  Recipe -> CompiledSignalConfig (the runtime path's first hop).
 //
 //  CompiledSignalConfig is the CPU-side mirror of the WGSL `SignalParams`
-//  uniform block (24 x f32 == 96 bytes). Compile() flattens a SignalRecipe +
+//  uniform block (11 vec4 rows == 44 x f32 == 176 bytes). Compile() flattens a SignalRecipe +
 //  request timing into that exact layout. This file is pure, header-only, and
 //  unit-testable with no GPU (cf. Etheros "CPU-testable mapping from request
 //  fields into control state").
@@ -36,7 +36,7 @@ struct CompiledSignalConfig {
         PLag = 28, PInvert, PRectify, ModTarget,
         ModDepth = 32, PWarp, PFold, PSat,
         WinLeft = 36, WinRight, WinFeatherL, WinFeatherR,
-        ZDepth = 40, ZPad0, ZPad1, ZPad2,
+        ZDepth = 40, PSpring, PSpringHz, PSpringDamp,   // v10: distort depth + spring stage
     };
 
     std::array<float, kFloatCount> params{};
@@ -94,6 +94,9 @@ inline CompiledSignalConfig Compile(const SignalRecipe& r,
     p[CompiledSignalConfig::WinFeatherL] = pr.winFeatherL;
     p[CompiledSignalConfig::WinFeatherR] = pr.winFeatherR;
     p[CompiledSignalConfig::ZDepth]      = pr.zDepth;
+    p[CompiledSignalConfig::PSpring]     = pr.spring;         // 0 = off (lag path)
+    p[CompiledSignalConfig::PSpringHz]   = pr.springHz;
+    p[CompiledSignalConfig::PSpringDamp] = pr.springDamping;
     return c;
 }
 
