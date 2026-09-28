@@ -169,6 +169,13 @@ ok("levelToInput interpolates and holds at the ends", liWant.every(function (v, 
 var liLoop = TL.levelToInput(lvl, 48000, 0.0125, 0.0025, 1, { loop: 0.01 });           // 12.5 ms wraps to 2.5 ms
 ok("levelToInput loop wraps lane time", approx(liLoop[0], 0.5, 1e-6));
 
+// 10b'. Tympo C2's move stage: the motion lane, as is or centred for a spring's swing
+var mb = TL.fromTympo({ sampleRate: 48000, level: [{ time: 0, value: 0.2 }], motion: [{ time: 480, value: -0.5 }, { time: 0, value: 1 }] });
+ok("fromTympo reads the motion lane (sorted)", mb.motion.length === 2 && mb.motion[0].time === 0 && mb.motion[1].value === -0.5);
+var mRaw = TL.laneToInput(mb, "motion", 0, 0.005, 3), mCen = TL.laneToInput(mb, "motionCentred", 0, 0.005, 3);
+ok("motion feed interpolates the lane; centred maps m to 0.5 + 0.5m", approx(mRaw[1], 0.25, 1e-6) && approx(mCen[0], 1, 1e-6) && approx(mCen[2], 0.25, 1e-6));
+ok("a timeline's motion column is read too", TL.fromTympo({ sampleRate: 48000, timeline: [{ time: 0.01, level: 0.1, motion: -0.2 }] }).motion[0].value === -0.2);
+
 // 10c. hitsToInput: strength * e^(-(t-hit)/decay) for t >= hit, max over overlaps
 var hits = [{ time: 4800, strength: 0.8, type: "hit" }, { time: 5760, strength: 0.5, type: "hit" }, { time: 100, strength: 1, type: "onset" }];
 var hi = TL.hitsToInput(hits, 48000, 0, 0.01, 40, { decay: 0.05 });          // hits at 0.10 s and 0.12 s
