@@ -150,7 +150,8 @@ ok("Distort depth 0 == identity", approx(zOff.output("A",0.3,10), new Rack({srcT
 var zChanged=false; for (var zt=0; zt<2; zt+=1/60){ var k=Math.round(zt*30)%WN; if (Math.abs(zOn.output("A",zt,k)-zOff.output("A",zt,k))>0.02){ zChanged=true; break; } }
 ok("Distort depth > 0 bends the signal", zChanged);
 
-// --- audio lane source ----------------------------------------------------
+// --- audio lane source (Tympo) --------------------------------------------
+var TL = require("./tympo-lane.js");
 var NORM = { A: { mode: MODE.normalized, min: 0, max: 1 } };
 
 // 10a. audioLane reads the per-sample external input (binding 2) + offset, clamped
@@ -160,6 +161,34 @@ ok("audioLane reads extInput[idx] + offset", approx(al.output("A", 0, 1), 0.35, 
 ok("audioLane clamps to [0,1]", al.output("A", 0, 3) === 1 && new Rack({ srcType: SOURCE.audioLane, extInput: laneIn, offset: -0.1, outputs: NORM }).output("A", 0, 0) === 0);
 ok("audioLane is per-sample (index, not time)", al.output("A", 0, 2) === al.output("A", 123.4, 2));
 ok("lumaInput alias still feeds lumaProbe", new Rack({ srcType: SOURCE.lumaProbe, lumaInput: laneIn, outputs: NORM }).output("A", 0, 2) === 0.5);
+
+// 10b. levelToInput: linear interpolation between published samples, hold at ends
+var lvl = [{ time: 0, value: 0 }, { time: 240, value: 1 }, { time: 480, value: 0.5 }];   // 0, 5, 10 ms @ 48 kHz
+var li = TL.levelToInput(lvl, 48000, -0.005, 0.0025, 8), liWant = [0, 0, 0, 0.5, 1, 0.75, 0.5, 0.5];
+ok("levelToInput interpolates and holds at the ends", liWant.every(function (v, i) { return approx(li[i], v, 1e-6); }));
+var liLoop = TL.levelToInput(lvl, 48000, 0.0125, 0.0025, 1, { loop: 0.01 });           // 12.5 ms wraps to 2.5 ms
+ok("levelToInput loop wraps lane time", approx(liLoop[0], 0.5, 1e-6));
+
+// 10c. hitsToInput: strength * e^(-(t-hit)/decay) for t >= hit, max over overlaps
+var hits = [{ time: 4800, strength: 0.8, type: "hit" }, { time: 5760, strength: 0.5, type: "hit" }, { time: 100, strength: 1, type: "onset" }];
+var hi = TL.hitsToInput(hits, 48000, 0, 0.01, 40, { decay: 0.05 });          // hits at 0.10 s and 0.12 s
+ok("hitsToInput: 0 before, strength at, e^-1 one decay after", hi[9] === 0 && approx(hi[10], 0.8, 1e-6) && approx(hi[15], 0.8 * Math.exp(-1), 1e-6));
+ok("hitsToInput: overlapping hits take the max (not the sum)", approx(hi[12], 0.8 * Math.exp(-0.4), 1e-6) && approx(hi[13], 0.8 * Math.exp(-0.6), 1e-6));
+var h0 = TL.hitsToInput([{ time: 5040, strength: 0.7, type: "hit" }], 48000, 0, 0.01, 40, { decay: 0 });   // 0.105 s
+var nz = 0; for (var i = 0; i < 40; i++) if (h0[i] !== 0) nz++;
+ok("hitsToInput: decay 0 = one frame (first sample at/after the hit)", nz === 1 && approx(h0[11], 0.7, 1e-6));
+var hl = TL.hitsToInput([{ time: 4800, strength: 1, type: "hit" }], 48000, 1.0, 0.01, 20, { decay: 0.05, loop: 1.0 });
+ok("hitsToInput loop repeats hits each cycle", approx(hl[10], 1, 1e-6) && approx(hl[15], Math.exp(-1), 1e-6));
+
+// 10d. fromTympo: bundle { sampleRate, level, hits } and a seconds timeline
+var tb = TL.fromTympo({ sampleRate: 48000, level: [{ time: 9600, value: 0.6 }, { time: 0, value: 0.2 }], hits: [{ time: 4800, strength: 0.9, type: "hit" }] });
+var tt2 = TL.fromTympo({ timeline: [{ time: 0.1, level: 0.3, hit: true, strength: 0.9 }, { time: 0.2, level: 0.6 }] });
+ok("fromTympo accepts a bundle (sorted) and a seconds timeline", tb.level[0].time === 0 && tb.hits.length === 1 && approx(tb.duration, 0.2, 1e-9) &&
+   tt2.level.length === 2 && approx(tt2.level[1].time, 9600, 1e-6) && tt2.hits.length === 1 && tt2.hits[0].strength === 0.9);
+var tm = TL.fromTympo({ sampleRate: 44100, lanes: { kick: { hits: [{ time: 441, strength: 1 }] }, hats: { level: [{ time: 0, value: 1 }] } } }, { lane: "hats" });
+ok("fromTympo picks a named lane from a multi-lane bundle", tm.name === "hats" && tm.level.length === 1 && tm.sampleRate === 44100);
+var lanePath = TL.laneToInput(tb, "level", 0.05, 0.05, 3);
+ok("laneToInput -> audioLane rack reproduces the lane", approx(new Rack({ srcType: SOURCE.audioLane, extInput: lanePath, outputs: NORM }).output("A", 0, 1), 0.4, 1e-6));
 
 // --- spring (true overshoot) -------------------------------------------------
 // Step 0 -> 1 through an audioLane input; the analytic 2nd-order overshoot is
