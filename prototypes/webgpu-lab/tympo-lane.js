@@ -18,6 +18,7 @@
  *         max over overlapping hits; decay 0 (default) = the one grid sample
  *         at/after the hit.
  *     fromTympo(bundle [, {lane}])   normalise an export (see below)
+ *     laneNames(bundle)              lane names of a multi-lane bundle ([] if single)
  *     laneToInput(lane, "level"|"hits", startTime, dt, N [, opts])
  *
  * `loop` (seconds, 0 = off) wraps lane time so a preview can cycle a track.
@@ -82,6 +83,11 @@
 
   function byTime(a, b) { return a.time - b.time; }
 
+  function laneNames(obj) {
+    if (!obj || !obj.lanes) return [];
+    return Array.isArray(obj.lanes) ? obj.lanes.map(function (l, i) { return l.name || l.band || l.id || String(i); }) : Object.keys(obj.lanes);
+  }
+
   // Normalise a Tympo export to { name, sampleRate, level, hits, duration (s) }.
   // Accepts a lane/bundle { sampleRate, level, hits }, a bundle of several lanes
   // ({ lanes: { name: lane } } or { lanes: [lane] }; opts.lane picks one, else
@@ -91,7 +97,7 @@
     obj = obj || {};
     var want = opts && opts.lane, src = obj, name = obj.name || obj.band || "";
     if (obj.lanes) {
-      var names = Array.isArray(obj.lanes) ? obj.lanes.map(function (l, i) { return l.name || l.band || l.id || String(i); }) : Object.keys(obj.lanes);
+      var names = laneNames(obj);
       var k = want != null && names.indexOf(String(want)) >= 0 ? names.indexOf(String(want)) : 0;
       src = Array.isArray(obj.lanes) ? obj.lanes[k] : obj.lanes[names[k]];
       name = names[k];
@@ -121,5 +127,5 @@
                            : levelToInput(lane.level, lane.sampleRate, startTime, dt, N, opts);
   }
 
-  return { levelToInput: levelToInput, hitsToInput: hitsToInput, fromTympo: fromTympo, laneToInput: laneToInput };
+  return { levelToInput: levelToInput, hitsToInput: hitsToInput, fromTympo: fromTympo, laneToInput: laneToInput, laneNames: laneNames };
 });
