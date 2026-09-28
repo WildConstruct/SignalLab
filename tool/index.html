@@ -50,6 +50,7 @@
   .ctl{ display:grid; grid-template-columns:64px 1fr 46px; align-items:center; gap:10px; margin:7px 0; }
   .ctl label{ color:var(--dim); font-size:11px; }
   .ctl output{ font-variant-numeric:tabular-nums; text-align:right; font-size:11px; }
+  .ctl input[type=file]{ width:100%; min-width:0; font-size:11px; color:var(--dim); }
   input[type=range]{ width:100%; accent-color:#3a7; height:26px; }
   input[type=checkbox]{ width:18px; height:18px; accent-color:#3a7; }
   select,input[type=number]{ background:#0b0e12; color:var(--ink); border:1px solid var(--edge); border-radius:6px; padding:6px 8px; width:100%; font-size:13px; }
@@ -376,12 +377,12 @@
     <p class="lead">Build a signal, then watch it drive things. Everything you see runs on the same WebGPU engine the After-Effects bridge uses — so a look you dial in here can be reproduced exactly, even copied out as a working AE expression.</p>
 
     <h3>1 · Make a signal</h3>
-    <p><b>Generator</b> has two channels, <b>X</b> and <b>Y</b>. Each is a source (Sine, Square, Saw, Triangle, Pulse, Noise, Random Walk) shaped by <b>Rate, Phase, Amount, Offset, Smooth</b> and a <b>Seed</b> (re-rolls the random sources and shifts the wave). The little <b>“o”</b> next to Amount/Phase oscillates that value slowly.</p>
+    <p><b>Generator</b> has two channels, <b>X</b> and <b>Y</b>. Each is a source (Sine, Square, Saw, Triangle, Pulse, Noise, Random Walk — and for X, an <b>Audio lane</b> loaded from a Tympo export) shaped by <b>Rate, Phase, Amount, Offset, Smooth</b> and a <b>Seed</b> (re-rolls the random sources and shifts the wave). The little <b>“o”</b> next to Amount/Phase oscillates that value slowly.</p>
     <p><b>Channel Y</b> can <b>Sync to X</b> (becomes X) or <b>Invert (mirror X)</b> (becomes 1−X) for clean symmetric figures.</p>
 
     <h3>2 · Shape it</h3>
     <ul>
-      <li><b>Processor</b> (shapes X): gain/bias, saturate, warp, fold, gate, quantize, lag, invert, rectify.</li>
+      <li><b>Processor</b> (shapes X): gain/bias, saturate, warp, fold, gate, quantize, lag, invert, rectify — and a <b>Spring</b> (Hz + damping) that replaces lag with a real overshoot-and-settle bounce.</li>
       <li><b>Window</b>: a feathered region that fades the signal in/out across the scope.</li>
       <li><b>Sidechain</b>: let X modulate Y’s amplitude, rate (FM) or phase.</li>
       <li><b>Distort</b>: a gentle third signal that phase-bends both channels.</li>
@@ -485,7 +486,14 @@
   <div class="panel">
     <h2>Generator</h2>
     <div class="chan x" data-ch="x"><div class="name">Channel X</div>
-      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option></select><output></output></div>
+      <div class="ctl"><label>Source</label><select data-p="src"><option value="1">Sine</option><option value="2">Square</option><option value="3">Saw</option><option value="8">Triangle</option><option value="9">Pulse</option><option value="4">Noise</option><option value="5">Random Walk</option><option value="10">Audio lane (Tympo)</option></select><output></output></div>
+      <div id="laneBox" hidden>
+        <div class="ctl"><label>Lane</label><input type="file" id="laneFile" accept=".json,application/json"><output id="laneInfo">none</output></div>
+        <div class="ctl" id="laneBandRow" hidden><label>Band</label><select id="laneBand"></select><output></output></div>
+        <div class="ctl"><label>Feed</label><select id="laneFeed"><option value="level">level</option><option value="hits">hits</option></select><output></output></div>
+        <div class="ctl"><label>Hit decay</label><input type="range" id="laneDecay" min="0" max="0.4" step="0.01" value="0.08"><output></output></div>
+        <div style="color:#52606b;font-size:11px;margin:-2px 0 6px">Load a Tympo export (.json with sampleRate + level / hits, or a timeline). The lane loops; Offset still applies.</div>
+      </div>
       <div class="ctl"><label>Rate</label><input type="range" data-p="rate" min="0.1" max="8" step="0.1" value="2"><output></output></div>
       <div class="ctl osc-row"><label>Phase</label><button class="osc" data-osc="phase" title="Oscillate this value">o</button><input type="range" data-p="phase" min="0" max="1" step="0.005" value="0"><output></output></div>
       <div class="ctl osc-row"><label>Amount</label><button class="osc" data-osc="amount" title="Oscillate this value">o</button><input type="range" data-p="amount" min="0" max="1.5" step="0.02" value="1"><output></output></div>
@@ -519,6 +527,9 @@
       <div class="ctl"><label>Fold</label><input type="range" data-q="fold" min="0" max="1" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Gate ≥</label><input type="range" data-q="gate" min="0" max="1" step="0.02" value="0"><output></output></div>
       <div class="ctl"><label>Lag</label><input type="range" data-q="lag" min="0" max="0.97" step="0.01" value="0"><output></output></div>
+      <div class="ctl"><label>Spring</label><input type="range" data-q="spring" min="0" max="1" step="0.02" value="0"><output></output></div>
+      <div class="ctl"><label>Spring Hz</label><input type="range" data-q="springHz" min="0.5" max="8" step="0.1" value="2"><output></output></div>
+      <div class="ctl"><label>Damping</label><input type="range" data-q="springDamping" min="0.05" max="1" step="0.01" value="0.3"><output></output></div>
       <div class="row" style="margin-top:6px">
         <label style="color:var(--dim);display:flex;align-items:center;gap:6px"><input type="checkbox" data-qb="invert"> invert</label>
         <label style="color:var(--dim);display:flex;align-items:center;gap:6px"><input type="checkbox" data-qb="rectify"> rectify</label>
@@ -588,9 +599,10 @@
 </div>
 
 <script src="../prototypes/webgpu-lab/signal-core-reference.js"></script>
+<script src="../prototypes/webgpu-lab/tympo-lane.js"></script>
 <script src="cathode-crt.js"></script>
 <script>
-const BUILD = "2026-06-16b";   // bump on deploy → check console / brand tooltip to spot a stale cache
+const BUILD = "2026-09-28a";   // bump on deploy → check console / brand tooltip to spot a stale cache
 console.info("Signal Rack — build " + BUILD);
 try{ const b=document.querySelector(".brand"); if(b) b.title="build "+BUILD; }catch(e){}
 const { Rack, SOURCE, MODE } = SignalCore;
@@ -601,7 +613,7 @@ const state = {
   y:{ src:1, rate:3, phase:0, amount:1, offset:0, smooth:0, seed:1941 },
 };
 const applied = { target:"scale", min:80, max:120 };
-const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, sat:0, invert:false, rectify:false };
+const proc = { gain:1, bias:0, quantize:0, gate:0, lag:0, warp:0, fold:0, sat:0, invert:false, rectify:false, spring:0, springHz:2, springDamping:0.3 };
 const drive = { mode:"x" };   // how Channel X & Y combine to drive the Applied property
 const side = { target:"off", depth:0.5 };
 const link = { sync:false, invert:false };   // Channel Y relationship to X (sync = copy, invert = mirror)
@@ -611,6 +623,10 @@ const z = { shape:1, rate:1, amount:0 };   // third signal — gently distorts X
 const zBuffer = new Float32Array(N).fill(0.5);   // third-signal (distort) per-sample
 const crt = { on:true, pass:null, failed:false };
 const win = { left:0, right:1, featherL:0, featherR:0 };   // feathered region window (drives Channel X)   // Cathode CRT/NTSC WebGPU overlay (default on)
+// Audio lane (Tympo) → Channel X per-sample external input (engine source 10).
+// The lane loops from when it was loaded (t0, on the tool clock).
+const lane = { data:null, bundle:null, file:"", band:"", feed:"level", decay:0.08, t0:0 };
+const laneBuf = new Float32Array(N);
 
 // The processor/sidechain/luma are NOT computed here — they live in the engine
 // (signal_core.wgsl ⇄ signal-core-reference.js). This host only configures and
@@ -620,7 +636,7 @@ const Engine = {
   mode:"cpu", gpuRejected:false, device:null, pipeline:null, bufs:null, bind:null,
   cpuRack(c,dt){ return new Rack({ srcType:+c.src, rate:c.rate, phase:c.phase, amount:c.amount, offset:c.offset||0,
     smooth:c.smooth, seed:c.seed, frameDur:dt, process:c.process||null, mod:c.mod||null,
-    modInput:c.modInput||null, lumaInput:c.lumaInput||null, win:c.win||null, sampleN:N, z:c.z||null, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
+    modInput:c.modInput||null, extInput:c.extInput||null, win:c.win||null, sampleN:N, z:c.z||null, outputs:{A:{mode:MODE.normalized,min:0,max:1}} }); },
   sampleCPU(c,start,dt,out){ const r=this.cpuRack(c,dt); for(let i=0;i<N;i++) out[i]=r.output("A",start+i*dt,i); return out; },
   async tryWebGPU(){ if(!navigator.gpu) return false;
     try{ const a=await navigator.gpu.requestAdapter(); if(!a) return false; this.device=await a.requestDevice();
@@ -631,12 +647,12 @@ const Engine = {
       this.bufs={ param:d.createBuffer({size:44*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),
         z:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         out:d.createBuffer({size:N*16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),
-        luma:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
+        ext:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),   // binding 2: luma / audio lane
         mod:d.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),
         read:d.createBuffer({size:N*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}) };
       this.bind=d.createBindGroup({layout:this.pipeline.getBindGroupLayout(0),entries:[
         {binding:0,resource:{buffer:this.bufs.param}},{binding:1,resource:{buffer:this.bufs.out}},
-        {binding:2,resource:{buffer:this.bufs.luma}},{binding:3,resource:{buffer:this.bufs.mod}},{binding:4,resource:{buffer:this.bufs.z}}]});
+        {binding:2,resource:{buffer:this.bufs.ext}},{binding:3,resource:{buffer:this.bufs.mod}},{binding:4,resource:{buffer:this.bufs.z}}]});
       this.mode="webgpu"; return true;
     }catch(e){ console.warn("WebGPU init failed:",e); return false; } },
   async sampleGPU(c,start,dt,out){ const p=new Float32Array(44), pr=c.process||{}, w=c.win||{}, zc=c.z||{};
@@ -647,9 +663,9 @@ const Engine = {
     p[31]=c.mod?(MODNUM[c.mod.target]||0):0;p[32]=c.mod?c.mod.depth:0;
     p[33]=pr.warp||0;p[34]=pr.fold||0;p[35]=pr.sat||0;
     p[36]=w.left!=null?w.left:0;p[37]=w.right!=null?w.right:1;p[38]=w.featherL||0;p[39]=w.featherR||0;
-    p[40]=zc.depth||0;
+    p[40]=zc.depth||0;p[41]=pr.spring||0;p[42]=pr.springHz!=null?pr.springHz:2;p[43]=pr.springDamping!=null?pr.springDamping:0.3;
     const d=this.device,b=this.bufs; d.queue.writeBuffer(b.param,0,p);
-    if(c.lumaInput) d.queue.writeBuffer(b.luma,0,c.lumaInput);
+    if(c.extInput) d.queue.writeBuffer(b.ext,0,c.extInput);
     if(zc.input) d.queue.writeBuffer(b.z,0,zc.input);
     if(c.modInput)  d.queue.writeBuffer(b.mod,0,c.modInput);
     const e=d.createCommandEncoder(); const pass=e.beginComputePass(); pass.setPipeline(this.pipeline); pass.setBindGroup(0,this.bind);
@@ -676,7 +692,7 @@ const Engine = {
 };
 
 // ---------- UI wiring ----------
-function fmt(p,v){ if(p==="src")return["","Sine","Square","Saw","Noise","Walk","Linked","Luma","Triangle","Pulse"][v]||v; if(p==="seed")return(+v).toFixed(0); if(p==="rate")return(+v).toFixed(1); return(+v).toFixed(2); }
+function fmt(p,v){ if(p==="src")return["","Sine","Square","Saw","Noise","Walk","Linked","Luma","Triangle","Pulse","Audio"][v]||v; if(p==="seed")return(+v).toFixed(0); if(p==="rate")return(+v).toFixed(1); return(+v).toFixed(2); }
 function bindCh(ch){ document.querySelectorAll(`.chan[data-ch="${ch}"] [data-p]`).forEach(el=>{ const p=el.dataset.p,o=el.parentElement.querySelector("output");
   const set=()=>{ state[ch][p]=+el.value; if(o)o.textContent=fmt(p,el.value); if(window._mathReady) updateMath(); }; el.addEventListener("input",set); set(); }); }
 bindCh("x"); bindCh("y");
@@ -708,7 +724,7 @@ const presetList=[
   { name:"Noise Cloud",    x:{src:5,rate:1.2,smooth:0.3},     y:{src:5,rate:1.4,smooth:0.3,seed:412} },
   { name:"Sync Drift",     x:{src:5,rate:0.3,smooth:0.4},     y:{src:5,rate:0.4,smooth:0.4,seed:1972} },
   { name:"Random Walk",    x:{src:5,rate:0.8,smooth:0.2},     y:{src:5,rate:1.0,smooth:0.2,seed:77} },
-  { name:"Needle Bounce",  x:{src:2,rate:1.5},                y:{src:1,rate:1.5,phase:0.25}, proc:{lag:0.7} },
+  { name:"Needle Bounce",  x:{src:9,rate:1},                  y:{src:1,rate:1,phase:0.25}, proc:{gain:0.55,spring:1,springHz:3,springDamping:0.3} },   // trigger kicks a real spring
   { name:"Clock Gate",     x:{src:2,rate:4},                  y:{src:3,rate:2}, proc:{gate:0.5} },
   { name:"Square × Saw",   x:{src:2,rate:2},                  y:{src:3,rate:3,phase:0.1} },
   { name:"Triangle Lissa", x:{src:8,rate:2},                  y:{src:8,rate:3,phase:0.12} },
@@ -728,7 +744,7 @@ const presetList=[
   { name:"Title Pump",  applied:"textPump",   drive:"mult", x:{src:9,rate:2}, y:{src:1,rate:2,phase:0.25}, proc:{sat:0.4} },
 ];
 const X0={src:1,rate:2,phase:0,amount:1,offset:0,smooth:0,seed:1941}, Y0={src:1,rate:3,phase:0,amount:1,offset:0,smooth:0,seed:1941};
-const PROC0={gain:1,bias:0,quantize:0,gate:0,lag:0,warp:0,fold:0,sat:0,invert:false,rectify:false};
+const PROC0={gain:1,bias:0,quantize:0,gate:0,lag:0,warp:0,fold:0,sat:0,invert:false,rectify:false,spring:0,springHz:2,springDamping:0.3};
 function presetRack(base,cfg,pr){ const c=Object.assign({},base,cfg); return new Rack({srcType:+c.src,rate:c.rate,phase:c.phase,amount:c.amount,offset:c.offset,smooth:c.smooth,seed:c.seed,frameDur:1/60,process:pr||null,outputs:{A:{mode:MODE.normalized,min:0,max:1}}}); }
 function renderThumb(cvn,p){ const c=cvn.getContext("2d"), W=cvn.width, H=cvn.height; c.fillStyle="#05070a"; c.fillRect(0,0,W,H);
   const rx=presetRack(X0,p.x,Object.assign({},PROC0,p.proc||{})), ry=presetRack(Y0,p.y,null);
@@ -745,6 +761,7 @@ function reflectInputs(){
   if(document.getElementById("sideDepth")) document.getElementById("sideDepth").value=side.depth;
   if(typeof lfo==="object") for(const ch of ["x","y"]) document.querySelectorAll(`.chan[data-ch="${ch}"] .osc`).forEach(b=>b.classList.toggle("on", !!lfo[ch][b.dataset.osc]));
   if(typeof syncLinkUI==="function") syncLinkUI();
+  if(typeof syncLaneUI==="function") syncLaneUI();
   if(typeof syncAppliedUI==="function") syncAppliedUI();
   if(typeof updateExpr==="function") updateExpr();
   { const yo=document.getElementById("yopac"); if(yo){ yo.value=YOPAC; const o=document.getElementById("yopacv"); if(o)o.textContent=(+YOPAC).toFixed(2); } }
@@ -833,18 +850,19 @@ function combine(a,b){ switch(drive.mode){
   case "diff": return Math.abs(a-b); case "min": return Math.min(a,b); case "max": return Math.max(a,b);
   default: return a; } }
 
-const SRC=["","sine","square","saw","noise","randomWalk","linked","lumaProbe","triangle","pulse"];
+const SRC=["","sine","square","saw","noise","randomWalk","linked","lumaProbe","triangle","pulse","audioLane"];
 function srcName(v){ return SRC[v]||"sine"; }
-const SRCIDX={sine:1,square:2,saw:3,pulse:9,ramp:3,noise:4,randomWalk:5,linked:6,lumaProbe:7,triangle:8,pulseNarrow:9};
+const SRCIDX={sine:1,square:2,saw:3,pulse:9,ramp:3,noise:4,randomWalk:5,linked:6,lumaProbe:7,triangle:8,pulseNarrow:9,audioLane:10};
 function buildFullRecipe(){ return {
   type:"wildconstruct.signalRecipe", name:"Experiment", id:"sg_experiment", version:"0.2", rackType:"generator",
-  source:{ type:srcName(state.x.src), rate:state.x.rate, amount:state.x.amount, phase:state.x.phase, offset:state.x.offset },
-  process:{ smooth:state.x.smooth, gain:proc.gain, bias:proc.bias, quantize:proc.quantize, gate:proc.gate, lag:proc.lag, warp:proc.warp, fold:proc.fold, sat:proc.sat, invert:proc.invert, rectify:proc.rectify, winLeft:win.left, winRight:win.right, winFeatherL:win.featherL, winFeatherR:win.featherR },
+  source:Object.assign({ type:srcName(state.x.src), rate:state.x.rate, amount:state.x.amount, phase:state.x.phase, offset:state.x.offset },
+    +state.x.src===10 ? { lane:{ file:lane.file, band:lane.band, feed:lane.feed, hitDecay:lane.decay } } : {}),
+  process:{ smooth:state.x.smooth, gain:proc.gain, bias:proc.bias, quantize:proc.quantize, gate:proc.gate, lag:proc.lag, warp:proc.warp, fold:proc.fold, sat:proc.sat, invert:proc.invert, rectify:proc.rectify, spring:proc.spring, springHz:proc.springHz, springDamping:proc.springDamping, winLeft:win.left, winRight:win.right, winFeatherL:win.featherL, winFeatherR:win.featherR },
   outputs:{ A:{name:"X",profile:"normalized_0_1",range:[0,1]}, B:{name:"Y",profile:"normalized_0_1",range:[0,1]}, C:{name:"Gate",profile:"gate",range:[0,1]} },
   timebase:{ mode:"compTime", seed:state.x.seed },
   _channelY:{ type:srcName(state.y.src), rate:state.y.rate, amount:state.y.amount, phase:state.y.phase, offset:state.y.offset, smooth:state.y.smooth, seed:state.y.seed },
   visualization:{ mode:MODE_CUR },
-  _tool:{ x:Object.assign({},state.x), y:Object.assign({},state.y), proc:Object.assign({},proc), win:Object.assign({},win), drive:drive.mode, side:{target:side.target,depth:side.depth}, link:Object.assign({},link), fire:fire.thresh, z:Object.assign({},z), lfo:{x:Object.assign({},lfo.x),y:Object.assign({},lfo.y)}, view:MODE_CUR, crt:crt.on, yOpacity:YOPAC, speed:SPEED, applied:{target:applied.target,min:applied.min,max:applied.max} },
+  _tool:{ x:Object.assign({},state.x), y:Object.assign({},state.y), proc:Object.assign({},proc), win:Object.assign({},win), drive:drive.mode, side:{target:side.target,depth:side.depth}, link:Object.assign({},link), fire:fire.thresh, z:Object.assign({},z), lane:{feed:lane.feed,decay:lane.decay,band:lane.band}, lfo:{x:Object.assign({},lfo.x),y:Object.assign({},lfo.y)}, view:MODE_CUR, crt:crt.on, yOpacity:YOPAC, speed:SPEED, applied:{target:applied.target,min:applied.min,max:applied.max} },
   compatibilityTags:["engine:wgsl","tool:signal-lab"] }; }
 function applyToolState(t){
   if(t.x) Object.assign(state.x,t.x); if(t.y) Object.assign(state.y,t.y);
@@ -853,6 +871,7 @@ function applyToolState(t){
   if(t.link) Object.assign(link,t.link);
   if(t.fire!=null) fire.thresh=t.fire;
   if(t.z) Object.assign(z,t.z);
+  if(t.lane) Object.assign(lane,{feed:t.lane.feed||"level",decay:t.lane.decay!=null?t.lane.decay:0.08,band:t.lane.band||""});   // lane data itself must be re-loaded
   if(t.lfo){ if(t.lfo.x)Object.assign(lfo.x,t.lfo.x); if(t.lfo.y)Object.assign(lfo.y,t.lfo.y); }
   if(t.applied){ applied.target=t.applied.target; applied.min=t.applied.min; applied.max=t.applied.max; }
   if(typeof t.crt==="boolean"){ crt.on=t.crt; const c=$("crtToggle"); if(c)c.checked=t.crt; }
@@ -864,7 +883,8 @@ function importRecipe(txt){ let r; try{ r=JSON.parse(txt); }catch(e){ alert("Inv
   if(r._tool){ applyToolState(r._tool); }
   else {
     if(r.source) Object.assign(state.x,{src:SRCIDX[r.source.type]||1, rate:r.source.rate, amount:r.source.amount, phase:r.source.phase, offset:r.source.offset});
-    if(r.process){ const p=r.process; Object.assign(proc,{gain:p.gain!=null?p.gain:1,bias:p.bias||0,quantize:p.quantize||0,gate:p.gate||0,lag:p.lag||0,warp:p.warp||0,fold:p.fold||0,sat:p.sat||0,invert:!!p.invert,rectify:!!p.rectify}); state.x.smooth=p.smooth||0; Object.assign(win,{left:p.winLeft!=null?p.winLeft:0,right:p.winRight!=null?p.winRight:1,featherL:p.winFeatherL||0,featherR:p.winFeatherR||0}); }
+    if(r.source&&r.source.lane){ const L=r.source.lane; Object.assign(lane,{feed:L.feed||"level",decay:L.hitDecay!=null?L.hitDecay:0.08,band:L.band||""}); }
+    if(r.process){ const p=r.process; Object.assign(proc,{gain:p.gain!=null?p.gain:1,bias:p.bias||0,quantize:p.quantize||0,gate:p.gate||0,lag:p.lag||0,warp:p.warp||0,fold:p.fold||0,sat:p.sat||0,invert:!!p.invert,rectify:!!p.rectify,spring:p.spring||0,springHz:p.springHz!=null?p.springHz:2,springDamping:p.springDamping!=null?p.springDamping:0.3}); state.x.smooth=p.smooth||0; Object.assign(win,{left:p.winLeft!=null?p.winLeft:0,right:p.winRight!=null?p.winRight:1,featherL:p.winFeatherL||0,featherR:p.winFeatherR||0}); }
     if(r.timebase&&r.timebase.seed!=null) state.x.seed=r.timebase.seed;
     if(r._channelY){ const y=r._channelY; Object.assign(state.y,{src:SRCIDX[y.type]||1,rate:y.rate,phase:y.phase,offset:y.offset}); if(y.amount!=null)state.y.amount=y.amount; if(y.smooth!=null)state.y.smooth=y.smooth; if(y.seed!=null)state.y.seed=y.seed; }
     if(r.visualization&&r.visualization.mode){ MODE_CUR=r.visualization.mode; [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===MODE_CUR)); $("appliedPanel").classList.toggle("show",MODE_CUR==="applied"); needGraticule=true; }
@@ -944,6 +964,7 @@ updateExpr();
 function num(v){ return (Math.round(v*1000)/1000).toString(); }
 function genMath(cfg){
   if(+cfg.src===7){ const n0=`lumaProbe(media)` + (cfg.offset?` + ${num(cfg.offset)}`:""); return { b:`lumaProbe(media)`, n0:`clamp(${n0}, 0, 1)`, probe:true }; }
+  if(+cfg.src===10){ const b=`lane.${lane.feed}(t)`, n0=b + (cfg.offset?` + ${num(cfg.offset)}`:""); return { b, n0:`clamp(${n0}, 0, 1)`, probe:true }; }
   const sp=((cfg.seed*0.07)%1); const inner = `${num(cfg.rate)}·t` + (cfg.phase ? ` + ${num(cfg.phase)}` : "") + (sp ? ` + ${num(sp)}` : "");
   const sd = cfg.seed ? ` + ${num(0.123*cfg.seed)}` : "";
   let b;
@@ -976,10 +997,11 @@ function procMath(t){
   if(p.rectify) e=`|2·(${e}) − 1|`;
   if(p.quantize>1) e=`round((${e})·${p.quantize-1}) / ${p.quantize-1}`;
   if(p.gate>0) e=`[ (${e}) ≥ ${num(p.gate)} ]`;
-  if(p.lag>0) e=`lag₍${num(p.lag)}₎(${e})`;
+  if(p.spring>0) e=`spring₍${num(p.springHz)} Hz, ζ ${num(p.springDamping)}${p.spring<1?`, ${num(p.spring)} wet`:""}₎(${e})`;   // replaces lag
+  else if(p.lag>0) e=`lag₍${num(p.lag)}₎(${e})`;
   return e;
 }
-function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rectify||p.quantize>1||p.gate>0||p.lag>0||p.warp!==0||p.fold>0||p.sat>0; }
+function anyProc(){ const p=proc; return p.gain!==1||p.bias!==0||p.invert||p.rectify||p.quantize>1||p.gate>0||p.lag>0||p.warp!==0||p.fold>0||p.sat>0||p.spring>0; }
 
 // Build a self-contained, WORKING After Effects expression that reproduces the
 // current Channel X signal -> property. Paste onto a property in AE.
@@ -1024,6 +1046,11 @@ function buildAEExpression(){
   function emitGen(S, c, ampLFO, phLFO, modSpec){
     const sc=+c.src;
     L.push("var rate"+S+"="+aeNum(c.rate)+", off"+S+"="+aeNum(c.offset)+", smooth"+S+"="+aeNum(c.smooth)+", seed"+S+"="+aeNum(c.seed)+";");
+    if(sc===10){   // audio lane: read a 0..1 slider keyed from the lane (history via valueAtTime)
+      L.push("var lane"+S+" = thisComp.layer(\"AUDIO LANE\").effect(\"Slider Control\")(\"Slider\");   // Tympo "+lane.feed+" keyed 0..1 (e.g. baked from the export)");
+      L.push("function srcUni"+S+"(tt){ return clamp(lane"+S+".valueAtTime(tt) + off"+S+", 0, 1); }");
+      emitSmooth(S); return;
+    }
     L.push("var amount"+S+"="+aeNum(c.amount)+(ampLFO?" + 0.45*Math.sin(T*0.8168141)":"")+";   "+(ampLFO?"// amount oscillator":""));
     L.push("var phase"+S+"="+aeNum(c.phase)+(phLFO?" + 0.5*Math.sin(T*0.5026548)":"")+";   "+(phLFO?"// phase oscillator":""));
     L.push("function srcUni"+S+"(tt){ var amt=amount"+S+", ph=phase"+S+";");
@@ -1043,6 +1070,9 @@ function buildAEExpression(){
     else if(sc===9) L.push("  bp=fx<0.2?1:-1;");
     else L.push("  bp=0;");
     L.push("  bp*=amt; return (bp+1)/2 + off"+S+"; }");
+    emitSmooth(S);
+  }
+  function emitSmooth(S){
     L.push("function smoothed"+S+"(tt){ if(smooth"+S+"<=0) return srcUni"+S+"(tt);");
     L.push("  var win=smooth"+S+"*0.5, M=Math.round(Math.max(1,Math.min(24,smooth"+S+"*24))), acc=0;");
     L.push("  for(var i=0;i<M;i++){ var f=(M==1)?0:i/(M-1); acc+=srcUni"+S+"(tt-win*f); } return acc/M; }");
@@ -1061,7 +1091,13 @@ function buildAEExpression(){
   if(p.quantize>1) L.push("  n=Math.round(n*"+(p.quantize-1)+")/"+(p.quantize-1)+";");
   if(p.gate>0) L.push("  n=(n>="+aeNum(p.gate)+")?1:0;");
   L.push("  return n; }");
-  if(p.lag>0){
+  if(p.spring>0){   // replaces lag, same bounded FIR as the engine's springN
+    L.push("// spring: damped 2nd-order bounce (taps to the ~3% envelope, <=64, unit DC gain); may overshoot 0..1");
+    L.push("var zeta=Math.max(0.05,Math.min(1,"+aeNum(p.springDamping)+")), w=2*Math.PI*Math.max(0.01,"+aeNum(p.springHz)+"), wd=w*Math.sqrt(Math.max(1-zeta*zeta,1e-6)), fdT=thisComp.frameDuration*"+aeNum(SPEED)+";");
+    L.push("var span=3.5/(zeta*w), S=Math.max(1,Math.ceil(span/(63*fdT))), hk=S*fdT, K=Math.min(64,Math.ceil(span/hk)+1), ph=T/hk-Math.floor(T/hk), accX=0, wsX=0, g0=0;");
+    L.push("for(var m=0;m<K;m++){ var tau=(m+1)*hk, g1=(m+1<K)?Math.exp(-zeta*w*tau)*Math.sin(wd*tau):0, wm=g0*(1-ph)+g1*ph; accX+=wm*shapedX(T-(ph+m)*hk); wsX+=wm; g0=g1; }");
+    L.push("var nx = "+(p.spring>=1?"accX/wsX":"shapedX(T)*"+aeNum(1-p.spring)+" + (accX/wsX)*"+aeNum(p.spring))+";");
+  } else if(p.lag>0){
     L.push("var lag="+aeNum(p.lag)+", fdT=thisComp.frameDuration*"+aeNum(SPEED)+", K=Math.min(34,Math.round(lag*32)+2), accX=0, wX=1, wsX=0;");
     L.push("for(var k=0;k<K;k++){ accX+=wX*shapedX(T-k*fdT); wsX+=wX; wX*=lag; }");
     L.push("var nx = accX/wsX;");
@@ -1090,7 +1126,8 @@ function buildAEExpression(){
   const drv={ y:"ny", mult:"nx*ny", mix:"(nx+ny)/2", diff:"Math.abs(nx-ny)", min:"Math.min(nx,ny)", max:"Math.max(nx,ny)" }[dm] || "nx";
   L.push("");
   L.push("var n = "+drv+";");
-  L.push("linear(n, 0, 1, "+aeNum(mn)+", "+aeNum(mx)+");");
+  if(p.spring>0) L.push(aeNum(mn)+" + "+aeNum(mx-mn)+"*clamp(n, -1, 2);   // spring headroom: the bounce may pass the range");
+  else L.push("linear(n, 0, 1, "+aeNum(mn)+", "+aeNum(mx)+");");
   return L.join("\n");
 }
 function updateMath(){
@@ -1120,7 +1157,7 @@ function updateMath(){
   html += `<div class="punch">${punch}<span class="cap">${cap}</span></div>`;
   html += `<button id="copyAE" style="margin-top:10px;background:#13251c;color:#9fe;border:1px solid #2b6;border-radius:8px;padding:9px 12px;font-size:12px;cursor:pointer;width:100%">⧉ Copy as After Effects expression</button>`;
   html += `<textarea id="aeOut" readonly style="display:none;width:100%;height:160px;margin-top:8px;background:#0b0e12;color:#bfe;border:1px solid var(--edge);border-radius:8px;font:11px/1.4 ui-monospace,Menlo,monospace;padding:8px"></textarea>`;
-  html += `<div class="legend">t = seconds · frac = fractional part · noise = value noise · clamp(v,0,1) bounds · [P] = 1 if P else 0 · lag = one-pole smoothing</div>`;
+  html += `<div class="legend">t = seconds · frac = fractional part · noise = value noise · clamp(v,0,1) bounds · [P] = 1 if P else 0 · lag = one-pole smoothing · spring = damped 2nd-order bounce (may overshoot 0..1)</div>`;
   document.getElementById("dinner").innerHTML = html;
   const tz=document.getElementById("dteaser"); tz.textContent = punch.length>70 ? punch.slice(0,70)+"…" : punch;
   if(typeof updateExpr==="function") updateExpr();   // keep the Applied AE expression live with every change
@@ -1595,7 +1632,33 @@ function syncLinkUI(){ const y=document.querySelector('.chan[data-ch="y"]'); if(
 $("ySync").onchange=()=>{ link.sync=$("ySync").checked; syncLinkUI(); updateMath(); };
 $("yInvert").onchange=()=>{ link.invert=$("yInvert").checked; syncLinkUI(); updateMath(); };
 
-function cfgX(){ return Object.assign({}, state.x, { amount:oscVal("x","amount",state.x.amount), phase:oscVal("x","phase",state.x.phase), process: proc, win: win, z:{input:zBuffer,depth:z.amount} }); }
+// ---------- audio lane (Tympo export → Channel X external input) ----------
+function syncLaneUI(){ const box=$("laneBox"); if(!box) return; box.hidden=(+state.x.src!==10);
+  $("laneFeed").value=lane.feed; $("laneDecay").value=lane.decay; $("laneDecay").parentElement.querySelector("output").textContent=(+lane.decay).toFixed(2)+"s";
+  const bands=TympoLane.laneNames(lane.bundle), bs=$("laneBand"); $("laneBandRow").hidden=bands.length<2;
+  bs.innerHTML=""; bands.forEach(n=>{ const o=document.createElement("option"); o.value=n; o.textContent=n; bs.appendChild(o); }); bs.value=lane.band;
+  const info=$("laneInfo"); info.textContent=lane.data?lane.data.duration.toFixed(1)+"s":"none";
+  info.title=lane.data?`${lane.file} · ${lane.data.level.length} level / ${lane.data.hits.length} hits`:"no lane loaded"; }
+function pickLane(){ const bands=TympoLane.laneNames(lane.bundle); if(bands.length&&bands.indexOf(lane.band)<0) lane.band=bands[0];
+  lane.data=TympoLane.fromTympo(lane.bundle,{lane:lane.band}); }
+$("laneFile").onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const rd=new FileReader();
+  rd.onload=()=>{ try{ lane.bundle=JSON.parse(rd.result); lane.file=f.name; pickLane(); lane.t0=lfoClock; syncLaneUI(); updateMath(); }
+    catch(err){ alert("Couldn't read that Tympo export: "+err.message); } };
+  rd.readAsText(f); };
+$("laneBand").onchange=()=>{ lane.band=$("laneBand").value; pickLane(); syncLaneUI(); };
+$("laneFeed").onchange=()=>{ lane.feed=$("laneFeed").value; updateMath(); };
+$("laneDecay").oninput=()=>{ lane.decay=+$("laneDecay").value; syncLaneUI(); };
+document.querySelector('.chan[data-ch="x"] [data-p="src"]').addEventListener("input",syncLaneUI); syncLaneUI();
+// render the lane onto this frame's grid (looping from t0); zeros until a file is loaded
+function fillLane(start,dt){ if(!lane.data){ laneBuf.fill(0); return; } const L=lane.data;
+  laneBuf.set(TympoLane.laneToInput(L, lane.feed, start-lane.t0, dt, N, { decay:lane.decay, loop:L.duration>dt?L.duration:0 }));
+  // this grid is finer than a frame, so the spring strides its taps S samples apart:
+  // box-filter the lane over S samples so sharp hits don't alias between taps
+  const S=proc.spring>0?SignalCore.springStride(proc.springHz,proc.springDamping,dt):1;
+  if(S>1){ const src=laneBuf.slice(); let acc=0; for(let i=0;i<N;i++){ acc+=src[i]; if(i>=S) acc-=src[i-S]; laneBuf[i]=acc/Math.min(i+1,S); } } }
+
+function cfgX(){ return Object.assign({}, state.x, { amount:oscVal("x","amount",state.x.amount), phase:oscVal("x","phase",state.x.phase), process: proc, win: win, z:{input:zBuffer,depth:z.amount},
+  extInput: (+state.x.src===10 ? laneBuf : null) }); }
 function cfgY(){
   // Sync/Invert link Channel Y to X. Synced → Y mirrors X's full pipeline
   // (generator + processor + window), so they track even with shaping on.
@@ -1612,6 +1675,7 @@ function frame(){
   for(const ch of ["x","y"]) for(const p of ["amount","phase"]) if(lfo[ch][p]){
     const o=document.querySelector(`.chan[data-ch="${ch}"] [data-p="${p}"]`).parentElement.querySelector("output");
     if(o) o.textContent=fmt(p, oscVal(ch,p,state[ch][p])); }
+  if(+state.x.src===10) fillLane(start,dt);
   if(z.amount>0){ const zr=Engine.cpuRack({src:z.shape,rate:z.rate,phase:0,amount:1,offset:0,smooth:0,seed:7},dt); for(let i=0;i<N;i++) zBuffer[i]=zr.output("A",start+i*dt,i); }
   Engine.sample(cfgX(),start,dt,bufX)
     .then(()=> Engine.sample(cfgY(),start,dt,bufY))
