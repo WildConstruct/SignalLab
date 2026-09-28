@@ -10,11 +10,16 @@
  * plugin) only configure and call it — they never do signal math themselves:
  *
  *     source -> smooth -> process (gain/bias/invert/rectify/quantize/gate)
- *            -> lag -> output profile
+ *            -> lag | spring -> output profile
  *
- * Sidechain (signal-drives-signal) and luma probing enter as PER-SAMPLE input
- * arrays (modInput / lumaInput), mirroring the WGSL storage buffers — so the
- * engine, not the host, applies modulation and luma mapping.
+ * Sidechain (signal-drives-signal), luma probing and audio lanes enter as
+ * PER-SAMPLE input arrays, mirroring the WGSL storage buffers — so the engine,
+ * not the host, applies modulation and input mapping:
+ *     extInput  (binding 2, WGSL `extIn`) the rack's external input: luma for
+ *               lumaProbe (7) or an audio lane for audioLane (10). One source
+ *               per rack, so one buffer. `lumaInput` is accepted as an alias.
+ *     modInput  (binding 3) sidechain modulator · z.input (binding 4) distort
+ * See tympo-lane.js for turning a Tympo lane into extInput.
  *
  * NOTE ON NOISE: the value-noise here matches the WGSL value-noise exactly.
  * -------------------------------------------------------------------------
@@ -32,7 +37,7 @@
   function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
   function linear(t, t0, t1, v0, v1) { if (t <= t0) return v0; if (t >= t1) return v1; return v0 + (v1 - v0) * (t - t0) / (t1 - t0); }
 
-  var SOURCE = { sine:1, pulse:2, ramp:3, noise:4, randomWalk:5, linked:6, lumaProbe:7, triangle:8, pulseNarrow:9 };
+  var SOURCE = { sine:1, pulse:2, ramp:3, noise:4, randomWalk:5, linked:6, lumaProbe:7, triangle:8, pulseNarrow:9, audioLane:10 };
   var MODE   = { normalized:1, signed:2, percentage:3, degrees:4, pixels:5, custom:6, gate:7, trigger:8 };
   var MOD    = { off:0, amp:1, rate:2, phase:3 };
 
@@ -40,7 +45,9 @@
     p = p || {};
     return { gain: p.gain != null ? p.gain : 1, bias: p.bias || 0, quantize: p.quantize || 0,
              gate: p.gate || 0, lag: p.lag || 0, invert: !!p.invert, rectify: !!p.rectify,
-             warp: p.warp || 0, fold: p.fold || 0, sat: p.sat || 0 };
+             warp: p.warp || 0, fold: p.fold || 0, sat: p.sat || 0,
+             spring: p.spring || 0, springHz: p.springHz != null ? p.springHz : 2,
+             springDamping: p.springDamping != null ? p.springDamping : 0.3 };
   }
   function modCode(m) { if (!m || !m.target || m.target === "off") return 0; return MOD[m.target] || (typeof m.target === "number" ? m.target : 0); }
 
@@ -61,7 +68,7 @@
     this.modTarget= modCode(cfg.mod);          // 0 off, 1 amp, 2 rate, 3 phase
     this.modDepth = (cfg.mod && cfg.mod.depth != null) ? cfg.mod.depth : 0;
     this.modInput = cfg.modInput || null;      // per-sample modulator 0..1 (sidechain)
-    this.lumaInput= cfg.lumaInput || null;     // per-sample luma 0..1 (probe)
+    this.extInput = cfg.extInput || cfg.lumaInput || null;   // per-sample external input 0..1 (luma / audio lane)
     var w = cfg.win || {};                     // feathered region window
     this.win = { left: w.left != null ? w.left : 0, right: w.right != null ? w.right : 1, featherL: w.featherL || 0, featherR: w.featherR || 0 };
     this.sampleN = cfg.sampleN || 0;           // total samples (for window position)
@@ -79,9 +86,10 @@
     idx = idx || 0;
     if (this.srcType === SOURCE.linked) { var v = this.inputA ? this.inputA.rack.output(this.inputA.ch, tt) : 0; return clamp(v, 0, 1); }
     if (this.srcType === SOURCE.lumaProbe) {
-      var l = this.lumaInput ? this.lumaInput[idx] : (this.luma ? this.luma(tt) : 0);
+      var l = this.extInput ? this.extInput[idx] : (this.luma ? this.luma(tt) : 0);
       return clamp(l + this.offset, 0, 1);
     }
+    if (this.srcType === SOURCE.audioLane) return clamp((this.extInput ? this.extInput[idx] : 0) + this.offset, 0, 1);
     var rate = this.rate, amount = this.amount, phase = this.phase, fmDev = 0;
     if (this.modTarget && this.modInput) {                 // sidechain modulation
       var m = this.modInput[idx];
@@ -132,8 +140,32 @@
   };
   Rack.prototype.shapedN = function (tt, idx) { return this.pointwise(clamp01(this.smoothed(tt, idx))); };
 
+  // spring: damped 2nd-order low-pass as a bounded FIR (see springN in the WGSL).
+  // g(tau) = e^(-zeta*w*tau)*sin(wd*tau), unit DC gain, taps to the ~3% envelope,
+  // strided S frames apart past 64 frames so springHz stays real-time Hz.
+  Rack.prototype.springN = function (tt, idx) {
+    var p = this.process;
+    idx = idx || 0;
+    var zeta = clamp(p.springDamping, 0.05, 1), w = 6.28318530718 * Math.max(p.springHz, 0.01);
+    var wd = w * Math.sqrt(Math.max(1 - zeta * zeta, 1e-6)), fd = Math.max(this.frameDur, 1e-6);
+    var span = 3.5 / (zeta * w);                                   // e^(-3.5) ~ 3%
+    var S = Math.max(1, Math.ceil(span / (63 * fd))), hk = S * fd;
+    var K = Math.min(64, Math.ceil(span / hk) + 1), acc = 0, wsum = 0;
+    for (var k = 1; k < K; k++) {
+      var tau = k * hk, g = Math.exp(-zeta * w * tau) * Math.sin(wd * tau);
+      var j = idx - k * S; if (j < 0) j = 0;
+      acc += g * this.shapedN(tt - tau, j); wsum += g;
+    }
+    var wet = acc / wsum;
+    if (p.spring >= 1) return wet;
+    return this.shapedN(tt, idx) * (1 - p.spring) + wet * p.spring;   // == WGSL mix(dry, wet, spring)
+  };
+  // output headroom: with the spring on, n may overshoot 0..1 (bounded to -1..2)
+  Rack.prototype.nClamp = function (n) { return this.process.spring > 0 ? clamp(n, -1, 2) : clamp01(n); };
+
   // normalized value after lag (finite geometric EWMA — parallel-safe / matches WGSL)
   Rack.prototype.normN = function (tt, idx) {
+    if (this.process.spring > 0) return this.springN(tt, idx);    // spring replaces lag
     var lag = this.process.lag;
     if (lag <= 0) return this.shapedN(tt, idx);
     idx = idx || 0;
@@ -153,15 +185,33 @@
     return e;
   };
   Rack.prototype.output = function (ch, tt, idx) {
-    var o = this.outputs[ch], n = clamp01(this.normN(tt, idx)) * this.windowEnv(idx);
+    var o = this.outputs[ch], n = this.nClamp(this.normN(tt, idx)) * this.windowEnv(idx);
     if (o.mode === MODE.gate) return n >= 0.5 ? o.max : o.min;
     if (o.mode === MODE.trigger) {
       for (var k = 1; k <= 3; k++) { var a = this.srcUni(tt - k * this.frameDur, idx) >= 0.5, b = this.srcUni(tt - (k - 1) * this.frameDur, idx) >= 0.5; if (b && !a) return o.max; }
       return o.min;
     }
+    if (this.process.spring > 0) return o.min + (o.max - o.min) * this.nClamp(n);   // headroom
     return linear(n, 0, 1, o.min, o.max);
   };
   Rack.prototype.normalized = function (ch, tt, idx) { var o = this.outputs[ch], v = this.output(ch, tt, idx); return o.max === o.min ? 0 : clamp((v - o.min) / (o.max - o.min), 0, 1); };
+
+  // Pack this rack into the flat float[44] uniform (== C++ Compile() and the WGSL
+  // v0..v10 rows) for a dispatch of sampleN samples starting at startTime.
+  Rack.prototype.pack = function (startTime, dt, sampleN) {
+    var P = new Float32Array(44), p = this.process, w = this.win, o = this.outputs;
+    P[0] = this.srcType; P[1] = this.rate; P[2] = this.amount; P[3] = this.phase;
+    P[4] = this.seed; P[5] = this.offset; P[6] = this.smooth;
+    P[7] = this.inputA ? this.inputA.rack.output(this.inputA.ch, startTime) : 0;   // host-resolved scalar
+    P[8] = startTime; P[9] = dt; P[10] = this.frameDur; P[11] = sampleN;
+    [o.A, o.B, o.C].forEach(function (c, i) { P[12 + i * 4] = c.mode; P[13 + i * 4] = c.min; P[14 + i * 4] = c.max; });
+    P[24] = p.gain; P[25] = p.bias; P[26] = p.quantize; P[27] = p.gate;
+    P[28] = p.lag; P[29] = p.invert ? 1 : 0; P[30] = p.rectify ? 1 : 0; P[31] = this.modTarget;
+    P[32] = this.modDepth; P[33] = p.warp; P[34] = p.fold; P[35] = p.sat;
+    P[36] = w.left; P[37] = w.right; P[38] = w.featherL; P[39] = w.featherR;
+    P[40] = this.zDepth; P[41] = p.spring; P[42] = p.springHz; P[43] = p.springDamping;
+    return P;
+  };
 
   return { Rack: Rack, SOURCE: SOURCE, MODE: MODE, MOD: MOD, _util: { valueNoise: valueNoise, clamp: clamp, clamp01: clamp01, linear: linear } };
 });

@@ -4,15 +4,20 @@
 //
 //  The same per-sample pipeline the AE plugin runs via Dawn:
 //     source -> smooth -> process (gain/bias/warp/fold/invert/rectify/quantize/
-//               gate) -> lag -> output profile  ->  interpreted scalars (n,A,B,C)
-//  Sidechain + luma enter as per-sample input buffers (modIn / lumaIn).
+//               gate) -> lag | spring -> output profile
+//               ->  interpreted scalars (n,A,B,C)
+//  Per-sample inputs enter as storage buffers:
+//     binding 2  extIn  the rack's EXTERNAL INPUT — luma for LumaProbe (7) or an
+//                       audio lane for AudioLane (10). A rack has one source, so
+//                       one buffer serves both (formerly `lumaIn`).
+//     binding 3  modIn  sidechain modulator      binding 4  zIn  distort signal
 //
 //  UNIFORM LAYOUT NOTE: params are packed as vec4<f32> rows (NOT a struct of
 //  bare scalars). This matches the Wild Construct convention (cf. Cathode's
 //  vec-padded uniform blocks) and is required for correct reads on WebKit/Metal
-//  (Safari/iOS) — a struct of 36 scalars there read back as zero. The byte
-//  layout is identical to the host's flat float[36] (CompiledSignalConfig), so
-//  the JS packer and C++ Compile() are unchanged.
+//  (Safari/iOS) — a struct of bare scalars there read back as zero. The byte
+//  layout is identical to the host's flat float[44] (CompiledSignalConfig), so
+//  the JS packer and C++ Compile() index the same floats.
 // =============================================================================
 
 // Row map (each vec4 = 4 consecutive host floats):
@@ -24,9 +29,9 @@
 //  v5: modeC    minC     maxC     padC
 //  v6: pGain    pBias    pQuant   pGate
 //  v7: pLag     pInvert  pRectify modTarget
-//  v8: modDepth pWarp    pFold    pad2
+//  v8: modDepth pWarp    pFold    pSat
 //  v9: winLeft   winRight winFeatherL winFeatherR   (feathered region window)
-//  v10: zDepth   _        _           _             (third-signal distort depth)
+//  v10: zDepth   spring   springHz    springDamp    (distort depth; spring stage)
 struct SignalParams {
     v0 : vec4<f32>, v1 : vec4<f32>, v2 : vec4<f32>,
     v3 : vec4<f32>, v4 : vec4<f32>, v5 : vec4<f32>,
@@ -36,7 +41,7 @@ struct SignalParams {
 
 @group(0) @binding(0) var<uniform>             P      : SignalParams;
 @group(0) @binding(1) var<storage, read_write> outBuf : array<vec4<f32>>;
-@group(0) @binding(2) var<storage, read>       lumaIn : array<f32>;
+@group(0) @binding(2) var<storage, read>       extIn  : array<f32>;   // external input (luma / audio lane)
 @group(0) @binding(3) var<storage, read>       modIn  : array<f32>;
 @group(0) @binding(4) var<storage, read>       zIn    : array<f32>;   // third signal (distorts X & Y)
 
@@ -70,6 +75,9 @@ fn pWinR()    -> f32 { return P.v9.y; }
 fn pWinFL()   -> f32 { return P.v9.z; }
 fn pWinFR()   -> f32 { return P.v9.w; }
 fn pZDepth()  -> f32 { return P.v10.x; }
+fn pSpring()  -> f32 { return P.v10.y; }   // 0 = off (lag path), else wet amount 0..1
+fn pSpringHz()-> f32 { return P.v10.z; }
+fn pSpringDamp()->f32 { return P.v10.w; }  // damping ratio zeta
 
 // feathered region window: 0 outside [winL,winR], smooth ramps over each feather
 fn windowEnv(pos : f32) -> f32 {
@@ -92,7 +100,8 @@ fn vnoise(x : f32) -> f32 { let i = floor(x); let f = x - i; let a = hash1(i); l
 fn srcUni(tt : f32, idx : u32) -> f32 {
     let st = pSrc();
     if (st >= 5.5 && st < 6.5) { return clamp(pInputA(), 0.0, 1.0); }       // 6 Linked
-    if (st >= 6.5 && st < 7.5) { return clamp(lumaIn[idx] + pOffset(), 0.0, 1.0); } // 7 Luma probe
+    if (st >= 6.5 && st < 7.5) { return clamp(extIn[idx] + pOffset(), 0.0, 1.0); }  // 7 Luma probe
+    if (st >= 9.5 && st < 10.5) { return clamp(extIn[idx] + pOffset(), 0.0, 1.0); } // 10 Audio lane
 
     var rate = pRate(); var amount = pAmount(); var phase = pPhase(); var fmDev = 0.0;
     if (pModTgt() > 0.5) {                                                  // sidechain modulation
@@ -162,7 +171,43 @@ fn pointwise(n0 : f32) -> f32 {
 }
 fn shapedN(tt : f32, idx : u32) -> f32 { return pointwise(clamp(smoothed(tt, idx), 0.0, 1.0)); }
 
+// Spring: a damped 2nd-order low-pass as a bounded FIR over past frames. The
+// weights are its impulse response g(tau) = e^(-zeta*w*tau) * sin(wd*tau)
+// (g(0) = 0, so taps start at k = 1), normalised to unit DC gain, with K taps
+// covering the envelope down to ~3%. A step overshoots by ~e^(-zeta*pi/sqrt(1-zeta^2))
+// and settles. Past 64 frames the taps are strided S frames apart (keeps K <= 64
+// and makes springHz real-time Hz whatever the frame/sample spacing).
+fn springN(tt : f32, idx : u32) -> f32 {
+    let zeta = clamp(pSpringDamp(), 0.05, 1.0);
+    let w    = 6.28318530718 * max(pSpringHz(), 0.01);
+    let wd   = w * sqrt(max(1.0 - zeta * zeta, 1e-6));
+    let fd   = max(pFrameDur(), 1e-6);
+    let span = 3.5 / (zeta * w);                                    // e^(-3.5) ~ 3%
+    let S    = max(1, i32(ceil(span / (63.0 * fd))));
+    let hk   = f32(S) * fd;
+    let K    = min(64, i32(ceil(span / hk)) + 1);
+    var acc : f32 = 0.0; var wsum : f32 = 0.0;
+    for (var k : i32 = 1; k < K; k = k + 1) {
+        let tau = f32(k) * hk;
+        let g = exp(-zeta * w * tau) * sin(wd * tau);
+        var j : i32 = i32(idx) - k * S; if (j < 0) { j = 0; }
+        acc = acc + g * shapedN(tt - tau, u32(j));
+        wsum = wsum + g;
+    }
+    let wet = acc / wsum;
+    if (pSpring() >= 1.0) { return wet; }
+    return mix(shapedN(tt, idx), wet, pSpring());                   // wet/dry amount
+}
+
+// Output headroom: with the spring on, n may overshoot 0..1 (bounded to -1..2)
+// so the bounce reaches the outputs instead of clipping at the range ends.
+fn nClamp(n : f32) -> f32 {
+    if (pSpring() > 0.0) { return clamp(n, -1.0, 2.0); }
+    return clamp(n, 0.0, 1.0);
+}
+
 fn normN(tt : f32, idx : u32) -> f32 {
+    if (pSpring() > 0.0) { return springN(tt, idx); }                // spring replaces lag
     let lag = pLag();
     if (lag <= 0.0) { return shapedN(tt, idx); }
     let K = i32(min(34.0, round(lag * 32.0) + 2.0));
@@ -186,7 +231,7 @@ fn mapOut(n : f32, tt : f32, idx : u32, mode : f32, mn : f32, mx : f32) -> f32 {
         }
         return select(mn, mx, fired);
     }
-    return mn + (mx - mn) * clamp(n, 0.0, 1.0);
+    return mn + (mx - mn) * nClamp(n);
 }
 
 @compute @workgroup_size(64)
@@ -195,7 +240,7 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
     if (idx >= u32(pSampleN())) { return; }
     let tt = pStart() + f32(idx) * pDt();
     let pos = select(f32(idx) / max(pSampleN() - 1.0, 1.0), 0.0, pSampleN() <= 1.0);
-    let n  = clamp(normN(tt, idx), 0.0, 1.0) * windowEnv(pos);
+    let n  = nClamp(normN(tt, idx)) * windowEnv(pos);
     let A  = mapOut(n, tt, idx, P.v3.x, P.v3.y, P.v3.z);
     let B  = mapOut(n, tt, idx, P.v4.x, P.v4.y, P.v4.z);
     let C  = mapOut(n, tt, idx, P.v5.x, P.v5.y, P.v5.z);
