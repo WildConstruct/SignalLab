@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Signal Rack — GPU Parity</title>
+<style>
+  :root { --bg:#0d0f12; --ink:#cfe; --dim:#7a8794; --ok:#2bd47a; --bad:#f36; }
+  body { background:var(--bg); color:var(--ink); font:13px/1.4 ui-monospace,Menlo,monospace; margin:0; padding:18px; }
+  h1 { font:600 16px/1.2 -apple-system,Segoe UI,Roboto,sans-serif; margin:0 0 4px; } .sub{ color:var(--dim); margin:0 0 14px; }
+  table { border-collapse:collapse; } td, th { padding:3px 10px; text-align:left; border-bottom:1px solid #20242b; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+</style>
+</head>
+<body>
+  <h1>Signal Rack — WGSL vs CPU reference parity</h1>
+  <p class="sub">Dispatches <code>shaders/signal_core.wgsl</code> and compares every sample (n, A, B, C) with
+  <code>signal-core-reference.js</code>. Serve the repo root over http and open this page in a WebGPU browser,
+  or run <code>node prototypes/webgpu-lab/gpu-parity-run.js</code> (headless Chromium via Playwright, SwiftShader).</p>
+  <table id="tbl"><tr><th>config</th><th>max |Δ| n/A/B</th><th>gate flips</th><th></th></tr></table>
+  <p id="sum"></p>
+
+<script src="signal-core-reference.js"></script>
+<script src="tympo-lane.js"></script>
+<script type="module">
+const { Rack, SOURCE, MODE } = SignalCore;
+const N = 512, TOL = 2e-3;   // f32 + WGSL transcendental precision (sin: 2^-11 abs in [-pi,pi])
+
+// lanes shared by the audio configs: a synthetic Tympo-shaped bundle
+const lane = TympoLane.fromTympo({ sampleRate: 48000,
+  level: Array.from({ length: 1200 }, (_, i) => ({ time: i * 240, value: 0.5 + 0.45 * Math.sin(i * 0.07) * Math.sin(i * 0.011) })),
+  hits: [0.3, 0.8, 1.05, 1.9, 2.6, 3.1].map((s, i) => ({ time: s * 48000, strength: [1, 0.6, 0.9, 0.75, 1, 0.5][i], type: "hit" })) });
+const wob = new Float32Array(N).map((_, i) => 0.5 + 0.5 * Math.sin(i * 0.05));
+const outs = { A: { mode: MODE.normalized, min: 0, max: 1 }, B: { mode: MODE.percentage, min: 100, max: 118 }, C: { mode: MODE.gate, min: 0, max: 1 } };
+const fine = 3 / 1024;       // the web tool's grid (dt == frameDur, strided spring taps)
+
+const CONFIGS = [
+  ["sine", 1 / 60, { srcType: SOURCE.sine, rate: 2, seed: 3 }],
+  ["sine+smooth+shape+lag", 1 / 60, { srcType: SOURCE.sine, rate: 2, seed: 41, smooth: 0.3, process: { gain: 1.3, bias: 0.05, sat: 0.4, warp: 0.3, lag: 0.6 } }],
+  ["triangle+sidechain+window+distort", 1 / 60, { srcType: SOURCE.triangle, rate: 1, seed: 9, mod: { target: "amp", depth: 0.7 }, modInput: wob,
+      z: { input: wob, depth: 0.3 }, win: { left: 0.1, right: 0.9, featherL: 0.1, featherR: 0.2 } }],
+  ["lumaProbe (extIn)", 1 / 60, { srcType: SOURCE.lumaProbe, offset: 0.05, extInput: wob }],
+  ["audioLane level", 1 / 60, { srcType: SOURCE.audioLane, offset: -0.1, lane: "level" }],
+  ["audioLane hits + spring (needle)", 1 / 60, { srcType: SOURCE.audioLane, lane: "hits", decay: 0.06, process: { spring: 1, springHz: 3, springDamping: 0.25 } }],
+  ["audioLane hits + spring, tool grid", fine, { srcType: SOURCE.audioLane, lane: "hits", decay: 0.08, process: { spring: 1, springHz: 2, springDamping: 0.3 } }],
+  ["square + spring 0.6 mix, tool grid", fine, { srcType: SOURCE.pulse, rate: 0.8, process: { spring: 0.6, springHz: 2.5, springDamping: 0.2, gain: 0.8 } }],
+  ["saw + spring zeta 1", 1 / 60, { srcType: SOURCE.ramp, rate: 0.5, process: { spring: 1, springHz: 4, springDamping: 1 } }],
+  // Known, pre-existing divergences (reported, not counted):
+  ["noise", 1 / 60, { srcType: SOURCE.noise, rate: 2, seed: 41 }, "value-noise hash fract(sin(n)*43758) amplifies f32 sin error"],
+  ["smooth 0.07", 1 / 60, { srcType: SOURCE.sine, rate: 2, smooth: 0.07 }, "smooth taps: CPU Math.round(sm*24), WGSL i32() truncates"],
+];
+
+function fail(msg) { document.getElementById("sum").innerHTML = `<b class="bad">${msg}</b>`; window.parityResult = { error: msg }; throw new Error(msg); }
+if (!navigator.gpu) fail("No WebGPU (navigator.gpu) in this browser.");
+const adapter = await navigator.gpu.requestAdapter(); if (!adapter) fail("No WebGPU adapter.");
+const device = await adapter.requestDevice();
+const module = device.createShaderModule({ code: await (await fetch("../../shaders/signal_core.wgsl")).text() });
+const info = await module.getCompilationInfo(); const errs = info.messages.filter(m => m.type === "error");
+if (errs.length) fail("WGSL compile error: " + errs.map(m => `${m.lineNum}:${m.linePos} ${m.message}`).join("; "));
+const pipeline = device.createComputePipeline({ layout: "auto", compute: { module, entryPoint: "main" } });
+const buf = (size, usage) => device.createBuffer({ size, usage });
+const S = GPUBufferUsage;
+const B = { param: buf(44 * 4, S.UNIFORM | S.COPY_DST), out: buf(N * 16, S.STORAGE | S.COPY_SRC), ext: buf(N * 4, S.STORAGE | S.COPY_DST),
+            mod: buf(N * 4, S.STORAGE | S.COPY_DST), z: buf(N * 4, S.STORAGE | S.COPY_DST), read: buf(N * 16, S.COPY_DST | S.MAP_READ) };
+const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: ["param", "out", "ext", "mod", "z"].map((k, i) => ({ binding: i, resource: { buffer: B[k] } })) });
+
+async function runGPU(rack, start, dt) {
+  device.queue.writeBuffer(B.param, 0, rack.pack(start, dt, N));
+  device.queue.writeBuffer(B.ext, 0, rack.extInput || new Float32Array(N));
+  device.queue.writeBuffer(B.mod, 0, rack.modInput || new Float32Array(N));
+  device.queue.writeBuffer(B.z, 0, rack.zInput || new Float32Array(N));
+  const enc = device.createCommandEncoder(), pass = enc.beginComputePass();
+  pass.setPipeline(pipeline); pass.setBindGroup(0, bind); pass.dispatchWorkgroups(Math.ceil(N / 64)); pass.end();
+  enc.copyBufferToBuffer(B.out, 0, B.read, 0, N * 16); device.queue.submit([enc.finish()]);
+  await B.read.mapAsync(GPUMapMode.READ); const r = new Float32Array(B.read.getMappedRange().slice(0)); B.read.unmap(); return r;
+}
+
+const results = []; let allOk = true;
+for (const [name, dt, c, known] of CONFIGS) {
+  const start = 2.0, cfg = Object.assign({ frameDur: dt, sampleN: N, outputs: outs }, c);
+  if (c.lane) cfg.extInput = TympoLane.laneToInput(lane, c.lane, start, dt, N, { decay: c.decay || 0 });
+  const rack = new Rack(cfg), g = await runGPU(rack, start, dt);
+  let dn = 0, dA = 0, dB = 0, flips = 0;
+  for (let i = 0; i < N; i++) {
+    const tt = start + i * dt, n = rack.nClamp(rack.normN(tt, i)) * rack.windowEnv(i);
+    dn = Math.max(dn, Math.abs(g[i * 4] - n));
+    dA = Math.max(dA, Math.abs(g[i * 4 + 1] - rack.output("A", tt, i)));
+    dB = Math.max(dB, Math.abs(g[i * 4 + 2] - rack.output("B", tt, i)) / 18);   // B spans 18 units -> normalise
+    if (g[i * 4 + 3] !== rack.output("C", tt, i) && Math.abs(n - 0.5) > TOL) flips++;   // flips away from the threshold
+  }
+  const ok = Math.max(dn, dA, dB) <= TOL && flips === 0; if (!known) allOk = allOk && ok;
+  results.push({ name, maxN: dn, maxA: dA, maxB: dB, flips, ok, known: known || "" });
+  const tag = known ? (ok ? "ok" : "known") : (ok ? "ok" : "FAIL");
+  document.getElementById("tbl").insertAdjacentHTML("beforeend",
+    `<tr><td>${name}</td><td>${dn.toExponential(2)} / ${dA.toExponential(2)} / ${dB.toExponential(2)}</td><td>${flips}</td><td class="${ok || known ? "ok" : "bad"}">${tag}${known ? " — " + known : ""}</td></tr>`);
+}
+const ai = adapter.info || {};
+const counted = results.filter(r => !r.known);
+document.getElementById("sum").innerHTML = `<b class="${allOk ? "ok" : "bad"}">${counted.filter(r => r.ok).length}/${counted.length} configs within ${TOL}</b> · adapter ${ai.vendor || "?"} ${ai.architecture || ""}`;
+window.parityResult = { ok: allOk, tol: TOL, adapter: ai.vendor + " " + ai.architecture, results };
+</script>
+</body>
+</html>
