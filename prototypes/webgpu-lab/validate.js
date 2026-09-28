@@ -213,6 +213,7 @@ ok("Spring overshoot reaches the outputs (headroom past the range)", spPct.peak 
 var sq = new Rack({ srcType: SOURCE.pulse, rate: 0.5, frameDur: 1 / 60, process: { spring: 1, springHz: 3, springDamping: 0.3 }, outputs: NORM });
 var sqHi = -9, sqLo = 9; for (var i = 0; i < 240; i++) { var v = sq.output("A", 10 + i / 60, i); sqHi = Math.max(sqHi, v); sqLo = Math.min(sqLo, v); }
 ok("Spring on a generator step bounces both ways", sqHi > 1.3 && sqLo < -0.3);
+ok("springStride: 1 at 60 fps, strided on a fine grid", SC.springStride(2, 0.3, 1 / 60) === 1 && SC.springStride(2, 0.3, 1 / 600) === 9);
 var pk = new Rack({ process: { spring: 0.7, springHz: 2.5, springDamping: 0.2 } }).pack(0, 1 / 60, 8);
 ok("pack() puts spring in v10.yzw (floats 41..43)", pk.length === 44 && approx(pk[41], 0.7, 1e-7) && approx(pk[42], 2.5, 1e-7) && approx(pk[43], 0.2, 1e-7));
 
