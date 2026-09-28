@@ -4,6 +4,8 @@
  * Tympo publishes band-passed audio lanes as
  *     level : [{ time: samplePosition, value: 0..1 }]            (e.g. 200 Hz cadence)
  *     hits  : [{ time: samplePosition, strength: 0..1, type: "hit" }]
+ *     motion: [{ time: samplePosition, value }]   (Tympo C2's move stage, when on;
+ *             decayPulse / smooth are 0..1, a spring swings -1..1)
  * with `time` in samples at the lane's sampleRate (usually 48000).
  *
  * The engine's audioLane source (10) reads a per-sample external input buffer
@@ -19,7 +21,9 @@
  *         at/after the hit.
  *     fromTympo(bundle [, {lane}])   normalise an export (see below)
  *     laneNames(bundle)              lane names of a multi-lane bundle ([] if single)
- *     laneToInput(lane, "level"|"hits", startTime, dt, N [, opts])
+ *     laneToInput(lane, "level"|"hits"|"motion"|"motionCentred", startTime, dt, N [, opts])
+ *         "motionCentred" maps motion m to 0.5 + 0.5*m, so a spring's swing
+ *         below rest survives the source's 0..1 clamp (rest reads 0.5).
  *
  * `loop` (seconds, 0 = off) wraps lane time so a preview can cycle a track.
  * Deterministic, no dependencies; the result is a Float32Array of length N.
@@ -103,28 +107,36 @@
       name = names[k];
     }
     src = src || {};
-    var sr = src.sampleRate || obj.sampleRate || DEFAULT_RATE, level = [], hits = [];
+    var sr = src.sampleRate || obj.sampleRate || DEFAULT_RATE, level = [], hits = [], motion = [];
     if (Array.isArray(src.timeline)) {                             // seconds-based timeline
       src.timeline.forEach(function (e) {
         var t = e.time * sr;
         if (e.level != null) level.push({ time: t, value: +e.level });
+        if (e.motion != null) motion.push({ time: t, value: +e.motion });
         if (e.hit) hits.push({ time: t, strength: e.strength != null ? +e.strength : 1, type: "hit" });
       });
     }
     (src.level || []).forEach(function (e) { level.push({ time: +e.time, value: +e.value }); });
+    (src.motion || []).forEach(function (e) { motion.push({ time: +e.time, value: +e.value }); });
     (src.hits || []).forEach(function (e) {
       if (e.type && e.type !== "hit") return;
       hits.push({ time: +e.time, strength: e.strength != null ? +e.strength : 1, type: "hit" });
     });
-    level.sort(byTime); hits.sort(byTime);
-    var end = Math.max(level.length ? level[level.length - 1].time : 0, hits.length ? hits[hits.length - 1].time : 0);
-    return { name: name, sampleRate: sr, level: level, hits: hits, duration: end / sr };
+    level.sort(byTime); hits.sort(byTime); motion.sort(byTime);
+    var end = Math.max(level.length ? level[level.length - 1].time : 0, hits.length ? hits[hits.length - 1].time : 0,
+      motion.length ? motion[motion.length - 1].time : 0);
+    return { name: name, sampleRate: sr, level: level, hits: hits, motion: motion, duration: end / sr };
   }
 
-  // one call for hosts: feed "hits" or "level" of a normalised lane
+  // one call for hosts: feed "level", "hits", "motion" or "motionCentred" of a normalised lane
   function laneToInput(lane, feed, startTime, dt, N, opts) {
-    return feed === "hits" ? hitsToInput(lane.hits, lane.sampleRate, startTime, dt, N, opts)
-                           : levelToInput(lane.level, lane.sampleRate, startTime, dt, N, opts);
+    if (feed === "hits") return hitsToInput(lane.hits, lane.sampleRate, startTime, dt, N, opts);
+    if (feed === "motion" || feed === "motionCentred") {
+      var out = levelToInput(lane.motion, lane.sampleRate, startTime, dt, N, opts);
+      if (feed === "motionCentred") for (var i = 0; i < N; i++) out[i] = 0.5 + 0.5 * out[i];
+      return out;
+    }
+    return levelToInput(lane.level, lane.sampleRate, startTime, dt, N, opts);
   }
 
   return { levelToInput: levelToInput, hitsToInput: hitsToInput, fromTympo: fromTympo, laneToInput: laneToInput, laneNames: laneNames };

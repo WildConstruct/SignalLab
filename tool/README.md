@@ -27,9 +27,11 @@ and shifts the wave.
 
 - **Audio lane (Tympo)** — Channel X can instead read a real audio-analysis
   lane: choose it as the Source and load a Tympo export (`.json` with
-  `sampleRate` + `level` / `hits`, a multi-lane bundle, or a `timeline`). Pick the
-  **Band**, **Feed** (`level` = continuous envelope, `hits` = decaying kicks) and
-  **Hit decay**. The lane loops from when it was loaded; the processor, window
+  `sampleRate` + `level` / `hits` / `motion`, a multi-lane bundle, or a
+  `timeline`). Pick the **Band**, **Feed** (`level` = continuous envelope,
+  `hits` = decaying kicks, `motion` = Tympo C2's move stage — a decay pulse,
+  smoothed level or spring per hit, with its echoes — and `motion, centred`,
+  which maps a spring's swing to 0..1 around 0.5) and **Hit decay**. The lane loops from when it was loaded; the processor, window
   and spring all apply. Rendering lives in `prototypes/webgpu-lab/tympo-lane.js`.
 
 - **Oscillators** — the small **“o”** beside Amount/Phase slowly oscillates that
