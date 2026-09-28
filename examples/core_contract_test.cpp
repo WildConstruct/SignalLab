@@ -19,6 +19,8 @@ int main(){
   r.process.modTarget=1; r.process.modDepth=0.8f; r.process.warp=-0.5f; r.process.fold=0.7f; r.process.sat=0.55f;
   r.process.winLeft=0.2f; r.process.winRight=0.85f; r.process.winFeatherL=0.1f; r.process.winFeatherR=0.0f;
   r.process.zDepth=0.3f;
+  assert(Compile(r, 0.0f, 1.0f/30, 1.0f/30, 30, 0.0f).params[CompiledSignalConfig::PSpring]==0.0f);  // spring off by default
+  r.process.spring=1.0f; r.process.springHz=3.0f; r.process.springDamping=0.25f;
   auto c = Compile(r, 0.0f, 1.0f/30, 1.0f/30, 30, 0.0f);
   assert(c.byteSize()==176);
   assert(c.params[CompiledSignalConfig::SrcType]==2.0f);     // Pulse
@@ -39,6 +41,17 @@ int main(){
   assert(c.params[CompiledSignalConfig::WinRight]==0.85f);
   assert(c.params[CompiledSignalConfig::WinFeatherL]==0.1f);
   assert(c.params[CompiledSignalConfig::ZDepth]==0.3f);
+  assert(CompiledSignalConfig::PSpring==41 && CompiledSignalConfig::PSpringDamp==43);  // v10.y/z/w
+  assert(c.params[CompiledSignalConfig::PSpring]==1.0f);
+  assert(c.params[CompiledSignalConfig::PSpringHz]==3.0f);
+  assert(c.params[CompiledSignalConfig::PSpringDamp]==0.25f);
+
+  // AudioLane source (10): external per-sample input, offset rides along
+  SignalRecipe a; a.id="sg_audio_lane"; a.source.type=SourceType::AudioLane; a.source.offset=-0.1f;
+  auto ca = Compile(a, 0.0f, 1.0f/60, 1.0f/60, 64, 0.0f);
+  assert(ca.params[CompiledSignalConfig::SrcType]==10.0f);
+  assert(ca.params[CompiledSignalConfig::Offset]==-0.1f);
+  assert(SuggestName(a)=="SR \xc2\xb7 Audio [sg_audio_lane]");
 
   // AE param snapshot -> recipe
   ae::ParamSnapshot s; s.sourceType=2; s.rate=2.0f; s.outAMode=3; s.outAMax=110;

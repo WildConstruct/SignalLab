@@ -26,6 +26,7 @@ inline const char* SourceWord(SourceType t) {
         case SourceType::RandomWalk: return "Walk";
         case SourceType::Linked:     return "Linked";
         case SourceType::LumaProbe:  return "Luma";
+        case SourceType::AudioLane:  return "Audio";
     }
     return "Signal";
 }

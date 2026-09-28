@@ -24,9 +24,12 @@ bool RenderSignalWithDawn(const SignalRenderRequest& request,
         if (message) *message = "out must not be null";
         return false;
     }
-    if (request.recipe.source.type == SourceType::LumaProbe &&
-        request.lumaSamples == nullptr) {
-        if (message) *message = "LumaProbe source requires host-supplied lumaSamples";
+    // Binding 2 is the rack's external input: luma (LumaProbe) or an audio
+    // lane (AudioLane). `lumaSamples` is the deprecated name for it.
+    const float* input = request.inputSamples ? request.inputSamples : request.lumaSamples;
+    const SourceType src = request.recipe.source.type;
+    if ((src == SourceType::LumaProbe || src == SourceType::AudioLane) && input == nullptr) {
+        if (message) *message = "LumaProbe/AudioLane source requires host-supplied inputSamples";
         return false;
     }
 
@@ -42,7 +45,7 @@ bool RenderSignalWithDawn(const SignalRenderRequest& request,
                 request.frameDuration, request.sampleCount, request.resolvedInputA);
 
     return runtime.Evaluate(device, cfg, request.sampleCount,
-                            request.lumaSamples, request.modSamples, request.zSamples,
+                            input, request.modSamples, request.zSamples,
                             request.startTime, request.dt,
                             out, message);
 }

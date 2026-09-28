@@ -30,6 +30,8 @@ enum class SourceType : std::uint32_t {
     RandomWalk = 5,
     Linked     = 6,   // Input A (sidechain), resolved to a scalar by the host
     LumaProbe  = 7,   // host samples a layer and supplies per-sample luma
+    // 8 Triangle / 9 Pulse (narrow) exist in the engine; not exposed here yet.
+    AudioLane  = 10,  // host renders an audio lane (Tympo) into per-sample input
 };
 
 // Output profile == "interpreted scalar output" class. The mode selects how a
@@ -66,6 +68,12 @@ struct SourceParams {
     std::string sourceLayer;           // AE layer name / id for LumaProbe
     std::array<float, 2> probePoint{ 0.0f, 0.0f };
     float probeRadius = 0.5f;          // 0.5 = 1x1, 2.5 = 5x5
+    // audio-lane-only: which Tympo lane the host renders into the request's
+    // inputSamples (see prototypes/webgpu-lab/tympo-lane.js):
+    std::string laneFile;              // Tympo export / bundle reference
+    std::string laneBand;              // lane name within a multi-lane bundle
+    bool  laneHits     = false;        // false = continuous level, true = hits
+    float laneHitDecay = 0.0f;         // s; hit -> strength*e^(-t/decay), 0 = one frame
 };
 
 struct ProcessParams {
@@ -79,6 +87,10 @@ struct ProcessParams {
     float warp      = 0.0f;           // -1..1 contrast S-curve (0 = identity)
     float fold      = 0.0f;           // 0..1 triangle wavefolder (0 = identity)
     float sat       = 0.0f;           // 0..1 soft saturation (drive + asymmetric warmth)
+    // spring (damped 2nd-order low-pass as a bounded FIR; replaces lag when on):
+    float spring        = 0.0f;       // 0 = off, else wet amount 0..1
+    float springHz      = 2.0f;       // natural frequency, Hz
+    float springDamping = 0.3f;       // damping ratio zeta (0.05..1; ~1 = no overshoot)
     // feathered region window (position 0..1 across the evaluated span):
     float winLeft     = 0.0f;
     float winRight    = 1.0f;
