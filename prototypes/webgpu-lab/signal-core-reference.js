@@ -145,7 +145,8 @@
 
   // spring: damped 2nd-order low-pass as a bounded FIR (see springN in the WGSL).
   // g(tau) = e^(-zeta*w*tau)*sin(wd*tau), unit DC gain, taps to the ~3% envelope,
-  // strided S frames apart past 64 frames so springHz stays real-time Hz.
+  // strided S frames apart past 64 frames so springHz stays real-time Hz; taps on
+  // an absolute grid, output interpolated between grid points (phase ph).
   Rack.prototype.springN = function (tt, idx) {
     var p = this.process;
     idx = idx || 0;
@@ -153,16 +154,26 @@
     var wd = w * Math.sqrt(Math.max(1 - zeta * zeta, 1e-6)), fd = Math.max(this.frameDur, 1e-6);
     var span = 3.5 / (zeta * w);                                   // e^(-3.5) ~ 3%
     var S = Math.max(1, Math.ceil(span / (63 * fd))), hk = S * fd;
-    var K = Math.min(64, Math.ceil(span / hk) + 1), acc = 0, wsum = 0;
-    for (var k = 1; k < K; k++) {
-      var tau = k * hk, g = Math.exp(-zeta * w * tau) * Math.sin(wd * tau);
-      var j = idx - k * S; if (j < 0) j = 0;
-      acc += g * this.shapedN(tt - tau, j); wsum += g;
+    var K = Math.min(64, Math.ceil(span / hk) + 1), acc = 0, wsum = 0, g0 = 0;   // g(0) = 0
+    var ph = tt / hk - Math.floor(tt / hk), jph = Math.floor(ph * S + 0.5);      // tt within the tap grid
+    for (var m = 0; m < K; m++) {
+      var tau = (m + 1) * hk, g1 = m + 1 < K ? Math.exp(-zeta * w * tau) * Math.sin(wd * tau) : 0;
+      var wm = g0 * (1 - ph) + g1 * ph;                            // == WGSL mix(g0, g1, ph)
+      var j = idx - m * S - jph; if (j < 0) j = 0;
+      acc += wm * this.shapedN(tt - (ph + m) * hk, j); wsum += wm; g0 = g1;
     }
     var wet = acc / wsum;
     if (p.spring >= 1) return wet;
     return this.shapedN(tt, idx) * (1 - p.spring) + wet * p.spring;   // == WGSL mix(dry, wet, spring)
   };
+  // The tap stride S (frames) springN uses for these params. On a grid finer than
+  // the spring needs (S > 1), a host feeding a per-sample input can box-filter it
+  // over S samples so sharp content (hits) doesn't alias between strided taps.
+  function springStride(springHz, springDamping, frameDur) {
+    var zeta = clamp(springDamping, 0.05, 1), w = 6.28318530718 * Math.max(springHz, 0.01);
+    var span = 3.5 / (zeta * w);
+    return Math.max(1, Math.ceil(span / (63 * Math.max(frameDur, 1e-6))));
+  }
   // output headroom: with the spring on, n may overshoot 0..1 (bounded to -1..2)
   Rack.prototype.nClamp = function (n) { return this.process.spring > 0 ? clamp(n, -1, 2) : clamp01(n); };
 
@@ -216,5 +227,5 @@
     return P;
   };
 
-  return { Rack: Rack, SOURCE: SOURCE, MODE: MODE, MOD: MOD, _util: { valueNoise: valueNoise, clamp: clamp, clamp01: clamp01, linear: linear } };
+  return { Rack: Rack, SOURCE: SOURCE, MODE: MODE, MOD: MOD, springStride: springStride, _util: { valueNoise: valueNoise, clamp: clamp, clamp01: clamp01, linear: linear } };
 });

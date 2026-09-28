@@ -173,10 +173,13 @@ fn shapedN(tt : f32, idx : u32) -> f32 { return pointwise(clamp(smoothed(tt, idx
 
 // Spring: a damped 2nd-order low-pass as a bounded FIR over past frames. The
 // weights are its impulse response g(tau) = e^(-zeta*w*tau) * sin(wd*tau)
-// (g(0) = 0, so taps start at k = 1), normalised to unit DC gain, with K taps
-// covering the envelope down to ~3%. A step overshoots by ~e^(-zeta*pi/sqrt(1-zeta^2))
-// and settles. Past 64 frames the taps are strided S frames apart (keeps K <= 64
-// and makes springHz real-time Hz whatever the frame/sample spacing).
+// (g(0) = 0), normalised to unit DC gain, with taps covering the envelope down
+// to ~3%. A step overshoots by ~e^(-zeta*pi/sqrt(1-zeta^2)) and settles. Past 64
+// frames the taps are strided S frames apart (keeps K <= 64 and makes springHz
+// real-time Hz whatever the frame/sample spacing). Taps sit on an absolute time
+// grid (spacing hk) and the output is interpolated between grid points (phase
+// ph, one extra tap), so sub-tap sampling stays smooth instead of stair-stepping;
+// at ph = 0 this is exactly sum_k g(k*hk) * x(tt - k*hk).
 fn springN(tt : f32, idx : u32) -> f32 {
     let zeta = clamp(pSpringDamp(), 0.05, 1.0);
     let w    = 6.28318530718 * max(pSpringHz(), 0.01);
@@ -186,13 +189,16 @@ fn springN(tt : f32, idx : u32) -> f32 {
     let S    = max(1, i32(ceil(span / (63.0 * fd))));
     let hk   = f32(S) * fd;
     let K    = min(64, i32(ceil(span / hk)) + 1);
-    var acc : f32 = 0.0; var wsum : f32 = 0.0;
-    for (var k : i32 = 1; k < K; k = k + 1) {
-        let tau = f32(k) * hk;
-        let g = exp(-zeta * w * tau) * sin(wd * tau);
-        var j : i32 = i32(idx) - k * S; if (j < 0) { j = 0; }
-        acc = acc + g * shapedN(tt - tau, u32(j));
-        wsum = wsum + g;
+    let ph   = fract(tt / hk);                                      // tt within the tap grid
+    let jph  = i32(floor(ph * f32(S) + 0.5));
+    var acc : f32 = 0.0; var wsum : f32 = 0.0; var g0 : f32 = 0.0;  // g(0) = 0
+    for (var m : i32 = 0; m < K; m = m + 1) {
+        let tau = f32(m + 1) * hk;
+        let g1 = select(0.0, exp(-zeta * w * tau) * sin(wd * tau), m + 1 < K);
+        let wm = mix(g0, g1, ph);
+        var j : i32 = i32(idx) - m * S - jph; if (j < 0) { j = 0; }
+        acc = acc + wm * shapedN(tt - (ph + f32(m)) * hk, u32(j));
+        wsum = wsum + wm; g0 = g1;
     }
     let wet = acc / wsum;
     if (pSpring() >= 1.0) { return wet; }
